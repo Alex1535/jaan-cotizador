@@ -41,32 +41,39 @@ def login_screen():
         st.markdown("</div>", unsafe_allow_html=True)
 
         if submit:
-            if supabase:
+            # Primero intentar modo local
+            USUARIOS_LOCALES = {
+                "admin@jaan.com": "jaan2024",
+            }
+            if email in USUARIOS_LOCALES and USUARIOS_LOCALES[email] == password:
+                st.session_state.user        = {"id": "local", "email": email}
+                st.session_state.user_email  = email
+                st.session_state.autenticado = True
+                st.session_state.usuario     = {"email": email, "nombre": "Admin", "rol": "admin"}
+                st.session_state.session     = None
+                st.rerun()
+            elif supabase:
+                # Intentar con Supabase
                 try:
                     res = supabase.auth.sign_in_with_password({
                         "email": email, "password": password
                     })
                     if res.user:
-                        st.session_state.user       = res.user
-                        st.session_state.user_email = res.user.email
-                        st.session_state.session    = res.session
+                        st.session_state.user        = res.user
+                        st.session_state.user_email  = res.user.email
+                        st.session_state.autenticado = True
+                        st.session_state.usuario     = {"email": res.user.email, "nombre": res.user.email, "rol": "vendedor"}
+                        st.session_state.session     = res.session
                         st.rerun()
                     else:
                         st.error("❌ Email o contraseña incorrectos")
                 except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
+                    st.error(f"❌ Error de conexión: {str(e)}")
             else:
-                # Modo local sin Supabase
-                if email == "admin@jaan.com" and password == "jaan2024":
-                    st.session_state.user       = {"id": "local", "email": email}
-                    st.session_state.user_email = email
-                    st.session_state.session    = None
-                    st.rerun()
-                else:
-                    st.error("❌ Email o contraseña incorrectos")
+                st.error("❌ Email o contraseña incorrectos")
 
 # ── Verificar sesión ──────────────────────────────────────────────────────────
-if "user" not in st.session_state:
+if not st.session_state.get("autenticado", False):
     login_screen()
     st.stop()
 

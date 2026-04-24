@@ -53,26 +53,42 @@ def login_screen():
                 st.session_state.session     = None
                 st.rerun()
             else:
-                # Intentar con Supabase
-                sb = get_supabase()
-                if sb:
-                    try:
-                        res = sb.auth.sign_in_with_password({
-                            "email": email, "password": password
-                        })
-                        if res.user:
-                            st.session_state.user        = res.user
-                            st.session_state.user_email  = res.user.email
+                # Intentar con Supabase via requests directo
+                try:
+                    import requests as req
+                    supa_url = st.secrets.get("SUPABASE_URL", "")
+                    supa_key = st.secrets.get("SUPABASE_KEY", "")
+                    if not supa_url or not supa_key:
+                        st.error("❌ Supabase no configurado")
+                    else:
+                        auth_url = f"{supa_url}/auth/v1/token?grant_type=password"
+                        resp = req.post(
+                            auth_url,
+                            headers={
+                                "apikey": supa_key,
+                                "Content-Type": "application/json"
+                            },
+                            json={"email": email, "password": password},
+                            timeout=15
+                        )
+                        data = resp.json()
+                        if resp.status_code == 200 and data.get("access_token"):
+                            user_data = data.get("user", {})
+                            st.session_state.user        = user_data
+                            st.session_state.user_email  = user_data.get("email", email)
                             st.session_state.autenticado = True
-                            st.session_state.usuario     = {"email": res.user.email, "nombre": res.user.email, "rol": "vendedor"}
-                            st.session_state.session     = res.session
+                            st.session_state.usuario     = {
+                                "email": user_data.get("email", email),
+                                "nombre": user_data.get("email", email),
+                                "rol": "vendedor"
+                            }
+                            st.session_state.access_token = data.get("access_token")
                             st.rerun()
                         else:
-                            st.error("❌ Email o contraseña incorrectos")
-                    except Exception as e:
-                        st.error(f"❌ Error de conexión: {str(e)}")
-                else:
-                    st.error("❌ Email o contraseña incorrectos")
+                            msg = data.get("error_description") or data.get("msg") or "Credenciales incorrectas"
+                            st.error(f"❌ {msg}")
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
 
 # ── Verificar sesión ──────────────────────────────────────────────────────────
 if not st.session_state.get("autenticado", False):

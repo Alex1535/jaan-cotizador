@@ -41,16 +41,22 @@ def login_screen():
         st.markdown("</div>", unsafe_allow_html=True)
 
         if submit:
-            # Primero intentar modo local
-            USUARIOS_LOCALES = {
-                "admin@jaan.com": "jaan2024",
+            # Usuarios registrados — agregar vendedores aquí
+            USUARIOS = {
+                "admin@jaan.com":                  {"password": "jaan2024",      "nombre": "Administrador", "rol": "admin"},
+                "a.islas@jaanmanufacturing.com":   {"password": "Obregon1481.@", "nombre": "Alejandro Islas", "rol": "admin"},
             }
-            if email in USUARIOS_LOCALES and USUARIOS_LOCALES[email] == password:
-                st.session_state.user        = {"id": "local", "email": email}
+            user_data = USUARIOS.get(email.lower().strip())
+            if user_data and user_data["password"] == password:
+                st.session_state.user        = {"id": email, "email": email}
                 st.session_state.user_email  = email
                 st.session_state.autenticado = True
-                st.session_state.usuario     = {"email": email, "nombre": "Admin", "rol": "admin"}
-                st.session_state.session     = None
+                st.session_state.usuario     = {
+                    "email":  email,
+                    "nombre": user_data["nombre"],
+                    "rol":    user_data["rol"]
+                }
+                st.session_state.session = None
                 st.rerun()
             else:
                 # Intentar con Supabase via requests directo

@@ -1,10 +1,218 @@
 import streamlit as st
 import pandas as pd
 import math
+import json
 from datetime import datetime
+
+# ── Supabase connection ───────────────────────────────────────────────────────
+@st.cache_resource
+def get_supabase():
+    try:
+        from supabase import create_client
+        url = st.secrets.get("SUPABASE_URL", "")
+        key = st.secrets.get("SUPABASE_KEY", "")
+        if url and key:
+            return create_client(url, key)
+    except Exception:
+        pass
+    return None
+
+supabase = get_supabase()
+
+# ── Autenticación ─────────────────────────────────────────────────────────────
+def login_screen():
+    st.markdown("""
+    <div style='max-width:400px;margin:80px auto;background:white;
+                border-radius:12px;padding:40px;
+                box-shadow:0 4px 24px rgba(0,0,0,0.08);
+                border-top:4px solid #185FA5'>
+        <h2 style='color:#0f1b3d;margin:0 0 8px;font-size:22px;font-weight:600'>
+            JAAN Manufacturing</h2>
+        <p style='color:#6b7280;font-size:13px;margin:0 0 28px'>
+            Cotizador Profesional — Acceso</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("login_form"):
+        st.markdown("<div style='max-width:400px;margin:0 auto'>", unsafe_allow_html=True)
+        email    = st.text_input("Email", placeholder="usuario@jaan.com")
+        password = st.text_input("Contraseña", type="password")
+        submit   = st.form_submit_button("Ingresar", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        if submit:
+            if supabase:
+                try:
+                    res = supabase.auth.sign_in_with_password({
+                        "email": email, "password": password
+                    })
+                    if res.user:
+                        st.session_state.user       = res.user
+                        st.session_state.user_email = res.user.email
+                        st.session_state.session    = res.session
+                        st.rerun()
+                    else:
+                        st.error("❌ Email o contraseña incorrectos")
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
+            else:
+                # Modo local sin Supabase
+                if email == "admin@jaan.com" and password == "jaan2024":
+                    st.session_state.user       = {"id": "local", "email": email}
+                    st.session_state.user_email = email
+                    st.session_state.session    = None
+                    st.rerun()
+                else:
+                    st.error("❌ Email o contraseña incorrectos")
+
+# ── Verificar sesión ──────────────────────────────────────────────────────────
+if "user" not in st.session_state:
+    login_screen()
+    st.stop()
 
 st.set_page_config(page_title="Cotizador JAAN Manufacturing", page_icon="⚙️",
                    layout="wide", initial_sidebar_state="expanded")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUPABASE — Conexión y autenticación
+# ══════════════════════════════════════════════════════════════════════════════
+def get_supabase():
+    """Retorna cliente de Supabase o None si no está configurado"""
+    try:
+        from supabase import create_client
+        url = st.secrets.get("SUPABASE_URL", "")
+        key = st.secrets.get("SUPABASE_KEY", "")
+        if url and key:
+            return create_client(url, key)
+    except Exception:
+        pass
+    return None
+
+def login_screen():
+    """Pantalla de login"""
+    st.markdown("""
+    <div style='max-width:400px;margin:80px auto;padding:40px;
+                background:white;border-radius:16px;
+                border:0.5px solid #dde1ea;
+                box-shadow:0 4px 24px rgba(0,0,0,0.08)'>
+        <div style='text-align:center;margin-bottom:32px'>
+            <h2 style='color:#0f1b3d;margin:0;font-weight:500'>JAAN Manufacturing</h2>
+            <p style='color:#6b7280;font-size:13px;margin:6px 0 0'>Cotizador Profesional</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("login_form"):
+        st.markdown("### Iniciar sesión")
+        email    = st.text_input("Correo electrónico", placeholder="usuario@jaan.com")
+        password = st.text_input("Contraseña", type="password")
+        submit   = st.form_submit_button("Entrar", use_container_width=True)
+
+        if submit:
+            if not email or not password:
+                st.error("Ingresa tu correo y contraseña")
+                return
+
+            sb = get_supabase()
+            if sb is None:
+                # Modo local sin Supabase — login de prueba
+                if email == "admin@jaan.com" and password == "jaan2024":
+                    st.session_state.usuario = {
+                        "id": "local", "email": email,
+                        "nombre": "Administrador", "rol": "admin"
+                    }
+                    st.session_state.autenticado = True
+                    st.rerun()
+                else:
+                    st.error("❌ Credenciales incorrectas")
+                return
+
+            try:
+                resp = sb.auth.sign_in_with_password({"email": email, "password": password})
+                if resp.user:
+                    # Obtener datos del usuario
+                    user_data = sb.table("usuarios").select("*").eq("id", str(resp.user.id)).execute()
+                    if user_data.data:
+                        st.session_state.usuario = user_data.data[0]
+                        st.session_state.usuario["supabase_session"] = resp.session.access_token
+                    else:
+                        st.session_state.usuario = {
+                            "id": str(resp.user.id),
+                            "email": resp.user.email,
+                            "nombre": resp.user.email,
+                            "rol": "vendedor"
+                        }
+                    st.session_state.autenticado = True
+                    st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+
+def guardar_cotizacion_supabase(num_cot, cliente, atencion, ciudad,
+                                 moneda_cot, tipo_cambio, margen_global,
+                                 total_general, iva, total_neto,
+                                 vigencia, t_entrega, cond_pago):
+    """Guarda la cotización completa en Supabase"""
+    sb = get_supabase()
+    if sb is None:
+        return False, "Sin conexión a Supabase"
+    try:
+        usuario_id = st.session_state.get("usuario", {}).get("id", "local")
+        datos = {
+            "numero":         num_cot,
+            "usuario_id":     usuario_id if usuario_id != "local" else None,
+            "cliente":        cliente,
+            "atencion":       atencion,
+            "ciudad":         ciudad,
+            "moneda":         moneda_cot,
+            "tipo_cambio":    tipo_cambio,
+            "margen_global":  margen_global,
+            "subtotal":       round(total_general, 2),
+            "iva":            round(iva, 2),
+            "total_neto":     round(total_neto, 2),
+            "vigencia":       vigencia,
+            "tiempo_entrega": t_entrega,
+            "cond_pago":      cond_pago,
+            "status":         "borrador",
+            "datos_json":     json.dumps([{
+                "num_dibujo":  p["num_dibujo"],
+                "descripcion": p["descripcion"],
+                "material":    p["materia_prima"]["material"],
+                "tratamiento": p["tratamiento"],
+                "cantidad":    p["cantidad"],
+                "operaciones": p["operaciones"],
+                "materia_prima": p["materia_prima"],
+                "maq_activas": p.get("maq_activas", 7),
+                "turnos":      p.get("turnos", 1),
+                "eficiencia":  p.get("eficiencia", 75),
+            } for p in st.session_state.piezas], ensure_ascii=False)
+        }
+        result = sb.table("cotizaciones").insert(datos).execute()
+        return True, result.data[0]["id"] if result.data else None
+    except Exception as e:
+        return False, str(e)
+
+def cargar_cotizaciones_supabase():
+    """Carga cotizaciones del usuario desde Supabase"""
+    sb = get_supabase()
+    if sb is None:
+        return []
+    try:
+        usuario = st.session_state.get("usuario", {})
+        if usuario.get("rol") == "admin":
+            result = sb.table("cotizaciones").select("*").order("created_at", desc=True).limit(100).execute()
+        else:
+            result = sb.table("cotizaciones").select("*").eq("usuario_id", usuario.get("id", "")).order("created_at", desc=True).limit(50).execute()
+        return result.data or []
+    except Exception:
+        return []
+
+# ── Verificar autenticación ───────────────────────────────────────────────────
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
+if not st.session_state.autenticado:
+    login_screen()
+    st.stop()
 
 st.markdown("""
 <style>
@@ -477,6 +685,29 @@ st.markdown("""
 # SIDEBAR
 # ══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
+    # ── Usuario actual ───────────────────────────────────────────────
+    usuario = st.session_state.get("usuario", {})
+    st.markdown(
+        f"<div style='background:#E6F1FB;border-radius:8px;padding:10px 12px;"
+        f"margin-bottom:12px;font-size:13px'>"
+        f"👤 <b>{usuario.get('nombre', usuario.get('email',''))}</b><br>"
+        f"<span style='color:#6b7280;font-size:11px'>{usuario.get('rol','vendedor').upper()}</span>"
+        f"</div>",
+        unsafe_allow_html=True
+    )
+    if st.button("🚪 Cerrar sesión", use_container_width=True):
+        if supabase and st.session_state.get("session"):
+            try:
+                supabase.auth.sign_out()
+            except Exception:
+                pass
+        st.session_state.autenticado = False
+        st.session_state.usuario     = {}
+        if "user" in st.session_state:
+            del st.session_state["user"]
+        st.rerun()
+    st.markdown("---")
+
     st.markdown("### 📋 Datos de la cotización")
     cliente     = st.text_input("Cliente",          placeholder="Nombre del cliente")
     atencion    = st.text_input("Atención a",        placeholder="Nombre del contacto")
@@ -507,6 +738,72 @@ def fmtc(v):
     return fmt(v, moneda_cot, tipo_cambio)
 
 simbolo = "USD $" if moneda_cot == "USD" else "$"
+
+# ── Guardar cotización en Supabase ───────────────────────────────────────────
+def guardar_cotizacion():
+    if not supabase:
+        st.warning("⚠️ Supabase no configurado — modo local")
+        return
+    try:
+        user = st.session_state.get("user", {})
+        user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
+
+        # Calcular totales
+        total = sum(
+            calcular_pieza(p, st.session_state.get("margen_global", 35)).get("total", 0)
+            for p in st.session_state.piezas
+        )
+        iva       = total * 0.16
+        total_neto = total + iva
+
+        datos = {
+            "numero":        st.session_state.get("num_cotizacion", ""),
+            "usuario_id":    str(user_id) if user_id != "local" else None,
+            "cliente":       st.session_state.get("cliente", ""),
+            "atencion":      st.session_state.get("atencion", ""),
+            "ciudad":        st.session_state.get("ciudad", ""),
+            "moneda":        st.session_state.get("moneda_cot", "MXN"),
+            "tipo_cambio":   float(st.session_state.get("tipo_cambio", 17.31)),
+            "margen_global": int(st.session_state.get("margen_global", 35)),
+            "subtotal":      float(total),
+            "iva":           float(iva),
+            "total_neto":    float(total_neto),
+            "vigencia":      st.session_state.get("vigencia", "15 Días"),
+            "tiempo_entrega":st.session_state.get("tiempo_entrega", "22-30 días hábiles"),
+            "cond_pago":     st.session_state.get("cond_pago", "40% anticipo - 60% contra-entrega"),
+            "datos_json":    json.dumps({
+                "piezas": st.session_state.piezas,
+                "cond_generales": {
+                    "vigencia":       st.session_state.get("vigencia", ""),
+                    "tiempo_entrega": st.session_state.get("tiempo_entrega", ""),
+                    "cond_pago":      st.session_state.get("cond_pago", ""),
+                }
+            }, default=str)
+        }
+
+        # Verificar si ya existe
+        existing = supabase.table("cotizaciones")            .select("id")            .eq("numero", datos["numero"])            .execute()
+
+        if existing.data:
+            supabase.table("cotizaciones")                .update(datos)                .eq("numero", datos["numero"])                .execute()
+            st.success(f"✅ Cotización {datos['numero']} actualizada")
+        else:
+            supabase.table("cotizaciones").insert(datos).execute()
+            st.success(f"✅ Cotización {datos['numero']} guardada")
+
+    except Exception as e:
+        st.error(f"❌ Error al guardar: {str(e)}")
+
+def cargar_cotizaciones():
+    if not supabase:
+        return []
+    try:
+        user = st.session_state.get("user", {})
+        user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
+        res = supabase.table("cotizaciones")            .select("*")            .order("created_at", desc=True)            .execute()
+        return res.data or []
+    except Exception:
+        return []
 
 tab1, tab2, tab3 = st.tabs(["📐 Piezas y Ruteo", "📄 Cotización", "🗂️ Historial"])
 
@@ -1360,6 +1657,14 @@ with tab1:
 
 # ══ TAB 2: COTIZACIÓN ════════════════════════════════════════════════════════
 with tab2:
+    # ── Botón guardar en Supabase ─────────────────────────────────────────
+    sv1, sv2 = st.columns([3, 1])
+    with sv2:
+        if st.button("💾 Guardar cotización", use_container_width=True,
+                     help="Guardar en Supabase"):
+            guardar_cotizacion()
+    st.markdown("---")
+
     st.markdown(
         f"<div style='background:#f0f2f7;border-radius:10px;padding:16px 20px;"
         f"margin-bottom:16px;border-left:4px solid #1a5cff;'>"
@@ -1464,7 +1769,8 @@ with tab2:
             m5.metric("Total orden",      fmtc(res["total"]))
             st.markdown("---")
 
-    if st.button("💾 Guardar cotización en historial", use_container_width=True):
+    if st.button("💾 Guardar cotización", use_container_width=True):
+        # Guardar en memoria local
         cot = {
             "numero":     num_cot,
             "fecha":      datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -1484,55 +1790,92 @@ with tab2:
             } for p in st.session_state.piezas],
         }
         st.session_state.cotizaciones.append(cot)
-        st.success(f"✅ {num_cot} guardada — {len(st.session_state.piezas)} pieza(s)")
+
+        # Guardar en Supabase
+        ok, result = guardar_cotizacion_supabase(
+            num_cot, cliente, atencion, ciudad,
+            moneda_cot, tipo_cambio, margen_global,
+            total_general, iva, total_neto,
+            vigencia, t_entrega, cond_pago
+        )
+        if ok:
+            st.success(f"✅ {num_cot} guardada en la nube — {len(st.session_state.piezas)} pieza(s)")
+        else:
+            st.warning(f"⚠️ Guardada localmente. Error Supabase: {result}")
 
 # ══ TAB 3: HISTORIAL ══════════════════════════════════════════════════════════
 with tab3:
-    st.markdown("#### Historial de cotizaciones")
-    if not st.session_state.cotizaciones:
-        st.info("Aún no hay cotizaciones guardadas.")
+    st.markdown("#### 🗂️ Historial de cotizaciones")
+
+    col_ref, col_btn = st.columns([3,1])
+    with col_btn:
+        if st.button("🔄 Actualizar", use_container_width=True):
+            st.rerun()
+
+    cotizaciones_db = cargar_cotizaciones()
+
+    if not cotizaciones_db:
+        # Fallback a historial local
+        if not st.session_state.get("cotizaciones"):
+            st.info("No hay cotizaciones guardadas. Usa 💾 en la pestaña Cotización.")
+        else:
+            st.dataframe(pd.DataFrame([{
+                "Cotización": c["numero"], "Fecha": c["fecha"],
+                "Cliente": c["cliente"], "Total": fmtc(c["total_neto"]),
+            } for c in st.session_state.cotizaciones]), use_container_width=True, hide_index=True)
     else:
         c1, c2, c3 = st.columns(3)
         with c1: buscar_cot = st.text_input("🔍 Núm. cotización", placeholder="COT-")
         with c2: buscar_cli = st.text_input("🔍 Cliente",          placeholder="Nombre")
         with c3: buscar_dwg = st.text_input("🔍 Núm. dibujo",      placeholder="DWG-")
 
-        filtradas = st.session_state.cotizaciones
-        if buscar_cot:
-            filtradas = [c for c in filtradas
-                         if buscar_cot.upper() in c["numero"].upper()]
-        if buscar_cli:
-            filtradas = [c for c in filtradas
-                         if buscar_cli.upper() in c.get("cliente","").upper()]
-        if buscar_dwg:
-            filtradas = [c for c in filtradas
-                         if any(buscar_dwg.upper() in it.get("num_dibujo","").upper()
-                                for it in c.get("items",[]))]
+        filtradas = cotizaciones_db
+        if buscar_cot: filtradas = [c for c in filtradas if buscar_cot.upper() in (c.get("numero","")).upper()]
+        if buscar_cli: filtradas = [c for c in filtradas if buscar_cli.upper() in (c.get("cliente","")).upper()]
+
         if filtradas:
             df_hist = pd.DataFrame([{
-                "Cotización": c["numero"], "Fecha": c["fecha"],
-                "Cliente":    c["cliente"], "Ciudad": c.get("ciudad",""),
-                "# Piezas":   c["piezas"],  "Subtotal": fmtc(c["subtotal"]),
-                "IVA":        fmtc(c["iva"]), "Total":   fmtc(c["total_neto"]),
-                "Margen %":   c["margen"],
+                "Cotización": c.get("numero",""),
+                "Fecha":      c.get("created_at","")[:10],
+                "Cliente":    c.get("cliente",""),
+                "Ciudad":     c.get("ciudad",""),
+                "Moneda":     c.get("moneda","MXN"),
+                "Total":      fmtc(float(c.get("total_neto", 0))),
+                "Status":     c.get("status","borrador").upper(),
             } for c in filtradas])
             st.dataframe(df_hist, use_container_width=True, hide_index=True)
-            sel     = st.selectbox("Ver detalle:", [c["numero"] for c in filtradas])
-            cot_sel = next(c for c in filtradas if c["numero"] == sel)
-            if cot_sel.get("items"):
-                df_items = pd.DataFrame([{
-                    "Dibujo":      it["num_dibujo"],
-                    "Descripción": it["descripcion"],
-                    "Material":    it["material"],
-                    "Tratamiento": it["tratamiento"],
-                    "Turnos":      it.get("turnos", 1),
-                    "Cantidad":    it["cantidad"],
-                    "P. Unitario": fmtc(it["precio_pza"]),
-                    "Total":       fmtc(it["total"]),
-                } for it in cot_sel["items"]])
-                st.dataframe(df_items, use_container_width=True, hide_index=True)
+
+            st.markdown("---")
+            numeros   = [c.get("numero","") for c in filtradas]
+            sel_num   = st.selectbox("📂 Abrir cotización:", ["— Selecciona —"] + numeros)
+
+            if sel_num != "— Selecciona —":
+                cot_sel = next((c for c in filtradas if c.get("numero") == sel_num), None)
+                if cot_sel:
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.markdown(f"**Cliente:** {cot_sel.get('cliente','')}")
+                        st.markdown(f"**Total:** {fmtc(float(cot_sel.get('total_neto',0)))}")
+                    with col_b:
+                        st.markdown(f"**Fecha:** {cot_sel.get('created_at','')[:10]}")
+                        st.markdown(f"**Moneda:** {cot_sel.get('moneda','MXN')}")
+
+                    if st.button(f"📂 Cargar cotización {sel_num}", type="primary"):
+                        try:
+                            datos_raw = cot_sel.get("datos_json", "{}")
+                            datos = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                            st.session_state.piezas         = datos.get("piezas", [])
+                            cond = datos.get("cond_generales", {})
+                            st.session_state.vigencia       = cond.get("vigencia", "15 Días")
+                            st.session_state.tiempo_entrega = cond.get("tiempo_entrega", "22-30 días hábiles")
+                            st.session_state.cond_pago      = cond.get("cond_pago", "")
+                            st.session_state.num_cotizacion = cot_sel.get("numero","")
+                            st.session_state.cliente_input  = cot_sel.get("cliente","")
+                            st.success(f"✅ Cotización {sel_num} cargada — ve a Piezas y Ruteo")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error al cargar: {str(e)}")
         else:
             st.warning("No se encontraron cotizaciones.")
-
 st.markdown("---")
 st.caption("JAAN Manufacturing · Sistemas de Manufactura Industrial JAAN CNC S.A. de C.V · RFC SAM2008079G8")

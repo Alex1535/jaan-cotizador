@@ -5,15 +5,15 @@ import json
 from datetime import datetime
 
 # ── Supabase connection ───────────────────────────────────────────────────────
-@st.cache_resource
 def get_supabase():
     try:
         from supabase import create_client
         url = st.secrets.get("SUPABASE_URL", "")
         key = st.secrets.get("SUPABASE_KEY", "")
         if url and key:
-            return create_client(url, key)
-    except Exception:
+            client = create_client(url, key)
+            return client
+    except Exception as e:
         pass
     return None
 
@@ -52,25 +52,27 @@ def login_screen():
                 st.session_state.usuario     = {"email": email, "nombre": "Admin", "rol": "admin"}
                 st.session_state.session     = None
                 st.rerun()
-            elif supabase:
-                # Intentar con Supabase
-                try:
-                    res = supabase.auth.sign_in_with_password({
-                        "email": email, "password": password
-                    })
-                    if res.user:
-                        st.session_state.user        = res.user
-                        st.session_state.user_email  = res.user.email
-                        st.session_state.autenticado = True
-                        st.session_state.usuario     = {"email": res.user.email, "nombre": res.user.email, "rol": "vendedor"}
-                        st.session_state.session     = res.session
-                        st.rerun()
-                    else:
-                        st.error("❌ Email o contraseña incorrectos")
-                except Exception as e:
-                    st.error(f"❌ Error de conexión: {str(e)}")
             else:
-                st.error("❌ Email o contraseña incorrectos")
+                # Intentar con Supabase
+                sb = get_supabase()
+                if sb:
+                    try:
+                        res = sb.auth.sign_in_with_password({
+                            "email": email, "password": password
+                        })
+                        if res.user:
+                            st.session_state.user        = res.user
+                            st.session_state.user_email  = res.user.email
+                            st.session_state.autenticado = True
+                            st.session_state.usuario     = {"email": res.user.email, "nombre": res.user.email, "rol": "vendedor"}
+                            st.session_state.session     = res.session
+                            st.rerun()
+                        else:
+                            st.error("❌ Email o contraseña incorrectos")
+                    except Exception as e:
+                        st.error(f"❌ Error de conexión: {str(e)}")
+                else:
+                    st.error("❌ Email o contraseña incorrectos")
 
 # ── Verificar sesión ──────────────────────────────────────────────────────────
 if not st.session_state.get("autenticado", False):

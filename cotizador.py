@@ -96,7 +96,7 @@ def get_gsheet_token():
         header = base64.urlsafe_b64encode(json.dumps({"alg":"RS256","typ":"JWT"}).encode()).rstrip(b"=").decode()
         payload = base64.urlsafe_b64encode(json.dumps({
             "iss": creds_dict["client_email"],
-            "scope": "https://www.googleapis.com/auth/spreadsheets",
+            "scope": "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive",
             "aud": "https://oauth2.googleapis.com/token",
             "exp": now + 3600,
             "iat": now

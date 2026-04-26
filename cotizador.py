@@ -2010,10 +2010,13 @@ with tab3:
                         try:
                             datos_raw = cot_sel.get("datos_json", "{}")
                             datos = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                            cond  = datos.get("cond_generales", {})
-
-                            # Restaurar TODO el proyecto completo
-                            piezas_cargadas = datos.get("piezas", [])
+                            # Manejar ambos formatos: lista directa o dict con "piezas"
+                            if isinstance(datos, list):
+                                piezas_cargadas = datos
+                                cond = {}
+                            else:
+                                piezas_cargadas = datos.get("piezas", [])
+                                cond  = datos.get("cond_generales", {})
                             st.session_state.piezas = piezas_cargadas
 
                             # Limpiar todos los keys de widgets de piezas para que tomen valores nuevos

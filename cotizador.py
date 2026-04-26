@@ -4,120 +4,37 @@ import math
 import json
 from datetime import datetime
 
-# ── Supabase connection ───────────────────────────────────────────────────────
-def get_supabase():
-    try:
-        from supabase import create_client
-        url = st.secrets.get("SUPABASE_URL", "")
-        key = st.secrets.get("SUPABASE_KEY", "")
-        if url and key:
-            client = create_client(url, key)
-            return client
-    except Exception as e:
-        pass
-    return None
-
-supabase = get_supabase()
-
-# ── Autenticación ─────────────────────────────────────────────────────────────
-def login_screen():
-    st.markdown("""
-    <div style='max-width:400px;margin:80px auto;background:white;
-                border-radius:12px;padding:40px;
-                box-shadow:0 4px 24px rgba(0,0,0,0.08);
-                border-top:4px solid #185FA5'>
-        <h2 style='color:#0f1b3d;margin:0 0 8px;font-size:22px;font-weight:600'>
-            JAAN Manufacturing</h2>
-        <p style='color:#6b7280;font-size:13px;margin:0 0 28px'>
-            Cotizador Profesional — Acceso</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    with st.form("login_form"):
-        st.markdown("<div style='max-width:400px;margin:0 auto'>", unsafe_allow_html=True)
-        email    = st.text_input("Email", placeholder="usuario@jaan.com")
-        password = st.text_input("Contraseña", type="password")
-        submit   = st.form_submit_button("Ingresar", use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        if submit:
-            # Usuarios registrados — agregar vendedores aquí
-            USUARIOS = {
-                "admin@jaan.com":                  {"password": "jaan2024",      "nombre": "Administrador", "rol": "admin"},
-                "a.islas@jaanmanufacturing.com":   {"password": "Obregon1481.@", "nombre": "Alejandro Islas", "rol": "admin"},
-            }
-            user_data = USUARIOS.get(email.lower().strip())
-            if user_data and user_data["password"] == password:
-                st.session_state.user        = {"id": email, "email": email}
-                st.session_state.user_email  = email
-                st.session_state.autenticado = True
-                st.session_state.usuario     = {
-                    "email":  email,
-                    "nombre": user_data["nombre"],
-                    "rol":    user_data["rol"]
-                }
-                st.session_state.session = None
-                st.rerun()
-            else:
-                # Intentar con Supabase via requests directo
-                try:
-                    import requests as req
-                    supa_url = st.secrets.get("SUPABASE_URL", "")
-                    supa_key = st.secrets.get("SUPABASE_KEY", "")
-                    if not supa_url or not supa_key:
-                        st.error("❌ Supabase no configurado")
-                    else:
-                        auth_url = f"{supa_url}/auth/v1/token?grant_type=password"
-                        resp = req.post(
-                            auth_url,
-                            headers={
-                                "apikey": supa_key,
-                                "Content-Type": "application/json"
-                            },
-                            json={"email": email, "password": password},
-                            timeout=15
-                        )
-                        data = resp.json()
-                        if resp.status_code == 200 and data.get("access_token"):
-                            user_data = data.get("user", {})
-                            st.session_state.user        = user_data
-                            st.session_state.user_email  = user_data.get("email", email)
-                            st.session_state.autenticado = True
-                            st.session_state.usuario     = {
-                                "email": user_data.get("email", email),
-                                "nombre": user_data.get("email", email),
-                                "rol": "vendedor"
-                            }
-                            st.session_state.access_token = data.get("access_token")
-                            st.rerun()
-                        else:
-                            msg = data.get("error_description") or data.get("msg") or "Credenciales incorrectas"
-                            st.error(f"❌ {msg}")
-                except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
-
-# ── Verificar sesión ──────────────────────────────────────────────────────────
-if not st.session_state.get("autenticado", False):
-    login_screen()
-    st.stop()
-
-st.set_page_config(page_title="Cotizador JAAN Manufacturing", page_icon="⚙️",
-                   layout="wide", initial_sidebar_state="expanded")
-
 # ══════════════════════════════════════════════════════════════════════════════
-# SUPABASE — Conexión y autenticación
+# AUTENTICACIÓN — Usuarios desde Streamlit Secrets
 # ══════════════════════════════════════════════════════════════════════════════
-def get_supabase():
-    """Retorna cliente de Supabase o None si no está configurado"""
+
+def cargar_usuarios():
+    """
+    Lee usuarios desde st.secrets['USUARIOS'].
+    Formato: "email:password:nombre:rol|email2:password2:nombre2:rol2"
+    Retorna dict: {email: {password, nombre, rol}}
+    """
+    usuarios = {}
+    raw = ""
     try:
-        from supabase import create_client
-        url = st.secrets.get("SUPABASE_URL", "")
-        key = st.secrets.get("SUPABASE_KEY", "")
-        if url and key:
-            return create_client(url, key)
+        raw = st.secrets.get("USUARIOS", "")
     except Exception:
         pass
-    return None
+
+    if not raw:
+        # Fallback hardcodeado de emergencia
+        return {"admin@jaan.com": {"password": "jaan2024", "nombre": "Administrador", "rol": "admin"}}
+
+    for entry in raw.split("|"):
+        parts = entry.strip().split(":")
+        if len(parts) >= 4:
+            email    = parts[0].strip()
+            password = parts[1].strip()
+            nombre   = parts[2].strip()
+            rol      = parts[3].strip()
+            usuarios[email] = {"password": password, "nombre": nombre, "rol": rol}
+    return usuarios
+
 
 def login_screen():
     """Pantalla de login"""
@@ -144,98 +61,20 @@ def login_screen():
                 st.error("Ingresa tu correo y contraseña")
                 return
 
-            sb = get_supabase()
-            if sb is None:
-                # Modo local sin Supabase — login de prueba
-                if email == "admin@jaan.com" and password == "jaan2024":
-                    st.session_state.usuario = {
-                        "id": "local", "email": email,
-                        "nombre": "Administrador", "rol": "admin"
-                    }
-                    st.session_state.autenticado = True
-                    st.rerun()
-                else:
-                    st.error("❌ Credenciales incorrectas")
-                return
+            usuarios = cargar_usuarios()
+            email = email.strip().lower()
 
-            try:
-                resp = sb.auth.sign_in_with_password({"email": email, "password": password})
-                if resp.user:
-                    # Obtener datos del usuario
-                    user_data = sb.table("usuarios").select("*").eq("id", str(resp.user.id)).execute()
-                    if user_data.data:
-                        st.session_state.usuario = user_data.data[0]
-                        st.session_state.usuario["supabase_session"] = resp.session.access_token
-                    else:
-                        st.session_state.usuario = {
-                            "id": str(resp.user.id),
-                            "email": resp.user.email,
-                            "nombre": resp.user.email,
-                            "rol": "vendedor"
-                        }
-                    st.session_state.autenticado = True
-                    st.rerun()
-            except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
+            if email in usuarios and usuarios[email]["password"] == password:
+                st.session_state.usuario = {
+                    "email":  email,
+                    "nombre": usuarios[email]["nombre"],
+                    "rol":    usuarios[email]["rol"],
+                }
+                st.session_state.autenticado = True
+                st.rerun()
+            else:
+                st.error("❌ Credenciales incorrectas")
 
-def guardar_cotizacion_supabase(num_cot, cliente, atencion, ciudad,
-                                 moneda_cot, tipo_cambio, margen_global,
-                                 total_general, iva, total_neto,
-                                 vigencia, t_entrega, cond_pago):
-    """Guarda la cotización completa en Supabase"""
-    sb = get_supabase()
-    if sb is None:
-        return False, "Sin conexión a Supabase"
-    try:
-        usuario_id = st.session_state.get("usuario", {}).get("id", "local")
-        datos = {
-            "numero":         num_cot,
-            "usuario_id":     usuario_id if usuario_id != "local" else None,
-            "cliente":        cliente,
-            "atencion":       atencion,
-            "ciudad":         ciudad,
-            "moneda":         moneda_cot,
-            "tipo_cambio":    tipo_cambio,
-            "margen_global":  margen_global,
-            "subtotal":       round(total_general, 2),
-            "iva":            round(iva, 2),
-            "total_neto":     round(total_neto, 2),
-            "vigencia":       vigencia,
-            "tiempo_entrega": t_entrega,
-            "cond_pago":      cond_pago,
-            "status":         "borrador",
-            "datos_json":     json.dumps([{
-                "num_dibujo":  p["num_dibujo"],
-                "descripcion": p["descripcion"],
-                "material":    p["materia_prima"]["material"],
-                "tratamiento": p["tratamiento"],
-                "cantidad":    p["cantidad"],
-                "operaciones": p["operaciones"],
-                "materia_prima": p["materia_prima"],
-                "maq_activas": p.get("maq_activas", 7),
-                "turnos":      p.get("turnos", 1),
-                "eficiencia":  p.get("eficiencia", 75),
-            } for p in st.session_state.piezas], ensure_ascii=False)
-        }
-        result = sb.table("cotizaciones").insert(datos).execute()
-        return True, result.data[0]["id"] if result.data else None
-    except Exception as e:
-        return False, str(e)
-
-def cargar_cotizaciones_supabase():
-    """Carga cotizaciones del usuario desde Supabase"""
-    sb = get_supabase()
-    if sb is None:
-        return []
-    try:
-        usuario = st.session_state.get("usuario", {})
-        if usuario.get("rol") == "admin":
-            result = sb.table("cotizaciones").select("*").order("created_at", desc=True).limit(100).execute()
-        else:
-            result = sb.table("cotizaciones").select("*").eq("usuario_id", usuario.get("id", "")).order("created_at", desc=True).limit(50).execute()
-        return result.data or []
-    except Exception:
-        return []
 
 # ── Verificar autenticación ───────────────────────────────────────────────────
 if "autenticado" not in st.session_state:
@@ -244,6 +83,7 @@ if "autenticado" not in st.session_state:
 if not st.session_state.autenticado:
     login_screen()
     st.stop()
+
 
 st.markdown("""
 <style>
@@ -727,15 +567,8 @@ with st.sidebar:
         unsafe_allow_html=True
     )
     if st.button("🚪 Cerrar sesión", use_container_width=True):
-        if supabase and st.session_state.get("session"):
-            try:
-                supabase.auth.sign_out()
-            except Exception:
-                pass
         st.session_state.autenticado = False
         st.session_state.usuario     = {}
-        if "user" in st.session_state:
-            del st.session_state["user"]
         st.rerun()
     st.markdown("---")
 
@@ -770,71 +603,157 @@ def fmtc(v):
 
 simbolo = "USD $" if moneda_cot == "USD" else "$"
 
-# ── Guardar cotización en Supabase ───────────────────────────────────────────
-def guardar_cotizacion():
-    if not supabase:
-        st.warning("⚠️ Supabase no configurado — modo local")
-        return
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GOOGLE SHEETS — Guardar y cargar cotizaciones
+# ══════════════════════════════════════════════════════════════════════════════
+
+def get_gsheet():
+    """
+    Retorna la hoja 'Cotizaciones' del Google Sheet configurado en Secrets.
+    Requiere en secrets.toml:
+      [gcp_service_account]
+      ... (JSON del service account)
+      GSHEET_ID = "ID del spreadsheet"
+    Retorna (sheet, None) o (None, mensaje_error)
+    """
     try:
-        user = st.session_state.get("user", {})
-        user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
+        import gspread
+        from google.oauth2.service_account import Credentials
 
-        # Calcular totales
-        total = sum(
-            calcular_pieza(p, st.session_state.get("margen_global", 35)).get("total", 0)
-            for p in st.session_state.piezas
-        )
-        iva       = total * 0.16
-        total_neto = total + iva
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive",
+        ]
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        gc    = gspread.authorize(creds)
 
-        datos = {
-            "numero":        st.session_state.get("num_cotizacion", ""),
-            "usuario_id":    str(user_id) if user_id != "local" else None,
-            "cliente":       st.session_state.get("cliente", ""),
-            "atencion":      st.session_state.get("atencion", ""),
-            "ciudad":        st.session_state.get("ciudad", ""),
-            "moneda":        st.session_state.get("moneda_cot", "MXN"),
-            "tipo_cambio":   float(st.session_state.get("tipo_cambio", 17.31)),
-            "margen_global": int(st.session_state.get("margen_global", 35)),
-            "subtotal":      float(total),
-            "iva":           float(iva),
-            "total_neto":    float(total_neto),
-            "vigencia":      st.session_state.get("vigencia", "15 Días"),
-            "tiempo_entrega":st.session_state.get("tiempo_entrega", "22-30 días hábiles"),
-            "cond_pago":     st.session_state.get("cond_pago", "40% anticipo - 60% contra-entrega"),
-            "datos_json":    json.dumps({
-                "piezas": st.session_state.piezas,
-                "cond_generales": {
-                    "vigencia":       st.session_state.get("vigencia", ""),
-                    "tiempo_entrega": st.session_state.get("tiempo_entrega", ""),
-                    "cond_pago":      st.session_state.get("cond_pago", ""),
-                }
-            }, default=str)
-        }
+        sheet_id = st.secrets.get("GSHEET_ID", "")
+        if not sheet_id:
+            return None, "GSHEET_ID no configurado en Secrets"
 
-        # Verificar si ya existe
-        existing = supabase.table("cotizaciones")            .select("id")            .eq("numero", datos["numero"])            .execute()
+        wb = gc.open_by_key(sheet_id)
 
-        if existing.data:
-            supabase.table("cotizaciones")                .update(datos)                .eq("numero", datos["numero"])                .execute()
-            st.success(f"✅ Cotización {datos['numero']} actualizada")
-        else:
-            supabase.table("cotizaciones").insert(datos).execute()
-            st.success(f"✅ Cotización {datos['numero']} guardada")
-
+        # Obtener o crear hoja Cotizaciones
+        try:
+            sh = wb.worksheet("Cotizaciones")
+        except gspread.WorksheetNotFound:
+            sh = wb.add_worksheet("Cotizaciones", rows=1000, cols=20)
+            # Encabezados
+            sh.append_row([
+                "numero", "fecha", "usuario_email", "cliente", "atencion",
+                "ciudad", "moneda", "tipo_cambio", "margen_global",
+                "subtotal", "iva", "total_neto",
+                "vigencia", "tiempo_entrega", "cond_pago", "datos_json"
+            ])
+        return sh, None
+    except ImportError:
+        return None, "gspread no instalado (agrega gspread y google-auth a requirements.txt)"
+    except KeyError:
+        return None, "gcp_service_account no configurado en Secrets"
     except Exception as e:
-        st.error(f"❌ Error al guardar: {str(e)}")
+        return None, str(e)
+
+
+def guardar_cotizacion():
+    """Guarda la cotización actual en Google Sheets"""
+    total = sum(
+        calcular_pieza(p, margen_global).get("total", 0)
+        for p in st.session_state.piezas
+    )
+    iva        = total * 0.16
+    total_neto = total + iva
+
+    fila = [
+        num_cot,
+        datetime.now().strftime("%d/%m/%Y %H:%M"),
+        st.session_state.get("usuario", {}).get("email", ""),
+        cliente, atencion, ciudad,
+        moneda_cot, str(tipo_cambio), str(margen_global),
+        str(round(total, 2)), str(round(iva, 2)), str(round(total_neto, 2)),
+        vigencia, t_entrega, cond_pago,
+        json.dumps({
+            "piezas": st.session_state.piezas,
+            "cond_generales": {
+                "vigencia":       vigencia,
+                "tiempo_entrega": t_entrega,
+                "cond_pago":      cond_pago,
+            }
+        }, default=str, ensure_ascii=False)
+    ]
+
+    sh, err = get_gsheet()
+    if sh is None:
+        # Fallback: guardar en memoria local
+        cot_local = {
+            "numero": num_cot, "fecha": fila[1],
+            "cliente": cliente, "total_neto": total_neto,
+        }
+        if "cotizaciones" not in st.session_state:
+            st.session_state.cotizaciones = []
+        # Actualizar si ya existe
+        existing = [i for i, c in enumerate(st.session_state.cotizaciones)
+                    if c.get("numero") == num_cot]
+        if existing:
+            st.session_state.cotizaciones[existing[0]] = cot_local
+        else:
+            st.session_state.cotizaciones.append(cot_local)
+        st.warning(f"⚠️ Guardada localmente (Google Sheets no disponible: {err})")
+        return
+
+    try:
+        # Buscar si ya existe la cotización para actualizar
+        all_vals = sh.get_all_values()
+        headers  = all_vals[0] if all_vals else []
+        rows     = all_vals[1:] if len(all_vals) > 1 else []
+
+        num_col = 0  # columna "numero"
+        existing_row = None
+        for i, row in enumerate(rows):
+            if row and row[0] == num_cot:
+                existing_row = i + 2  # +2: encabezado + 1-indexed
+                break
+
+        if existing_row:
+            sh.update(f"A{existing_row}", [fila])
+            st.success(f"✅ Cotización {num_cot} actualizada en Google Sheets")
+        else:
+            sh.append_row(fila)
+            st.success(f"✅ Cotización {num_cot} guardada en Google Sheets — {len(st.session_state.piezas)} pieza(s)")
+    except Exception as e:
+        st.error(f"❌ Error al guardar en Google Sheets: {str(e)}")
+
 
 def cargar_cotizaciones():
-    if not supabase:
-        return []
+    """Carga cotizaciones desde Google Sheets. Retorna lista de dicts."""
+    sh, err = get_gsheet()
+    if sh is None:
+        # Fallback local
+        return st.session_state.get("cotizaciones", [])
+
     try:
-        user = st.session_state.get("user", {})
-        user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
-        res = supabase.table("cotizaciones")            .select("*")            .order("created_at", desc=True)            .execute()
-        return res.data or []
+        all_vals = sh.get_all_values()
+        if len(all_vals) < 2:
+            return []
+        headers = all_vals[0]
+        rows    = all_vals[1:]
+
+        result = []
+        for row in rows:
+            if not row or not row[0]:
+                continue
+            d = {}
+            for i, h in enumerate(headers):
+                d[h] = row[i] if i < len(row) else ""
+            result.append(d)
+
+        # Más reciente primero
+        result.reverse()
+        return result
     except Exception:
-        return []
+        return st.session_state.get("cotizaciones", [])
+
 
 tab1, tab2, tab3 = st.tabs(["📐 Piezas y Ruteo", "📄 Cotización", "🗂️ Historial"])
 
@@ -1692,7 +1611,7 @@ with tab2:
     sv1, sv2 = st.columns([3, 1])
     with sv2:
         if st.button("💾 Guardar cotización", use_container_width=True,
-                     help="Guardar en Supabase"):
+                     help="Guardar en Google Sheets"):
             guardar_cotizacion()
     st.markdown("---")
 
@@ -1867,10 +1786,10 @@ with tab3:
         if filtradas:
             df_hist = pd.DataFrame([{
                 "Cotización": c.get("numero",""),
-                "Fecha":      c.get("created_at","")[:10],
+                "Fecha":      c.get("fecha", c.get("created_at",""))[:10],
                 "Cliente":    c.get("cliente",""),
                 "Ciudad":     c.get("ciudad",""),
-                "Moneda":     c.get("moneda","MXN"),
+                "Moneda":     c.get("moneda", c.get("moneda_cot","MXN")),
                 "Total":      fmtc(float(c.get("total_neto", 0))),
                 "Status":     c.get("status","borrador").upper(),
             } for c in filtradas])
@@ -1888,7 +1807,7 @@ with tab3:
                         st.markdown(f"**Cliente:** {cot_sel.get('cliente','')}")
                         st.markdown(f"**Total:** {fmtc(float(cot_sel.get('total_neto',0)))}")
                     with col_b:
-                        st.markdown(f"**Fecha:** {cot_sel.get('created_at','')[:10]}")
+                        st.markdown(f"**Fecha:** {cot_sel.get('fecha', cot_sel.get('created_at',''))[:10]}")
                         st.markdown(f"**Moneda:** {cot_sel.get('moneda','MXN')}")
 
                     if st.button(f"📂 Cargar cotización {sel_num}", type="primary"):

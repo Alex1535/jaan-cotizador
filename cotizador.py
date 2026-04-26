@@ -666,7 +666,8 @@ def guardar_cotizacion():
             st.session_state.cotizaciones[existing[0]] = cot_local
         else:
             st.session_state.cotizaciones.append(cot_local)
-        st.warning(f"⚠️ Guardada localmente (Google Sheets no disponible: {err})")
+        st.warning(f"⚠️ Guardada localmente. Error detallado: {err}")
+        st.info(f"🔍 Debug — GSHEET_ID: '{st.secrets.get('GSHEET_ID', 'NO ENCONTRADO')}'")
         return
 
     try:

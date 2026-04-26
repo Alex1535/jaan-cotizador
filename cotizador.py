@@ -1033,7 +1033,7 @@ with tab1:
                                     # Detectar si la página es vertical y rotar
                                     rect = page.rect
                                     if rect.height > rect.width:
-                                        mat = fitz.Matrix(2, 2).prerotate(90)
+                                        mat = fitz.Matrix(2, 2).prerotate(270)
                                     else:
                                         mat = fitz.Matrix(2, 2)
                                     pix = page.get_pixmap(matrix=mat)

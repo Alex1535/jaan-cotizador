@@ -1022,11 +1022,14 @@ with tab1:
                     key=plano_key,
                     help="El plano se enviará a Claude para análisis"
                 )
-                # Guardar en session_state para persistir
+                # Guardar en session_state para persistir entre reruns
                 if plano_file is not None:
-                    st.session_state[plano_bytes_key] = plano_file.read()
+                    bytes_data = plano_file.read()
                     plano_file.seek(0)
-                    st.session_state[plano_name_key] = plano_file.name
+                    if bytes_data:
+                        st.session_state[plano_bytes_key] = bytes_data
+                        st.session_state[plano_name_key] = plano_file.name
+                        st.rerun()
             with plano_col2:
                 notas_plano = st.text_area(
                     "Notas adicionales para la IA (opcional)",

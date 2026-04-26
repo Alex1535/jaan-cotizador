@@ -1992,7 +1992,7 @@ with tab3:
                             st.error(f"❌ {err}")
 
             st.markdown("---")
-            numeros   = [c.get("numero","") for c in filtradas]
+            numeros   = [c.get("numero","").strip() for c in filtradas if c.get("numero","").strip()]
             sel_num   = st.selectbox("📂 Abrir cotización:", ["— Selecciona —"] + numeros)
 
             if sel_num != "— Selecciona —":
@@ -2013,7 +2013,24 @@ with tab3:
                             cond  = datos.get("cond_generales", {})
 
                             # Restaurar TODO el proyecto completo
-                            st.session_state.piezas          = datos.get("piezas", [])
+                            piezas_cargadas = datos.get("piezas", [])
+                            st.session_state.piezas = piezas_cargadas
+
+                            # Limpiar todos los keys de widgets de piezas para que tomen valores nuevos
+                            keys_to_delete = [k for k in st.session_state.keys()
+                                if any(k.startswith(prefix) for prefix in [
+                                    "ndwg_", "desc_", "cant_", "tped_", "moq_", "eau_",
+                                    "pmaq_", "pturn_", "phrs_", "pdias_", "pefic_",
+                                    "fig_", "mpmat_", "mpmod_", "pkg_", "desp_",
+                                    "trat_", "ctrat_", "dtrat_", "dem_",
+                                    "mmo_", "mmat_", "mtrat_", "mg_",
+                                    "tipo_", "nm_", "setup_", "ciclo_", "par_", "lbl_",
+                                    "ltramo_", "ctramo_", "lpieza_", "agarre_", "cman_",
+                                    "dim_", "cprevio_", "lbarra_", "lcorte_", "cbarra_",
+                                ])]
+                            for k in keys_to_delete:
+                                del st.session_state[k]
+
                             st.session_state.num_cot_generado = cot_sel.get("numero", "")
                             st.session_state.sufijo_cot      = cot_sel.get("numero", "").split("-")[0] if "-" in cot_sel.get("numero","") else "COT"
                             st.session_state.sufijo_anterior = st.session_state.sufijo_cot

@@ -4,6 +4,13 @@ import math
 import json
 from datetime import datetime
 
+st.set_page_config(
+    page_title="Cotizador JAAN Manufacturing",
+    page_icon="⚙️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 # ══════════════════════════════════════════════════════════════════════════════
 # AUTENTICACIÓN — Usuarios desde Streamlit Secrets
 # ══════════════════════════════════════════════════════════════════════════════

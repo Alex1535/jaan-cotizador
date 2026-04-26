@@ -76,11 +76,31 @@ def get_gsheet():
     """Retorna hoja 'Cotizaciones' del Google Sheet, o (None, error)"""
     try:
         import gspread
+        import json
         from google.oauth2.service_account import Credentials
         scopes = ["https://www.googleapis.com/auth/spreadsheets",
                   "https://www.googleapis.com/auth/drive"]
-        creds = Credentials.from_service_account_info(
-            dict(st.secrets["gcp_service_account"]), scopes=scopes)
+
+        # Intentar leer como JSON string primero (GSHEET_CREDENTIALS)
+        creds_dict = None
+        try:
+            raw = st.secrets.get("GSHEET_CREDENTIALS", "")
+            if raw:
+                creds_dict = json.loads(raw)
+        except Exception:
+            pass
+
+        # Fallback: leer como sección TOML [gcp_service_account]
+        if not creds_dict:
+            try:
+                creds_dict = dict(st.secrets["gcp_service_account"])
+            except Exception:
+                pass
+
+        if not creds_dict:
+            return None, "No se encontraron credenciales (GSHEET_CREDENTIALS o gcp_service_account)"
+
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         gc = gspread.authorize(creds)
         sheet_id = st.secrets.get("GSHEET_ID", "")
         if not sheet_id:
@@ -97,8 +117,6 @@ def get_gsheet():
         return sh, None
     except ImportError:
         return None, "gspread no instalado"
-    except KeyError:
-        return None, "gcp_service_account no configurado en Secrets"
     except Exception as e:
         return None, str(e)
 

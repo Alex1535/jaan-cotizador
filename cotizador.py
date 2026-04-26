@@ -1015,6 +1015,14 @@ with tab1:
                     with prev_c1:
                         st.markdown(f"📄 **{plano_file.name}**")
                         st.caption(f"{len(file_bytes_prev)//1024} KB")
+                        st.download_button(
+                            "⬇️ Descargar PDF",
+                            data=file_bytes_prev,
+                            file_name=plano_file.name,
+                            mime="application/pdf",
+                            key=f"dl_plano_{pieza['id']}",
+                            use_container_width=True
+                        )
                     with prev_c2:
                         if st.toggle("🔍 Ver PDF completo", key=f"toggle_prev_{pieza['id']}"):
                             try:
@@ -1022,7 +1030,13 @@ with tab1:
                                 pdf_doc = fitz.open(stream=file_bytes_prev, filetype="pdf")
                                 for page_num in range(min(len(pdf_doc), 3)):
                                     page = pdf_doc[page_num]
-                                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                                    # Detectar si la página es vertical y rotar
+                                    rect = page.rect
+                                    if rect.height > rect.width:
+                                        mat = fitz.Matrix(2, 2).prerotate(90)
+                                    else:
+                                        mat = fitz.Matrix(2, 2)
+                                    pix = page.get_pixmap(matrix=mat)
                                     img_bytes = pix.tobytes("png")
                                     st.image(img_bytes, use_container_width=True,
                                              caption=f"Página {page_num+1}")

@@ -977,41 +977,6 @@ with tab1:
                     piezas_a_eliminar.append(pi)
 
         # ── Plano / Análisis IA ──────────────────────────────────────────────
-        # Miniatura del plano si ya fue subido
-        plano_key = f"plano_{pieza['id']}"
-        plano_bytes_key = f"plano_bytes_{pieza['id']}"
-        plano_name_key = f"plano_name_{pieza['id']}"
-
-        if st.session_state.get(plano_bytes_key):
-            import base64
-            _bytes = st.session_state[plano_bytes_key]
-            _name  = st.session_state.get(plano_name_key, "")
-            is_img = any(_name.lower().endswith(ext) for ext in [".png",".jpg",".jpeg"])
-            mini_col1, mini_col2, mini_col3 = st.columns([1, 2, 1])
-            with mini_col1:
-                if is_img:
-                    st.image(_bytes, width=120, caption="Plano")
-                else:
-                    st.markdown("📄 **Plano PDF cargado**")
-                    st.caption(_name)
-            with mini_col2:
-                if st.toggle("🔍 Ver plano completo", key=f"ver_plano_{pieza['id']}"):
-                    if is_img:
-                        st.image(_bytes, use_container_width=True)
-                    else:
-                        b64 = base64.b64encode(_bytes).decode()
-                        st.markdown(
-                            f"""<iframe src="data:application/pdf;base64,{b64}"
-                            width="100%" height="600px" style="border:1px solid #dde1ea;border-radius:8px">
-                            </iframe>""",
-                            unsafe_allow_html=True)
-            with mini_col3:
-                if st.button("🗑️ Quitar plano", key=f"del_plano_{pieza['id']}"):
-                    del st.session_state[plano_bytes_key]
-                    if plano_name_key in st.session_state:
-                        del st.session_state[plano_name_key]
-                    st.rerun()
-
         with st.expander("▸  Plano de la pieza — Análisis IA", expanded=False):
             st.caption("Sube el plano en PDF o imagen y la IA analizará las operaciones, tiempos y tipo de máquina sugeridos")
             plano_col1, plano_col2 = st.columns([1, 1])
@@ -1019,17 +984,9 @@ with tab1:
                 plano_file = st.file_uploader(
                     "Subir plano (PDF o imagen)",
                     type=["pdf", "png", "jpg", "jpeg"],
-                    key=plano_key,
+                    key=f"plano_{pieza['id']}",
                     help="El plano se enviará a Claude para análisis"
                 )
-                # Guardar en session_state para persistir entre reruns
-                if plano_file is not None:
-                    bytes_data = plano_file.read()
-                    plano_file.seek(0)
-                    if bytes_data:
-                        st.session_state[plano_bytes_key] = bytes_data
-                        st.session_state[plano_name_key] = plano_file.name
-                        st.rerun()
             with plano_col2:
                 notas_plano = st.text_area(
                     "Notas adicionales para la IA (opcional)",
@@ -1037,6 +994,34 @@ with tab1:
                     key=f"notas_plano_{pieza['id']}",
                     height=80
                 )
+
+            # Vista previa del plano dentro del expander
+            if plano_file is not None:
+                import base64 as b64mod
+                file_bytes_prev = plano_file.read()
+                plano_file.seek(0)
+                is_img = plano_file.name.lower().endswith((".png",".jpg",".jpeg"))
+                st.markdown("**👁️ Vista previa del plano:**")
+                if is_img:
+                    prev_c1, prev_c2 = st.columns([1, 2])
+                    with prev_c1:
+                        st.image(file_bytes_prev, width=150, caption=plano_file.name)
+                    with prev_c2:
+                        if st.toggle("🔍 Ver tamaño completo", key=f"toggle_prev_{pieza['id']}"):
+                            st.image(file_bytes_prev, use_container_width=True)
+                else:
+                    pdf_b64 = b64mod.b64encode(file_bytes_prev).decode()
+                    prev_c1, prev_c2 = st.columns([1, 3])
+                    with prev_c1:
+                        st.markdown(f"📄 **{plano_file.name}**")
+                        st.caption(f"{len(file_bytes_prev)//1024} KB")
+                    with prev_c2:
+                        if st.toggle("🔍 Ver PDF completo", key=f"toggle_prev_{pieza['id']}"):
+                            st.markdown(
+                                f'<iframe src="data:application/pdf;base64,{pdf_b64}" '
+                                f'width="100%" height="500px" style="border:1px solid #dde1ea;border-radius:8px"></iframe>',
+                                unsafe_allow_html=True)
+                st.markdown("---")
 
             if plano_file is not None:
                 ia_col1, ia_col2 = st.columns([1, 2])

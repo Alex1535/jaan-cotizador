@@ -132,19 +132,7 @@ def get_or_create_sheet_id(token):
             headers={"Authorization": f"Bearer {token}"})
         if r.status_code == 200:
             return sheet_id, None
-    # Crear nuevo spreadsheet via Drive API (con parent folder)
-    folder_id = "1aS1KZgmWCu_5niV4blMmB9BzGn7WiXk3"
-    r = requests.post(
-        "https://www.googleapis.com/drive/v3/files",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        json={"name": "Cotizaciones JAAN",
-              "mimeType": "application/vnd.google-apps.spreadsheet",
-              "parents": [folder_id]})
-    if r.status_code == 200:
-        new_id = r.json()["id"]
-        st.info(f"📋 Sheet creado en carpeta. ID: GSHEET_ID = '{new_id}'")
-        return new_id, None
-    return None, f"No se pudo crear: {r.text[:200]}"
+    return None, f"Sheet no accesible con ID: {sheet_id}"
 
 
 def append_to_gsheet(values):

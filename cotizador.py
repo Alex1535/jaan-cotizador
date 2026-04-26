@@ -72,57 +72,74 @@ st.set_page_config(page_title="Cotizador JAAN Manufacturing", page_icon="⚙️"
 # GOOGLE SHEETS — Guardar y cargar cotizaciones
 # ══════════════════════════════════════════════════════════════════════════════
 
-def get_gsheet():
-    """Retorna hoja 'Cotizaciones' del Google Sheet, o (None, error)"""
+def get_gsheet_token():
+    """Obtiene token de acceso OAuth2 para Google Sheets API"""
+    import json, time
+    import requests
     try:
-        import gspread
-        import json
-        from google.oauth2.service_account import Credentials
-        scopes = ["https://www.googleapis.com/auth/spreadsheets",
-                  "https://www.googleapis.com/auth/drive"]
-
-        # Intentar leer como JSON string primero (GSHEET_CREDENTIALS)
-        creds_dict = None
-        try:
-            raw = st.secrets.get("GSHEET_CREDENTIALS", "")
-            if raw:
-                creds_dict = json.loads(raw)
-        except Exception:
-            pass
-
-        # Fallback: leer como sección TOML [gcp_service_account]
-        if not creds_dict:
+        raw = st.secrets.get("GSHEET_CREDENTIALS", "")
+        if not raw:
             try:
                 creds_dict = dict(st.secrets["gcp_service_account"])
+                raw = json.dumps(creds_dict)
             except Exception:
-                pass
-
-        if not creds_dict:
-            return None, "No se encontraron credenciales (GSHEET_CREDENTIALS o gcp_service_account)"
-
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-        gc = gspread.authorize(creds)
-        sheet_id = st.secrets.get("GSHEET_ID", "").strip()
-        if not sheet_id:
-            return None, "GSHEET_ID no configurado"
-        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
-        try:
-            wb = gc.open("Cotizaciones JAAN")
-        except Exception:
-            wb = gc.open_by_key(sheet_id)
-        try:
-            sh = wb.worksheet("Cotizaciones")
-        except gspread.WorksheetNotFound:
-            sh = wb.add_worksheet("Cotizaciones", rows=1000, cols=20)
-            sh.append_row(["numero","fecha","usuario_email","cliente","atencion",
-                           "ciudad","moneda","tipo_cambio","margen_global",
-                           "subtotal","iva","total_neto","vigencia",
-                           "tiempo_entrega","cond_pago","datos_json"])
-        return sh, None
-    except ImportError:
-        return None, "gspread no instalado"
+                return None, "No se encontraron credenciales"
+        creds_dict = json.loads(raw)
+        
+        # Crear JWT para obtener access token
+        import base64, hashlib
+        from cryptography.hazmat.primitives import serialization, hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+        from cryptography.hazmat.backends import default_backend
+        
+        now = int(time.time())
+        header = base64.urlsafe_b64encode(json.dumps({"alg":"RS256","typ":"JWT"}).encode()).rstrip(b"=").decode()
+        payload = base64.urlsafe_b64encode(json.dumps({
+            "iss": creds_dict["client_email"],
+            "scope": "https://www.googleapis.com/auth/spreadsheets",
+            "aud": "https://oauth2.googleapis.com/token",
+            "exp": now + 3600,
+            "iat": now
+        }).encode()).rstrip(b"=").decode()
+        
+        msg = f"{header}.{payload}".encode()
+        private_key = serialization.load_pem_private_key(
+            creds_dict["private_key"].encode(), password=None, backend=default_backend())
+        sig = base64.urlsafe_b64encode(
+            private_key.sign(msg, padding.PKCS1v15(), hashes.SHA256())).rstrip(b"=").decode()
+        
+        jwt = f"{header}.{payload}.{sig}"
+        resp = requests.post("https://oauth2.googleapis.com/token", data={
+            "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            "assertion": jwt
+        })
+        token_data = resp.json()
+        if "access_token" not in token_data:
+            return None, f"Error token: {token_data}"
+        return token_data["access_token"], None
     except Exception as e:
         return None, str(e)
+
+
+def append_to_gsheet(values):
+    """Agrega una fila al Google Sheet via REST API"""
+    token, err = get_gsheet_token()
+    if not token:
+        return False, err
+    import requests
+    sheet_id = st.secrets.get("GSHEET_ID", "").strip()
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Cotizaciones!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS"
+    resp = requests.post(url, 
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={"values": [values]})
+    if resp.status_code == 200:
+        return True, None
+    return False, f"Error {resp.status_code}: {resp.text[:200]}"
+
+
+def get_gsheet():
+    """Compatibilidad — retorna None para usar append_to_gsheet directamente"""
+    return None, "usar append_to_gsheet"
 
 
 # ── Verificar autenticación ───────────────────────────────────────────────────
@@ -688,48 +705,19 @@ def guardar_cotizacion():
             st.session_state.cotizaciones[existing[0]] = cot_local
         else:
             st.session_state.cotizaciones.append(cot_local)
-        raw_cred = st.secrets.get('GSHEET_CREDENTIALS', 'NO ENCONTRADO')
-        has_gcp = 'gcp_service_account' in st.secrets
-        st.warning(f"⚠️ Error: {err}")
-        st.info(f"GSHEET_CREDENTIALS presente: {len(raw_cred) > 10} | gcp_service_account: {has_gcp} | ID: {st.secrets.get('GSHEET_ID','?')}")
+        st.warning(f"⚠️ Guardada localmente.")
         return
 
-    try:
-        all_vals = sh.get_all_values()
-        rows     = all_vals[1:] if len(all_vals) > 1 else []
-        existing_row = None
-        for i, row in enumerate(rows):
-            if row and row[0] == num_cot:
-                existing_row = i + 2
-                break
-        if existing_row:
-            sh.update(f"A{existing_row}", [fila])
-            st.success(f"✅ Cotización {num_cot} actualizada en Google Sheets")
-        else:
-            sh.append_row(fila)
-            st.success(f"✅ Cotización {num_cot} guardada — {len(st.session_state.piezas)} pieza(s)")
-    except Exception as e:
-        st.error(f"❌ Error al guardar: {str(e)}")
+    # Usar REST API directamente
+    ok, err2 = append_to_gsheet(fila)
+    if ok:
+        st.success(f"✅ Cotización {num_cot} guardada en Google Sheets — {len(st.session_state.piezas)} pieza(s)")
+    else:
+        st.error(f"❌ Error al guardar: {err2}")
 
 
 def cargar_cotizaciones():
-    sh, err = get_gsheet()
-    if sh is None:
-        return st.session_state.get("cotizaciones", [])
-    try:
-        all_vals = sh.get_all_values()
-        if len(all_vals) < 2:
-            return []
-        headers = all_vals[0]
-        result  = []
-        for row in reversed(all_vals[1:]):
-            if not row or not row[0]:
-                continue
-            d = {h: (row[i] if i < len(row) else "") for i, h in enumerate(headers)}
-            result.append(d)
-        return result
-    except Exception:
-        return st.session_state.get("cotizaciones", [])
+    return st.session_state.get("cotizaciones", [])
 
 
 tab1, tab2, tab3 = st.tabs(["📐 Piezas y Ruteo", "📄 Cotización", "🗂️ Historial"])

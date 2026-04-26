@@ -133,7 +133,7 @@ def get_or_create_sheet_id(token):
         if r.status_code == 200:
             return sheet_id, None
     # Crear nuevo spreadsheet via Drive API (con parent folder)
-    folder_id = "1a51KZgmWCu_5niV4bIMmB9BzGn7WiXk3"
+    folder_id = "1aS1KZgmWCu_5niV4blMmB9BzGn7WiXk3"
     r = requests.post(
         "https://www.googleapis.com/drive/v3/files",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},

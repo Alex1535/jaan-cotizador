@@ -705,7 +705,8 @@ def guardar_cotizacion():
             st.session_state.cotizaciones[existing[0]] = cot_local
         else:
             st.session_state.cotizaciones.append(cot_local)
-        st.warning(f"⚠️ Guardada localmente.")
+        token_test, token_err = get_gsheet_token()
+        st.warning(f"⚠️ Guardada localmente. Token error: {token_err}")
         return
 
     # Usar REST API directamente

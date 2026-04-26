@@ -693,8 +693,12 @@ def guardar_cotizacion():
         }, default=str, ensure_ascii=False)
     ]
 
-    sh, err = get_gsheet()
-    if sh is None:
+    # Usar REST API directamente
+    ok, err2 = append_to_gsheet(fila)
+    if ok:
+        st.success(f"✅ Cotización {num_cot} guardada en Google Sheets — {len(st.session_state.piezas)} pieza(s)")
+    else:
+        # Guardar localmente como fallback
         if "cotizaciones" not in st.session_state:
             st.session_state.cotizaciones = []
         existing = [i for i, c in enumerate(st.session_state.cotizaciones)
@@ -705,16 +709,7 @@ def guardar_cotizacion():
             st.session_state.cotizaciones[existing[0]] = cot_local
         else:
             st.session_state.cotizaciones.append(cot_local)
-        token_test, token_err = get_gsheet_token()
-        st.warning(f"⚠️ Guardada localmente. Token error: {token_err}")
-        return
-
-    # Usar REST API directamente
-    ok, err2 = append_to_gsheet(fila)
-    if ok:
-        st.success(f"✅ Cotización {num_cot} guardada en Google Sheets — {len(st.session_state.piezas)} pieza(s)")
-    else:
-        st.error(f"❌ Error al guardar: {err2}")
+        st.warning(f"⚠️ Guardada localmente. Error: {err2}")
 
 
 def cargar_cotizaciones():

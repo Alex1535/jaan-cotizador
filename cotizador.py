@@ -672,8 +672,50 @@ with st.sidebar:
     cliente     = st.text_input("Cliente",          placeholder="Nombre del cliente")
     atencion    = st.text_input("Atención a",        placeholder="Nombre del contacto")
     ciudad      = st.text_input("Ciudad",            placeholder="Ciudad, Estado")
-    num_cot     = st.text_input("Núm. cotización",
-                    value=f"COT-{datetime.now().strftime('%Y%m%d')}-001")
+
+    # ── Consecutivo automático por sufijo ────────────────────────────
+    sufijo_default = st.session_state.get("sufijo_cot", "COT")
+    sufijo = st.text_input("Sufijo de cotización", value=sufijo_default,
+                placeholder="Ej: AIE, GFT, COT",
+                help="El número consecutivo se asigna automáticamente por sufijo").upper().strip()
+    st.session_state["sufijo_cot"] = sufijo
+
+    def get_siguiente_numero(sufijo):
+        """Obtiene el siguiente número consecutivo para el sufijo dado"""
+        import requests
+        token, _ = get_gsheet_token()
+        if not token:
+            return f"{sufijo}-001"
+        sheet_id = st.secrets.get("GSHEET_ID", "").strip()
+        try:
+            resp = requests.get(
+                f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A2:A1000",
+                headers={"Authorization": f"Bearer {token}"})
+            if resp.status_code != 200:
+                return f"{sufijo}-001"
+            numeros = [r[0] for r in resp.json().get("values", []) if r and r[0].startswith(sufijo + "-")]
+            if not numeros:
+                return f"{sufijo}-001"
+            # Extraer el mayor consecutivo
+            maxn = 0
+            for n in numeros:
+                try:
+                    maxn = max(maxn, int(n.split("-")[-1]))
+                except Exception:
+                    pass
+            return f"{sufijo}-{str(maxn + 1).zfill(3)}"
+        except Exception:
+            return f"{sufijo}-001"
+
+    # Generar número si cambia el sufijo o es nuevo
+    if ("num_cot_generado" not in st.session_state or
+        st.session_state.get("sufijo_anterior") != sufijo):
+        st.session_state["num_cot_generado"] = get_siguiente_numero(sufijo)
+        st.session_state["sufijo_anterior"] = sufijo
+
+    num_cot = st.text_input("Núm. cotización",
+                value=st.session_state.get("num_cot_generado", f"{sufijo}-001"),
+                help="Editable — se genera automáticamente")
     tipo_cambio = st.number_input("Tipo de cambio USD/MXN", value=17.31, step=0.01)
     moneda_cot  = st.radio("Moneda de la cotización", ["MXN", "USD"],
                     horizontal=True,

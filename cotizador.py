@@ -121,20 +121,54 @@ def get_gsheet_token():
         return None, str(e)
 
 
+def get_or_create_sheet_id(token):
+    """Obtiene el sheet ID desde Secrets o crea uno nuevo"""
+    import requests, json
+    sheet_id = st.secrets.get("GSHEET_ID", "").strip()
+    if sheet_id:
+        # Verificar acceso
+        r = requests.get(
+            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}",
+            headers={"Authorization": f"Bearer {token}"})
+        if r.status_code == 200:
+            return sheet_id, None
+    # Crear nuevo spreadsheet
+    r = requests.post(
+        "https://sheets.googleapis.com/v4/spreadsheets",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={"properties": {"title": "Cotizaciones JAAN"},
+              "sheets": [{"properties": {"title": "Cotizaciones"}}]})
+    if r.status_code == 200:
+        new_id = r.json()["spreadsheetId"]
+        st.info(f"📋 Nuevo Sheet creado. Agrega este ID a tus Secrets: GSHEET_ID = '{new_id}'")
+        return new_id, None
+    return None, f"No se pudo crear Sheet: {r.text[:200]}"
+
+
 def append_to_gsheet(values):
     """Agrega una fila al Google Sheet via REST API"""
     token, err = get_gsheet_token()
     if not token:
         return False, err
     import requests
-    sheet_id = st.secrets.get("GSHEET_ID", "").strip()
-    # Primero verificar que el spreadsheet existe
-    check_url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}"
-    check_resp = requests.get(check_url, headers={"Authorization": f"Bearer {token}"})
-    if check_resp.status_code != 200:
-        return False, f"Sheet no accesible: {check_resp.status_code} - {check_resp.text[:200]}"
+    sheet_id, err2 = get_or_create_sheet_id(token)
+    if not sheet_id:
+        return False, err2
+    # Agregar encabezados si es nuevo
+    check = requests.get(
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Cotizaciones!A1",
+        headers={"Authorization": f"Bearer {token}"})
+    if check.status_code == 200 and not check.json().get("values"):
+        headers = ["numero","fecha","usuario_email","cliente","atencion",
+                   "ciudad","moneda","tipo_cambio","margen_global",
+                   "subtotal","iva","total_neto","vigencia",
+                   "tiempo_entrega","cond_pago","datos_json"]
+        requests.post(
+            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Cotizaciones!A1:append?valueInputOption=RAW",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={"values": [headers]})
     # Agregar fila
-    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS"
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Cotizaciones!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS"
     resp = requests.post(url,
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         json={"values": [values]})

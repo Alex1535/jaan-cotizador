@@ -1860,7 +1860,7 @@ with tab3:
                     st.markdown(f"<span style='font-size:11px;font-weight:600;color:#9aa3b8;text-transform:uppercase;letter-spacing:0.06em'>{h}</span>", unsafe_allow_html=True)
             st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
 
-            for c in filtradas:
+            for ci, c in enumerate(filtradas):
                 status_actual = c.get("status", "borrador").lower()
                 if status_actual not in ESTADOS:
                     status_actual = "borrador"
@@ -1877,8 +1877,8 @@ with tab3:
                     st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)
                 with cols_row[6]:
                     nuevo = st.selectbox("s", [e for e in ESTADOS if e != status_actual],
-                        key=f"hist_status_{c.get('numero','')}", label_visibility="collapsed")
-                    if st.button("Actualizar", key=f"hist_upd_{c.get('numero','')}", use_container_width=True):
+                        key=f"hs_{ci}", label_visibility="collapsed")
+                    if st.button("Actualizar", key=f"hu_{ci}", use_container_width=True):
                         ok, err = actualizar_status_gsheet(c.get("numero",""), nuevo)
                         if ok:
                             st.success(f"✅ Status actualizado a {nuevo}")

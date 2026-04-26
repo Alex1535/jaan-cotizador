@@ -1017,10 +1017,23 @@ with tab1:
                         st.caption(f"{len(file_bytes_prev)//1024} KB")
                     with prev_c2:
                         if st.toggle("🔍 Ver PDF completo", key=f"toggle_prev_{pieza['id']}"):
-                            st.markdown(
-                                f'<iframe src="data:application/pdf;base64,{pdf_b64}" '
-                                f'width="100%" height="500px" style="border:1px solid #dde1ea;border-radius:8px"></iframe>',
-                                unsafe_allow_html=True)
+                            try:
+                                import fitz
+                                pdf_doc = fitz.open(stream=file_bytes_prev, filetype="pdf")
+                                for page_num in range(min(len(pdf_doc), 3)):
+                                    page = pdf_doc[page_num]
+                                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                                    img_bytes = pix.tobytes("png")
+                                    st.image(img_bytes, use_container_width=True,
+                                             caption=f"Página {page_num+1}")
+                            except ImportError:
+                                st.markdown(
+                                    f'<object data="data:application/pdf;base64,{pdf_b64}" '
+                                    f'type="application/pdf" width="100%" height="500px">'
+                                    f'<p>Tu navegador no puede mostrar el PDF. '
+                                    f'<a href="data:application/pdf;base64,{pdf_b64}" download="plano.pdf">Descargar PDF</a></p>'
+                                    f'</object>',
+                                    unsafe_allow_html=True)
                 st.markdown("---")
 
             if plano_file is not None:

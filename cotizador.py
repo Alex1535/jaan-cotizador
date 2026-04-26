@@ -779,6 +779,47 @@ def cargar_cotizaciones():
         return st.session_state.get("cotizaciones", [])
 
 
+def actualizar_status_gsheet(numero, nuevo_status):
+    """Actualiza el status de una cotización en Google Sheets"""
+    import requests
+    token, err = get_gsheet_token()
+    if not token:
+        return False, err
+    sheet_id = st.secrets.get("GSHEET_ID", "").strip()
+    # Leer todas las filas para encontrar la fila correcta
+    resp = requests.get(
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1:Z1000",
+        headers={"Authorization": f"Bearer {token}"})
+    if resp.status_code != 200:
+        return False, "No se pudo leer el sheet"
+    values = resp.json().get("values", [])
+    if len(values) < 2:
+        return False, "Sheet vacío"
+    headers = values[0]
+    # Encontrar columna status
+    try:
+        status_col = headers.index("status")
+    except ValueError:
+        status_col = len(headers)  # al final
+    # Encontrar fila del número
+    row_num = None
+    for i, row in enumerate(values[1:], 2):
+        if row and row[0] == numero:
+            row_num = i
+            break
+    if not row_num:
+        return False, f"Cotización {numero} no encontrada"
+    # Convertir índice de columna a letra
+    col_letter = chr(ord('A') + status_col)
+    update_resp = requests.put(
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{col_letter}{row_num}?valueInputOption=RAW",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={"values": [[nuevo_status]]})
+    if update_resp.status_code == 200:
+        return True, None
+    return False, update_resp.text[:200]
+
+
 tab1, tab2, tab3 = st.tabs(["📐 Piezas y Ruteo", "📄 Cotización", "🗂️ Historial"])
 
 # Inject expander colors via components.html (executes in real iframe with DOM access)
@@ -1807,17 +1848,43 @@ with tab3:
         if buscar_cot: filtradas = [c for c in filtradas if buscar_cot.upper() in (c.get("numero","")).upper()]
         if buscar_cli: filtradas = [c for c in filtradas if buscar_cli.upper() in (c.get("cliente","")).upper()]
 
+        ESTADOS = ["borrador", "enviada", "ganada", "perdida"]
+        ICONOS  = {"borrador": "📝", "enviada": "📤", "ganada": "✅", "perdida": "❌"}
+        COLORES = {"borrador": "#6b7280", "enviada": "#185FA5", "ganada": "#27500A", "perdida": "#991b1b"}
+
         if filtradas:
-            df_hist = pd.DataFrame([{
-                "Cotización": c.get("numero",""),
-                "Fecha":      c.get("fecha", c.get("created_at",""))[:10],
-                "Cliente":    c.get("cliente",""),
-                "Ciudad":     c.get("ciudad",""),
-                "Moneda":     c.get("moneda","MXN"),
-                "Total":      fmtc(float(c.get("total_neto", 0))),
-                "Status":     c.get("status","borrador").upper(),
-            } for c in filtradas])
-            st.dataframe(df_hist, use_container_width=True, hide_index=True)
+            # Tabla con status editable inline
+            cols_header = st.columns([1.5, 1.2, 2, 1.5, 1, 1, 1.8])
+            for col, h in zip(cols_header, ["Cotización", "Fecha", "Cliente", "Total", "Moneda", "Status", "Cambiar status"]):
+                with col:
+                    st.markdown(f"<span style='font-size:11px;font-weight:600;color:#9aa3b8;text-transform:uppercase;letter-spacing:0.06em'>{h}</span>", unsafe_allow_html=True)
+            st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
+
+            for c in filtradas:
+                status_actual = c.get("status", "borrador").lower()
+                if status_actual not in ESTADOS:
+                    status_actual = "borrador"
+                color  = COLORES.get(status_actual, "#6b7280")
+                icono  = ICONOS.get(status_actual, "📝")
+
+                cols_row = st.columns([1.5, 1.2, 2, 1.5, 1, 1, 1.8])
+                with cols_row[0]: st.markdown(f"**{c.get('numero','')}**")
+                with cols_row[1]: st.markdown(c.get("fecha", c.get("created_at",""))[:10])
+                with cols_row[2]: st.markdown(c.get("cliente","—"))
+                with cols_row[3]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
+                with cols_row[4]: st.markdown(c.get("moneda","MXN"))
+                with cols_row[5]:
+                    st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)
+                with cols_row[6]:
+                    nuevo = st.selectbox("s", [e for e in ESTADOS if e != status_actual],
+                        key=f"status_{c.get('numero','')}", label_visibility="collapsed")
+                    if st.button("Actualizar", key=f"upd_{c.get('numero','')}", use_container_width=True):
+                        ok, err = actualizar_status_gsheet(c.get("numero",""), nuevo)
+                        if ok:
+                            st.success(f"✅ Status actualizado a {nuevo}")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {err}")
 
             st.markdown("---")
             numeros   = [c.get("numero","") for c in filtradas]

@@ -1412,7 +1412,7 @@ with tab1:
                     st.session_state.piezas[pi]["operaciones"][oi]["setup_hrs"] = setup
 
                 with cols[4]:
-                    ciclo = st.number_input("c", min_value=0.001, max_value=999.0,
+                    ciclo = st.number_input("c", min_value=0.0, max_value=999.0,
                         value=float(op["ciclo_hrs"]), step=0.01, key=key_ciclo,
                         label_visibility="collapsed")
                     st.session_state.piezas[pi]["operaciones"][oi]["ciclo_hrs"] = ciclo

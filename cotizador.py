@@ -102,10 +102,11 @@ def get_gsheet():
 
         creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         gc = gspread.authorize(creds)
-        sheet_id = st.secrets.get("GSHEET_ID", "")
+        sheet_id = st.secrets.get("GSHEET_ID", "").strip()
         if not sheet_id:
             return None, "GSHEET_ID no configurado"
-        wb = gc.open_by_key(sheet_id)
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
+        wb = gc.open_by_url(url)
         try:
             sh = wb.worksheet("Cotizaciones")
         except gspread.WorksheetNotFound:

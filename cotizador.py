@@ -743,7 +743,40 @@ def guardar_cotizacion():
 
 
 def cargar_cotizaciones():
-    return st.session_state.get("cotizaciones", [])
+    """Lee cotizaciones desde Google Sheets"""
+    import requests
+    token, err = get_gsheet_token()
+    if not token:
+        return st.session_state.get("cotizaciones", [])
+    
+    sheet_id = st.secrets.get("GSHEET_ID", "").strip()
+    if not sheet_id:
+        return st.session_state.get("cotizaciones", [])
+    
+    try:
+        resp = requests.get(
+            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1:Z1000",
+            headers={"Authorization": f"Bearer {token}"})
+        if resp.status_code != 200:
+            return st.session_state.get("cotizaciones", [])
+        
+        data = resp.json()
+        values = data.get("values", [])
+        if len(values) < 2:
+            return []
+        
+        headers = values[0]
+        result = []
+        for row in reversed(values[1:]):
+            if not row or not row[0]:
+                continue
+            d = {}
+            for i, h in enumerate(headers):
+                d[h] = row[i] if i < len(row) else ""
+            result.append(d)
+        return result
+    except Exception:
+        return st.session_state.get("cotizaciones", [])
 
 
 tab1, tab2, tab3 = st.tabs(["📐 Piezas y Ruteo", "📄 Cotización", "🗂️ Historial"])

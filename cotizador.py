@@ -796,28 +796,36 @@ def actualizar_status_gsheet(numero, nuevo_status):
     if len(values) < 2:
         return False, "Sheet vacío"
     headers = values[0]
-    # Encontrar columna status
-    try:
+    # Encontrar o crear columna status
+    if "status" in headers:
         status_col = headers.index("status")
-    except ValueError:
-        status_col = len(headers)  # al final
-    # Encontrar fila del número
+    else:
+        # Agregar encabezado status al final
+        status_col = len(headers)
+        col_header_letter = chr(ord("A") + status_col)
+        requests.put(
+            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{col_header_letter}1?valueInputOption=RAW",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={"values": [["status"]]})
+
+    # Encontrar fila del número de cotización
     row_num = None
     for i, row in enumerate(values[1:], 2):
         if row and row[0] == numero:
             row_num = i
             break
     if not row_num:
-        return False, f"Cotización {numero} no encontrada"
-    # Convertir índice de columna a letra
-    col_letter = chr(ord('A') + status_col)
+        return False, f"Cotización {numero} no encontrada en el Sheet"
+
+    # Actualizar el status
+    col_letter = chr(ord("A") + status_col)
     update_resp = requests.put(
         f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{col_letter}{row_num}?valueInputOption=RAW",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         json={"values": [[nuevo_status]]})
     if update_resp.status_code == 200:
         return True, None
-    return False, update_resp.text[:200]
+    return False, f"Error {update_resp.status_code}: {update_resp.text[:200]}"
 
 
 tab1, tab2, tab3 = st.tabs(["📐 Piezas y Ruteo", "📄 Cotización", "🗂️ Historial"])

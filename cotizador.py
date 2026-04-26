@@ -106,7 +106,10 @@ def get_gsheet():
         if not sheet_id:
             return None, "GSHEET_ID no configurado"
         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
-        wb = gc.open_by_url(url)
+        try:
+            wb = gc.open("Cotizaciones JAAN")
+        except Exception:
+            wb = gc.open_by_key(sheet_id)
         try:
             sh = wb.worksheet("Cotizaciones")
         except gspread.WorksheetNotFound:
@@ -685,8 +688,10 @@ def guardar_cotizacion():
             st.session_state.cotizaciones[existing[0]] = cot_local
         else:
             st.session_state.cotizaciones.append(cot_local)
-        st.warning(f"⚠️ Guardada localmente. Error detallado: {err}")
-        st.info(f"🔍 Debug — GSHEET_ID: '{st.secrets.get('GSHEET_ID', 'NO ENCONTRADO')}'")
+        raw_cred = st.secrets.get('GSHEET_CREDENTIALS', 'NO ENCONTRADO')
+        has_gcp = 'gcp_service_account' in st.secrets
+        st.warning(f"⚠️ Error: {err}")
+        st.info(f"GSHEET_CREDENTIALS presente: {len(raw_cred) > 10} | gcp_service_account: {has_gcp} | ID: {st.secrets.get('GSHEET_ID','?')}")
         return
 
     try:

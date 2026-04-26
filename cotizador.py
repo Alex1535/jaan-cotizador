@@ -669,9 +669,9 @@ with st.sidebar:
     st.markdown("---")
 
     st.markdown("### 📋 Datos de la cotización")
-    cliente     = st.text_input("Cliente",          placeholder="Nombre del cliente")
-    atencion    = st.text_input("Atención a",        placeholder="Nombre del contacto")
-    ciudad      = st.text_input("Ciudad",            placeholder="Ciudad, Estado")
+    cliente     = st.text_input("Cliente",     value=st.session_state.pop("_cliente","")     or "", placeholder="Nombre del cliente")
+    atencion    = st.text_input("Atención a",  value=st.session_state.pop("_atencion","")    or "", placeholder="Nombre del contacto")
+    ciudad      = st.text_input("Ciudad",      value=st.session_state.pop("_ciudad","")      or "", placeholder="Ciudad, Estado")
 
     # ── Consecutivo automático por sufijo ────────────────────────────
     sufijo_default = st.session_state.get("sufijo_cot", "COT")
@@ -2010,14 +2010,26 @@ with tab3:
                         try:
                             datos_raw = cot_sel.get("datos_json", "{}")
                             datos = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                            st.session_state.piezas         = datos.get("piezas", [])
-                            cond = datos.get("cond_generales", {})
-                            st.session_state.vigencia       = cond.get("vigencia", "15 Días")
-                            st.session_state.tiempo_entrega = cond.get("tiempo_entrega", "22-30 días hábiles")
-                            st.session_state.cond_pago      = cond.get("cond_pago", "")
-                            st.session_state.num_cotizacion = cot_sel.get("numero","")
-                            st.session_state.cliente_input  = cot_sel.get("cliente","")
-                            st.success(f"✅ Cotización {sel_num} cargada — ve a Piezas y Ruteo")
+                            cond  = datos.get("cond_generales", {})
+
+                            # Restaurar TODO el proyecto completo
+                            st.session_state.piezas          = datos.get("piezas", [])
+                            st.session_state.num_cot_generado = cot_sel.get("numero", "")
+                            st.session_state.sufijo_cot      = cot_sel.get("numero", "").split("-")[0] if "-" in cot_sel.get("numero","") else "COT"
+                            st.session_state.sufijo_anterior = st.session_state.sufijo_cot
+                            # Datos del sidebar
+                            st.session_state["_cliente"]     = cot_sel.get("cliente", "")
+                            st.session_state["_atencion"]    = cot_sel.get("atencion", "")
+                            st.session_state["_ciudad"]      = cot_sel.get("ciudad", "")
+                            st.session_state["_moneda"]      = cot_sel.get("moneda", "MXN")
+                            st.session_state["_tipo_cambio"] = float(cot_sel.get("tipo_cambio", 17.31) or 17.31)
+                            st.session_state["_margen"]      = int(float(cot_sel.get("margen_global", 35) or 35))
+                            # Condiciones generales
+                            st.session_state["_vigencia"]    = cond.get("vigencia", "15 Días")
+                            st.session_state["_t_entrega"]   = cond.get("tiempo_entrega", "22-30 días hábiles")
+                            st.session_state["_cond_pago"]   = cond.get("cond_pago", "40% anticipo - 60% contra-entrega")
+
+                            st.success(f"✅ Proyecto {sel_num} cargado completo — ve a Piezas y Ruteo")
                             st.rerun()
                         except Exception as e:
                             st.error(f"❌ Error al cargar: {str(e)}")

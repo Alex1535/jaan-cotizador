@@ -146,7 +146,7 @@ def append_to_gsheet(values):
         return False, err2
     # Agregar encabezados si es nuevo
     check = requests.get(
-        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Cotizaciones!A1",
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Cotizaciones%21A1",
         headers={"Authorization": f"Bearer {token}"})
     if check.status_code == 200 and not check.json().get("values"):
         headers = ["numero","fecha","usuario_email","cliente","atencion",
@@ -154,11 +154,11 @@ def append_to_gsheet(values):
                    "subtotal","iva","total_neto","vigencia",
                    "tiempo_entrega","cond_pago","datos_json"]
         requests.post(
-            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Cotizaciones!A1:append?valueInputOption=RAW",
+            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Cotizaciones%21A1:append?valueInputOption=RAW",
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             json={"values": [headers]})
     # Agregar fila
-    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Cotizaciones!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS"
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Cotizaciones%21A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS"
     resp = requests.post(url,
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         json={"values": [values]})

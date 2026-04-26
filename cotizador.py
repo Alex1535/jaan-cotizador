@@ -4,47 +4,33 @@ import math
 import json
 from datetime import datetime
 
-st.set_page_config(
-    page_title="Cotizador JAAN Manufacturing",
-    page_icon="⚙️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 # ══════════════════════════════════════════════════════════════════════════════
 # AUTENTICACIÓN — Usuarios desde Streamlit Secrets
 # ══════════════════════════════════════════════════════════════════════════════
 
 def cargar_usuarios():
-    """
-    Lee usuarios desde st.secrets['USUARIOS'].
+    """Lee usuarios desde st.secrets['USUARIOS'].
     Formato: "email:password:nombre:rol|email2:password2:nombre2:rol2"
-    Retorna dict: {email: {password, nombre, rol}}
     """
-    usuarios = {}
-    raw = ""
     try:
         raw = st.secrets.get("USUARIOS", "")
     except Exception:
-        pass
-
+        raw = ""
     if not raw:
-        # Fallback hardcodeado de emergencia
         return {"admin@jaan.com": {"password": "jaan2024", "nombre": "Administrador", "rol": "admin"}}
-
+    usuarios = {}
     for entry in raw.split("|"):
         parts = entry.strip().split(":")
         if len(parts) >= 4:
-            email    = parts[0].strip()
-            password = parts[1].strip()
-            nombre   = parts[2].strip()
-            rol      = parts[3].strip()
-            usuarios[email] = {"password": password, "nombre": nombre, "rol": rol}
+            usuarios[parts[0].strip()] = {
+                "password": parts[1].strip(),
+                "nombre":   parts[2].strip(),
+                "rol":      parts[3].strip(),
+            }
     return usuarios
 
 
 def login_screen():
-    """Pantalla de login"""
     st.markdown("""
     <div style='max-width:400px;margin:80px auto;padding:40px;
                 background:white;border-radius:16px;
@@ -56,31 +42,65 @@ def login_screen():
         </div>
     </div>
     """, unsafe_allow_html=True)
-
     with st.form("login_form"):
         st.markdown("### Iniciar sesión")
         email    = st.text_input("Correo electrónico", placeholder="usuario@jaan.com")
         password = st.text_input("Contraseña", type="password")
         submit   = st.form_submit_button("Entrar", use_container_width=True)
-
         if submit:
             if not email or not password:
                 st.error("Ingresa tu correo y contraseña")
                 return
-
             usuarios = cargar_usuarios()
-            email = email.strip().lower()
-
-            if email in usuarios and usuarios[email]["password"] == password:
-                st.session_state.usuario = {
-                    "email":  email,
-                    "nombre": usuarios[email]["nombre"],
-                    "rol":    usuarios[email]["rol"],
-                }
+            email_key = email.strip().lower()
+            if email_key in usuarios and usuarios[email_key]["password"] == password:
+                st.session_state.usuario     = {"email": email_key, "nombre": usuarios[email_key]["nombre"], "rol": usuarios[email_key]["rol"]}
                 st.session_state.autenticado = True
                 st.rerun()
             else:
                 st.error("❌ Credenciales incorrectas")
+
+
+if not st.session_state.get("autenticado", False):
+    login_screen()
+    st.stop()
+
+st.set_page_config(page_title="Cotizador JAAN Manufacturing", page_icon="⚙️",
+                   layout="wide", initial_sidebar_state="expanded")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GOOGLE SHEETS — Guardar y cargar cotizaciones
+# ══════════════════════════════════════════════════════════════════════════════
+
+def get_gsheet():
+    """Retorna hoja 'Cotizaciones' del Google Sheet, o (None, error)"""
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        scopes = ["https://www.googleapis.com/auth/spreadsheets",
+                  "https://www.googleapis.com/auth/drive"]
+        creds = Credentials.from_service_account_info(
+            dict(st.secrets["gcp_service_account"]), scopes=scopes)
+        gc = gspread.authorize(creds)
+        sheet_id = st.secrets.get("GSHEET_ID", "")
+        if not sheet_id:
+            return None, "GSHEET_ID no configurado"
+        wb = gc.open_by_key(sheet_id)
+        try:
+            sh = wb.worksheet("Cotizaciones")
+        except gspread.WorksheetNotFound:
+            sh = wb.add_worksheet("Cotizaciones", rows=1000, cols=20)
+            sh.append_row(["numero","fecha","usuario_email","cliente","atencion",
+                           "ciudad","moneda","tipo_cambio","margen_global",
+                           "subtotal","iva","total_neto","vigencia",
+                           "tiempo_entrega","cond_pago","datos_json"])
+        return sh, None
+    except ImportError:
+        return None, "gspread no instalado"
+    except KeyError:
+        return None, "gcp_service_account no configurado en Secrets"
+    except Exception as e:
+        return None, str(e)
 
 
 # ── Verificar autenticación ───────────────────────────────────────────────────
@@ -611,64 +631,10 @@ def fmtc(v):
 simbolo = "USD $" if moneda_cot == "USD" else "$"
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# GOOGLE SHEETS — Guardar y cargar cotizaciones
-# ══════════════════════════════════════════════════════════════════════════════
-
-def get_gsheet():
-    """
-    Retorna la hoja 'Cotizaciones' del Google Sheet configurado en Secrets.
-    Requiere en secrets.toml:
-      [gcp_service_account]
-      ... (JSON del service account)
-      GSHEET_ID = "ID del spreadsheet"
-    Retorna (sheet, None) o (None, mensaje_error)
-    """
-    try:
-        import gspread
-        from google.oauth2.service_account import Credentials
-
-        scopes = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive",
-        ]
-        creds_dict = dict(st.secrets["gcp_service_account"])
-        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-        gc    = gspread.authorize(creds)
-
-        sheet_id = st.secrets.get("GSHEET_ID", "")
-        if not sheet_id:
-            return None, "GSHEET_ID no configurado en Secrets"
-
-        wb = gc.open_by_key(sheet_id)
-
-        # Obtener o crear hoja Cotizaciones
-        try:
-            sh = wb.worksheet("Cotizaciones")
-        except gspread.WorksheetNotFound:
-            sh = wb.add_worksheet("Cotizaciones", rows=1000, cols=20)
-            # Encabezados
-            sh.append_row([
-                "numero", "fecha", "usuario_email", "cliente", "atencion",
-                "ciudad", "moneda", "tipo_cambio", "margen_global",
-                "subtotal", "iva", "total_neto",
-                "vigencia", "tiempo_entrega", "cond_pago", "datos_json"
-            ])
-        return sh, None
-    except ImportError:
-        return None, "gspread no instalado (agrega gspread y google-auth a requirements.txt)"
-    except KeyError:
-        return None, "gcp_service_account no configurado en Secrets"
-    except Exception as e:
-        return None, str(e)
-
-
+# ── Guardar cotización en Google Sheets ──────────────────────────────────────
 def guardar_cotizacion():
-    """Guarda la cotización actual en Google Sheets"""
-    total = sum(
-        calcular_pieza(p, margen_global).get("total", 0)
-        for p in st.session_state.piezas
-    )
+    total = sum(calcular_pieza(p, margen_global).get("total", 0)
+                for p in st.session_state.piezas)
     iva        = total * 0.16
     total_neto = total + iva
 
@@ -682,26 +648,20 @@ def guardar_cotizacion():
         vigencia, t_entrega, cond_pago,
         json.dumps({
             "piezas": st.session_state.piezas,
-            "cond_generales": {
-                "vigencia":       vigencia,
-                "tiempo_entrega": t_entrega,
-                "cond_pago":      cond_pago,
-            }
+            "cond_generales": {"vigencia": vigencia,
+                               "tiempo_entrega": t_entrega,
+                               "cond_pago": cond_pago}
         }, default=str, ensure_ascii=False)
     ]
 
     sh, err = get_gsheet()
     if sh is None:
-        # Fallback: guardar en memoria local
-        cot_local = {
-            "numero": num_cot, "fecha": fila[1],
-            "cliente": cliente, "total_neto": total_neto,
-        }
         if "cotizaciones" not in st.session_state:
             st.session_state.cotizaciones = []
-        # Actualizar si ya existe
         existing = [i for i, c in enumerate(st.session_state.cotizaciones)
                     if c.get("numero") == num_cot]
+        cot_local = {"numero": num_cot, "fecha": fila[1],
+                     "cliente": cliente, "total_neto": total_neto}
         if existing:
             st.session_state.cotizaciones[existing[0]] = cot_local
         else:
@@ -710,53 +670,38 @@ def guardar_cotizacion():
         return
 
     try:
-        # Buscar si ya existe la cotización para actualizar
         all_vals = sh.get_all_values()
-        headers  = all_vals[0] if all_vals else []
         rows     = all_vals[1:] if len(all_vals) > 1 else []
-
-        num_col = 0  # columna "numero"
         existing_row = None
         for i, row in enumerate(rows):
             if row and row[0] == num_cot:
-                existing_row = i + 2  # +2: encabezado + 1-indexed
+                existing_row = i + 2
                 break
-
         if existing_row:
             sh.update(f"A{existing_row}", [fila])
             st.success(f"✅ Cotización {num_cot} actualizada en Google Sheets")
         else:
             sh.append_row(fila)
-            st.success(f"✅ Cotización {num_cot} guardada en Google Sheets — {len(st.session_state.piezas)} pieza(s)")
+            st.success(f"✅ Cotización {num_cot} guardada — {len(st.session_state.piezas)} pieza(s)")
     except Exception as e:
-        st.error(f"❌ Error al guardar en Google Sheets: {str(e)}")
+        st.error(f"❌ Error al guardar: {str(e)}")
 
 
 def cargar_cotizaciones():
-    """Carga cotizaciones desde Google Sheets. Retorna lista de dicts."""
     sh, err = get_gsheet()
     if sh is None:
-        # Fallback local
         return st.session_state.get("cotizaciones", [])
-
     try:
         all_vals = sh.get_all_values()
         if len(all_vals) < 2:
             return []
         headers = all_vals[0]
-        rows    = all_vals[1:]
-
-        result = []
-        for row in rows:
+        result  = []
+        for row in reversed(all_vals[1:]):
             if not row or not row[0]:
                 continue
-            d = {}
-            for i, h in enumerate(headers):
-                d[h] = row[i] if i < len(row) else ""
+            d = {h: (row[i] if i < len(row) else "") for i, h in enumerate(headers)}
             result.append(d)
-
-        # Más reciente primero
-        result.reverse()
         return result
     except Exception:
         return st.session_state.get("cotizaciones", [])
@@ -1796,7 +1741,7 @@ with tab3:
                 "Fecha":      c.get("fecha", c.get("created_at",""))[:10],
                 "Cliente":    c.get("cliente",""),
                 "Ciudad":     c.get("ciudad",""),
-                "Moneda":     c.get("moneda", c.get("moneda_cot","MXN")),
+                "Moneda":     c.get("moneda","MXN"),
                 "Total":      fmtc(float(c.get("total_neto", 0))),
                 "Status":     c.get("status","borrador").upper(),
             } for c in filtradas])

@@ -128,7 +128,8 @@ def append_to_gsheet(values):
         return False, err
     import requests
     sheet_id = st.secrets.get("GSHEET_ID", "").strip()
-    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Cotizaciones!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS"
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/Cotizaciones%21A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS"
+    st.write(f"DEBUG URL: {url[:80]}")  # debug temporal
     resp = requests.post(url, 
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         json={"values": [values]})

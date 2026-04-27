@@ -937,18 +937,40 @@ def cargar_cotizaciones():
                      "margen_global","subtotal","iva","total_neto","vigencia",
                      "tiempo_entrega","cond_pago","datos_json","status"]
 
+        # Schemas conocidos — mapeados por número de columnas (sin contar status al final)
+        # Schema viejo:  numero,fecha,email,cliente,atencion,ciudad,moneda,tc,margen,sub,iva,total,vig,tent,cpago,json
+        # Schema nuevo:  numero,fecha,email,cliente,atencion,direccion,cp,ciudad,pais,moneda,tc,margen,sub,iva,total,vig,tent,cpago,json
+        SCHEMA_VIEJO = ["numero","fecha","usuario_email","cliente","atencion",
+                        "ciudad","moneda","tipo_cambio","margen_global",
+                        "subtotal","iva","total_neto","vigencia",
+                        "tiempo_entrega","cond_pago","datos_json"]
+        SCHEMA_NUEVO = ["numero","fecha","usuario_email","cliente","atencion",
+                        "direccion","cp","ciudad","pais","moneda","tipo_cambio",
+                        "margen_global","subtotal","iva","total_neto","vigencia",
+                        "tiempo_entrega","cond_pago","datos_json"]
+
         def parse_row(headers, row):
             """Mapea una fila tolerando schemas viejos (sin direccion/cp/pais)."""
+            # Detectar schema por los headers reales de la fila del Sheet
+            # Si el header real tiene "direccion" usar schema nuevo, si no usar viejo
+            if "direccion" in headers:
+                schema = SCHEMA_NUEVO
+            else:
+                schema = SCHEMA_VIEJO
+
             d = {}
-            # Mapeo directo por header real de la fila
-            for i, h in enumerate(headers):
+            for i, h in enumerate(schema):
                 d[h] = row[i] if i < len(row) else ""
 
-            # Si faltan campos nuevos (schema viejo), intentar reubicar datos_json
-            # buscando la última celda que contenga JSON válido con "piezas"
-            if not d.get("datos_json","").strip().startswith("{"):
+            # Garantizar campos nuevos vacíos si schema viejo
+            for campo in ["direccion","cp","pais"]:
+                if campo not in d:
+                    d[campo] = ""
+
+            # Buscar datos_json si está vacío o corrupto (puede estar al final)
+            if not (d.get("datos_json","").strip().startswith("{")):
                 for cell in reversed(row):
-                    cell = cell.strip() if cell else ""
+                    cell = (cell or "").strip()
                     if cell.startswith("{") and '"piezas"' in cell:
                         try:
                             _json.loads(cell)
@@ -957,19 +979,11 @@ def cargar_cotizaciones():
                         except Exception:
                             pass
 
-            # Para schemas viejos sin direccion/cp/pais, dejar vacíos
-            for campo in ["direccion","cp","pais"]:
-                if campo not in d:
-                    d[campo] = ""
+            # Status puede estar como columna extra al final
+            if "status" in headers:
+                si = headers.index("status")
+                d["status"] = row[si] if si < len(row) else ""
 
-            # Reparar moneda/total_neto si cayeron en columna equivocada
-            # (schema viejo: columna 6=ciudad era moneda, columna 11=total_neto)
-            if d.get("moneda","") in ("", "0") and len(row) > 6:
-                # Intentar detectar moneda buscando MXN/USD en la fila
-                for cell in row:
-                    if cell in ("MXN", "USD"):
-                        d["moneda"] = cell
-                        break
             if not d.get("moneda",""):
                 d["moneda"] = "MXN"
 
@@ -2373,8 +2387,14 @@ with tab3:
                             st.session_state["_ciudad"]     = cot_sel.get("ciudad", "")
                             st.session_state["_pais"]       = cot_sel.get("pais", "")
                             st.session_state["_moneda"]      = cot_sel.get("moneda", "MXN")
-                            st.session_state["_tipo_cambio"] = float(cot_sel.get("tipo_cambio", 17.31) or 17.31)
-                            st.session_state["_margen"]      = int(float(cot_sel.get("margen_global", 35) or 35))
+                            try:
+                                st.session_state["_tipo_cambio"] = float(cot_sel.get("tipo_cambio", 17.31) or 17.31)
+                            except (ValueError, TypeError):
+                                st.session_state["_tipo_cambio"] = 17.31
+                            try:
+                                st.session_state["_margen"] = int(float(cot_sel.get("margen_global", 35) or 35))
+                            except (ValueError, TypeError):
+                                st.session_state["_margen"] = 35
                             st.session_state["_vigencia"]    = cond.get("vigencia", "15 Días")
                             st.session_state["_t_entrega"]   = cond.get("tiempo_entrega", "22-30 días hábiles")
                             st.session_state["_cond_pago"]   = cond.get("cond_pago", "40% anticipo - 60% contra-entrega")

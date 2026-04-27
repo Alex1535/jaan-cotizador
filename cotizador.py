@@ -1060,8 +1060,8 @@ def cargar_cotizaciones():
                     if es_proyecto:
                         moq  = int(p.get("moq", 0) or 0)
                         eau  = int(p.get("eau", 0) or 0)
-                        cant = eau
-                        cant_display = f"MOQ: {moq}\nEAU: {eau}"
+                        cant = moq + eau
+                        cant_display = str(cant)
                     else:
                         cant = int(p.get("cantidad", 0) or 0)
                         cant_display = str(cant)
@@ -2419,13 +2419,7 @@ with tab3:
                             st.markdown(it.get("desc") or "—")
                     with cols_row[5]:
                         for it in items_lista:
-                            cd = it.get("cant_display", str(it.get("cant",0)))
-                            if "\n" in cd:
-                                moq_line, eau_line = cd.split("\n")
-                                st.markdown(f"**{moq_line}**")
-                                st.markdown(f"**{eau_line}**")
-                            else:
-                                st.markdown(f"**{cd}**")
+                            st.markdown(f"**{it.get('cant_display', it.get('cant',0))}**")
                     with cols_row[6]:
                         for it in items_lista:
                             st.markdown(fmtc(it.get("total", 0)))

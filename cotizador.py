@@ -2070,7 +2070,7 @@ with tab1:
             provmp_c1, provmp_c2 = st.columns([2, 2])
             with provmp_c1:
                 prov_mp = st.text_input(
-                    "🏭 Proveedor de materia prima",
+                    "Proveedor de materia prima",
                     value=mp.get("proveedor", ""),
                     key=f"provmp_{pieza['id']}",
                     placeholder="Nombre del proveedor"
@@ -2078,7 +2078,7 @@ with tab1:
                 st.session_state.piezas[pi]["materia_prima"]["proveedor"] = prov_mp
             with provmp_c2:
                 cot_mp_file = st.file_uploader(
-                    "📎 Cotización del proveedor (PDF/imagen)",
+                    "Cotización del proveedor (PDF/imagen)",
                     type=["pdf", "png", "jpg", "jpeg"],
                     key=f"cotmpfile_{pieza['id']}",
                     help="Se guardará junto con la cotización"
@@ -2130,7 +2130,7 @@ with tab1:
             prov_t1, prov_t2 = st.columns([2, 2])
             with prov_t1:
                 prov_trat = st.text_input(
-                    "🏭 Proveedor de tratamiento",
+                    "Proveedor de tratamiento",
                     value=pieza.get("proveedor_trat", ""),
                     key=f"provtrat_{pieza['id']}",
                     placeholder="Nombre del proveedor"
@@ -2138,7 +2138,7 @@ with tab1:
                 st.session_state.piezas[pi]["proveedor_trat"] = prov_trat
             with prov_t2:
                 cot_file = st.file_uploader(
-                    "📎 Cotización del proveedor (PDF/imagen)",
+                    "Cotización del proveedor (PDF/imagen)",
                     type=["pdf", "png", "jpg", "jpeg"],
                     key=f"cotfile_{pieza['id']}",
                     help="Se guardará junto con la cotización"
@@ -2166,7 +2166,7 @@ with tab1:
                     )
 
             # Demanda mensual (para semáforo de turnos)
-            demanda = st.number_input("📦 Demanda mensual requerida (pzas/mes)",
+            demanda = st.number_input("Demanda mensual requerida (pzas/mes)",
                 min_value=0, max_value=999999,
                 value=int(pieza.get("demanda_mensual", 0)),
                 key=f"dem_{pieza['id']}",
@@ -2555,7 +2555,7 @@ with tab2:
         guardar_cotizacion()
 
     st.markdown("---")
-    st.markdown("#### 📤 Enviar cotización al cliente")
+    st.markdown("#### Enviar cotización al cliente")
 
     # ── Datos del usuario remitente ──────────────────────────────────────
     usuario_actual   = st.session_state.get("usuario", {})
@@ -2564,22 +2564,22 @@ with tab2:
     smtp_pass_actual = st.secrets.get(f"SMTP_{smtp_user_actual}", "")
 
     if not smtp_pass_actual:
-        st.warning("⚠️ No se encontró contraseña SMTP para " + smtp_user_actual +
+        st.warning("No se encontró contraseña SMTP para " + smtp_user_actual +
                    ". Verifica que en Secrets exista: SMTP_" + smtp_user_actual)
     else:
-        st.success("✅ SMTP configurado para " + smtp_user_actual)
+        st.success("SMTP configurado para " + smtp_user_actual)
 
     ecol1, ecol2 = st.columns([2, 1])
     with ecol1:
-        email_cliente = st.text_input("📧 Email del cliente",
+        email_cliente = st.text_input("Email del cliente",
             key="sb_email_cliente", placeholder="cliente@empresa.com")
     with ecol2:
         st.markdown(
             f"<div style='padding-top:28px;font-size:12px;color:#6b7280'>"
-            f"📤 Remitente:<br><b>{smtp_user_actual or 'No configurado'}</b></div>",
+            f"Remitente:<br><b>{smtp_user_actual or 'No configurado'}</b></div>",
             unsafe_allow_html=True)
 
-    asunto = st.text_input("📌 Asunto",
+    asunto = st.text_input("Asunto",
         value=f"Cotización {num_cot} — JAAN Manufacturing",
         key=f"sb_email_asunto_{num_cot}")
 
@@ -2594,7 +2594,7 @@ with tab2:
     body_key = f"sb_email_body_{num_cot}"
     if body_key not in st.session_state:
         st.session_state[body_key] = default_body
-    cuerpo_email = st.text_area("✉️ Redactar mensaje", key=body_key, height=220)
+    cuerpo_email = st.text_area("Mensaje", key=body_key, height=220)
 
 
     # Generar PDF
@@ -2617,16 +2617,16 @@ with tab2:
     bcol1, bcol2 = st.columns(2)
     with bcol1:
         if pdf_bytes:
-            st.download_button("📥 Descargar PDF",
+            st.download_button("Descargar PDF",
                 data=pdf_bytes,
                 file_name=f"Cotizacion_{num_cot}.pdf",
                 mime="application/pdf",
                 use_container_width=True)
         else:
-            st.button("📥 Descargar PDF", disabled=True, use_container_width=True)
+            st.button("Descargar PDF", disabled=True, use_container_width=True)
     with bcol2:
         can_send = bool(email_cliente and "@" in email_cliente and pdf_bytes and smtp_pass_actual)
-        if st.button("📨 Enviar al cliente", disabled=not can_send,
+        if st.button("Enviar al cliente", disabled=not can_send,
                      use_container_width=True, type="primary"):
             with st.spinner(f"Enviando desde {smtp_user_actual} a {email_cliente}..."):
                 ok_send, err_send = enviar_cotizacion_email(

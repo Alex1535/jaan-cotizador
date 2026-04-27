@@ -1977,7 +1977,12 @@ with tab1:
             r1.metric("Maquinado/pza",   fmtc(res["costo_maq"]))
             r2.metric("Material/pza",    fmtc(res["costo_material"]))
             r3.metric("Tratamiento/pza", fmtc(res["costo_trat"]))
-            r4.metric("Precio/pza",      fmtc(res["precio_pza"]))
+            with r4:
+                st.markdown(
+                    f"<div style='padding:4px 0'>"
+                    f"<div style='font-size:12px;color:#6b7280;font-weight:500'>Precio/pza</div>"
+                    f"<div style='font-size:26px;font-weight:700;color:#16a34a'>{fmtc(res['precio_pza'])}</div>"
+                    f"</div>", unsafe_allow_html=True)
 
             st.markdown(
                 f"<div style='display:flex;gap:12px;margin-top:8px'>"
@@ -2002,7 +2007,12 @@ with tab1:
             r1.metric("Maquinado/pza",    fmtc(res["costo_maq"]))
             r2.metric("Material/pza",     fmtc(res["costo_material"]))
             r3.metric("Tratamiento/pza",  fmtc(res["costo_trat"]))
-            r4.metric("Precio/pza",       fmtc(res["precio_pza"]))
+            with r4:
+                st.markdown(
+                    f"<div style='padding:4px 0'>"
+                    f"<div style='font-size:12px;color:#6b7280;font-weight:500'>Precio/pza</div>"
+                    f"<div style='font-size:26px;font-weight:700;color:#16a34a'>{fmtc(res['precio_pza'])}</div>"
+                    f"</div>", unsafe_allow_html=True)
             r5.metric(f"Total {cant} pzas", fmtc(res["total"]))
 
         st.markdown("</div>", unsafe_allow_html=True)

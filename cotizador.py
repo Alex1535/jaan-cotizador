@@ -2564,7 +2564,10 @@ with tab2:
     smtp_pass_actual = st.secrets.get(f"SMTP_{smtp_user_actual}", "")
 
     if not smtp_pass_actual:
-        st.info(f"ℹ️ Para enviar como **{smtp_user_actual}**, agrega `SMTP_{smtp_user_actual}` a los Secrets de Streamlit.")
+        st.warning("⚠️ No se encontró contraseña SMTP para " + smtp_user_actual +
+                   ". Verifica que en Secrets exista: SMTP_" + smtp_user_actual)
+    else:
+        st.success("✅ SMTP configurado para " + smtp_user_actual)
 
     ecol1, ecol2 = st.columns([2, 1])
     with ecol1:

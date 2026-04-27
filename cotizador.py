@@ -2017,34 +2017,101 @@ with tab3:
                             else:
                                 piezas_cargadas = datos.get("piezas", [])
                                 cond  = datos.get("cond_generales", {})
-                            st.session_state.piezas = piezas_cargadas
 
-                            # Limpiar todos los keys de widgets de piezas para que tomen valores nuevos
-                            keys_to_delete = [k for k in st.session_state.keys()
-                                if any(k.startswith(prefix) for prefix in [
-                                    "ndwg_", "desc_", "cant_", "tped_", "moq_", "eau_",
-                                    "pmaq_", "pturn_", "phrs_", "pdias_", "pefic_",
-                                    "fig_", "mpmat_", "mpmod_", "pkg_", "desp_",
-                                    "trat_", "ctrat_", "dtrat_", "dem_",
-                                    "mmo_", "mmat_", "mtrat_", "mg_",
-                                    "tipo_", "nm_", "setup_", "ciclo_", "par_", "lbl_",
-                                    "ltramo_", "ctramo_", "lpieza_", "agarre_", "cman_",
-                                    "dim_", "cprevio_", "lbarra_", "lcorte_", "cbarra_",
-                                ])]
+                            # ── Paso 1: Borrar TODOS los keys de widgets de piezas ──────────
+                            prefixes_to_clear = [
+                                "ndwg_", "desc_", "cant_", "tped_", "moq_", "eau_",
+                                "pmaq_", "pturn_", "phrs_", "pdias_", "pefic_",
+                                "fig_", "mpmat_", "mpmod_", "pkg_", "desp_",
+                                "trat_", "ctrat_", "dtrat_", "dem_",
+                                "mmo_", "mmat_", "mtrat_", "mg_",
+                                "tipo_", "nm_", "setup_", "ciclo_", "par_", "lbl_",
+                                "ltramo_", "ctramo_", "lpieza_", "agarre_", "cman_",
+                                "dim_", "cprevio_", "lbarra_", "lcorte_", "cbarra_",
+                                "plano_", "notas_plano_", "ia_engine_",
+                                "toggle_prev_", "analyze_",
+                            ]
+                            keys_to_delete = [k for k in list(st.session_state.keys())
+                                if any(k.startswith(p) for p in prefixes_to_clear)]
                             for k in keys_to_delete:
                                 del st.session_state[k]
 
+                            # ── Paso 2: Pre-escribir los valores de cada pieza en session_state ──
+                            # Esto garantiza que los widgets los lean correctamente en el rerun
+                            # aunque el parámetro value= sea ignorado si el key ya existía.
+                            for p in piezas_cargadas:
+                                pid = p["id"]
+                                mp  = p.get("materia_prima", {})
+                                # Identificación
+                                st.session_state[f"ndwg_{pid}"]  = p.get("num_dibujo", "")
+                                st.session_state[f"desc_{pid}"]  = p.get("descripcion", "")
+                                tipo_ped = p.get("tipo_pedido", "Pedido único")
+                                st.session_state[f"tped_{pid}"]  = tipo_ped
+                                if tipo_ped == "Por proyecto":
+                                    st.session_state[f"moq_{pid}"] = int(p.get("moq", 0))
+                                    st.session_state[f"eau_{pid}"] = int(p.get("eau", 0))
+                                else:
+                                    st.session_state[f"cant_{pid}"] = int(p.get("cantidad", 1))
+                                # Parámetros de operación
+                                st.session_state[f"pmaq_{pid}"]  = int(p.get("maq_activas", 7))
+                                st.session_state[f"pturn_{pid}"] = int(p.get("turnos", 1))
+                                st.session_state[f"phrs_{pid}"]  = int(p.get("hrs_turno", 8))
+                                st.session_state[f"pdias_{pid}"] = int(p.get("dias_mes", 21))
+                                st.session_state[f"pefic_{pid}"] = int(p.get("eficiencia", 65))
+                                # Materia prima
+                                fig_val = mp.get("figura", "Redondo (barra)")
+                                st.session_state[f"fig_{pid}"]   = fig_val
+                                st.session_state[f"mpmat_{pid}"] = mp.get("material", "Inox 303")
+                                st.session_state[f"mpmod_{pid}"] = mp.get("modo", "Por tramo")
+                                st.session_state[f"pkg_{pid}"]   = float(mp.get("precio_kg", 0.0))
+                                st.session_state[f"desp_{pid}"]  = float(mp.get("desperdicio", 10.0))
+                                st.session_state[f"cman_{pid}"]  = float(mp.get("costo_manual", 0.0))
+                                # Dimensiones
+                                dims = mp.get("dims", [0.0, 0.0, 0.0, 0.0])
+                                for di, dv in enumerate(dims[:4]):
+                                    st.session_state[f"dim_{pid}_{di}"] = float(dv)
+                                # Modo tramo
+                                st.session_state[f"cprevio_{pid}"] = bool(mp.get("corte_previo", False))
+                                st.session_state[f"ltramo_{pid}"]  = float(mp.get("largo_tramo", 31.5))
+                                st.session_state[f"lpieza_{pid}"]  = float(mp.get("largo_pieza", 1.575))
+                                st.session_state[f"agarre_{pid}"]  = float(mp.get("agarre", 0.984))
+                                st.session_state[f"ctramo_{pid}"]  = float(mp.get("costo_tramo", 0.0))
+                                st.session_state[f"lbarra_{pid}"]  = float(mp.get("largo_barra", 144.0))
+                                st.session_state[f"lcorte_{pid}"]  = float(mp.get("largo_corte", 26.0))
+                                st.session_state[f"cbarra_{pid}"]  = float(mp.get("costo_tramo", 0.0))
+                                # Tratamiento
+                                st.session_state[f"trat_{pid}"]   = p.get("tratamiento", "Ninguno")
+                                st.session_state[f"ctrat_{pid}"]  = float(p.get("costo_trat", 0.0))
+                                st.session_state[f"dtrat_{pid}"]  = int(p.get("dias_trat", 0))
+                                st.session_state[f"dem_{pid}"]    = int(p.get("demanda_mensual", 0))
+                                # Márgenes
+                                st.session_state[f"mg_{pid}"]     = bool(p.get("usar_margen_global", False))
+                                st.session_state[f"mmo_{pid}"]    = int(p.get("margen_mo", 35))
+                                st.session_state[f"mmat_{pid}"]   = int(p.get("margen_mat", 35))
+                                st.session_state[f"mtrat_{pid}"]  = int(p.get("margen_trat", 35))
+                                # Operaciones
+                                for op in p.get("operaciones", []):
+                                    oid = op["id"]
+                                    st.session_state[f"lbl_{pid}_{oid}"]   = op.get("label", f"Op {oid*10}")
+                                    st.session_state[f"tipo_{pid}_{oid}"]  = op.get("tipo_maq", "Lathe 2 Axis")
+                                    st.session_state[f"nm_{pid}_{oid}"]    = int(op.get("num_maquinas", 1))
+                                    st.session_state[f"setup_{pid}_{oid}"] = float(op.get("setup_hrs", 0.5))
+                                    st.session_state[f"ciclo_{pid}_{oid}"] = float(op.get("ciclo_hrs", 0.25))
+                                    st.session_state[f"par_{pid}_{oid}"]   = bool(op.get("paralelo", False))
+
+                            # ── Paso 3: Asignar las piezas al session_state ──────────────────
+                            st.session_state.piezas = piezas_cargadas
+
+                            # ── Paso 4: Datos del sidebar y condiciones ──────────────────────
                             st.session_state.num_cot_generado = cot_sel.get("numero", "")
                             st.session_state.sufijo_cot      = cot_sel.get("numero", "").split("-")[0] if "-" in cot_sel.get("numero","") else "COT"
                             st.session_state.sufijo_anterior = st.session_state.sufijo_cot
-                            # Datos del sidebar
                             st.session_state["_cliente"]     = cot_sel.get("cliente", "")
                             st.session_state["_atencion"]    = cot_sel.get("atencion", "")
                             st.session_state["_ciudad"]      = cot_sel.get("ciudad", "")
                             st.session_state["_moneda"]      = cot_sel.get("moneda", "MXN")
                             st.session_state["_tipo_cambio"] = float(cot_sel.get("tipo_cambio", 17.31) or 17.31)
                             st.session_state["_margen"]      = int(float(cot_sel.get("margen_global", 35) or 35))
-                            # Condiciones generales
                             st.session_state["_vigencia"]    = cond.get("vigencia", "15 Días")
                             st.session_state["_t_entrega"]   = cond.get("tiempo_entrega", "22-30 días hábiles")
                             st.session_state["_cond_pago"]   = cond.get("cond_pago", "40% anticipo - 60% contra-entrega")

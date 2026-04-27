@@ -2679,8 +2679,8 @@ with tab3:
 
         if filtradas:
             # Tabla con status editable inline
-            cols_header = st.columns([1.0, 1.5, 1.5, 1.0, 1.8, 0.6, 1.0, 1.0, 0.8, 0.9, 1.5])
-            for col, h in zip(cols_header, ["Cotización", "Fecha", "Cliente", "Núm. Dibujo", "Descripción", "Cant.", "P/Pza", "Total", "Moneda", "Status", "Cambiar status"]):
+            cols_header = st.columns([1.0, 1.5, 1.5, 5.4, 0.8, 0.9, 1.5])
+            for col, h in zip(cols_header, ["Cotización", "Fecha", "Cliente", "Piezas (Dibujo · Descripción · Cant. · P/Pza · Total)", "Moneda", "Status", "Cambiar status"]):
                 with col:
                     st.markdown(f"<span style='font-size:11px;font-weight:600;color:#9aa3b8;text-transform:uppercase;letter-spacing:0.06em'>{h}</span>", unsafe_allow_html=True)
             st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
@@ -2696,55 +2696,55 @@ with tab3:
                 descs = c.get("descripciones", "—") or "—"
 
                 fecha_raw = c.get("fecha", c.get("created_at",""))
-                cols_row = st.columns([1.0, 1.5, 1.5, 1.0, 1.8, 0.6, 1.0, 1.0, 0.8, 0.9, 1.5])
+                cols_row = st.columns([1.0, 1.5, 1.5, 5.4, 0.8, 0.9, 1.5])
                 with cols_row[0]: st.markdown(f"**{c.get('numero','')}**")
                 with cols_row[1]: st.markdown(fecha_raw[:16])
                 with cols_row[2]: st.markdown(c.get("cliente","—"))
-                # Sub-tabla HTML — única forma de garantizar alineación perfecta
+                # Mini-tabla HTML en una sola columna ancha — alineación perfecta garantizada
                 items_lista = c.get("items_lista", [])
-
-                def render_items_html(items):
-                    ROW_H = "28px"
-                    td = f"style='height:{ROW_H};padding:2px 4px;vertical-align:middle;border-bottom:0.5px solid #e5e7eb;font-size:13px'"
-                    rows_dwg = rows_desc = rows_cant = rows_ppza = rows_total = ""
-                    for it in items:
-                        cd = it.get("cant_display", str(it.get("cant",0)))
-                        td_val = it.get("total_display")
-                        pp = it.get("precio_pza", 0)
-                        if isinstance(cd, tuple):
-                            rows_dwg   += f"<tr><td {td} rowspan='2'>{it.get('dwg') or '—'}</td></tr>"
-                            rows_desc  += f"<tr><td {td} rowspan='2'>{it.get('desc') or '—'}</td></tr>"
-                            rows_cant  += f"<tr><td {td}><b>{cd[0]}</b></td></tr><tr><td {td}><b>{cd[1]}</b></td></tr>"
-                            rows_ppza  += f"<tr><td {td}><b>{fmtc(pp)}</b></td></tr><tr><td {td}><b>{fmtc(pp)}</b></td></tr>"
-                            t0 = td_val[0] if isinstance(td_val, tuple) else fmtc(it.get('total',0))
-                            t1 = td_val[1] if isinstance(td_val, tuple) else ""
-                            rows_total += f"<tr><td {td}>{t0}</td></tr>" + (f"<tr><td {td}>{t1}</td></tr>" if t1 else "")
-                        else:
-                            rows_dwg   += f"<tr><td {td}>{it.get('dwg') or '—'}</td></tr>"
-                            rows_desc  += f"<tr><td {td}>{it.get('desc') or '—'}</td></tr>"
-                            rows_cant  += f"<tr><td {td}><b>{cd}</b></td></tr>"
-                            rows_ppza  += f"<tr><td {td}><b>{fmtc(pp)}</b></td></tr>"
-                            rows_total += f"<tr><td {td}>{fmtc(it.get('total',0))}</td></tr>"
-                    return rows_dwg, rows_desc, rows_cant, rows_ppza, rows_total
-
-                if items_lista:
-                    rdwg, rdesc, rcant, rppza, rtotal = render_items_html(items_lista)
-                    ts = "style='border-collapse:collapse;width:100%'"
-                    with cols_row[3]: st.markdown(f"<table {ts}>{rdwg}</table>",   unsafe_allow_html=True)
-                    with cols_row[4]: st.markdown(f"<table {ts}>{rdesc}</table>",  unsafe_allow_html=True)
-                    with cols_row[5]: st.markdown(f"<table {ts}>{rcant}</table>",  unsafe_allow_html=True)
-                    with cols_row[6]: st.markdown(f"<table {ts}>{rppza}</table>",  unsafe_allow_html=True)
-                    with cols_row[7]: st.markdown(f"<table {ts}>{rtotal}</table>", unsafe_allow_html=True)
-                else:
-                    with cols_row[3]: st.markdown(dwgs)
-                    with cols_row[4]: st.markdown(descs)
-                    with cols_row[5]: st.markdown(f"**{c.get('cantidad_total','—')}**")
-                    with cols_row[6]: st.markdown("—")
-                    with cols_row[7]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
-                with cols_row[8]: st.markdown(c.get("moneda","MXN"))
-                with cols_row[9]:
+                with cols_row[3]:
+                    th = "style='font-size:11px;color:#9aa3b8;font-weight:600;text-transform:uppercase;padding:2px 8px;border-bottom:1px solid #e5e7eb;text-align:left'"
+                    td_s = "style='font-size:13px;padding:4px 8px;border-bottom:0.5px solid #f3f4f6;vertical-align:middle'"
+                    td_r = "style='font-size:13px;padding:4px 8px;border-bottom:0.5px solid #f3f4f6;vertical-align:middle;text-align:right'"
+                    html = (f"<table style='border-collapse:collapse;width:100%'>"
+                            f"<tr><th {th}>Núm. Dibujo</th><th {th}>Descripción</th>"
+                            f"<th {th} style='text-align:right'>Cant.</th>"
+                            f"<th {th} style='text-align:right'>P/Pza</th>"
+                            f"<th {th} style='text-align:right'>Total</th></tr>")
+                    if items_lista:
+                        for it in items_lista:
+                            cd = it.get("cant_display", str(it.get("cant",0)))
+                            pp = it.get("precio_pza", 0)
+                            td_val = it.get("total_display")
+                            if isinstance(cd, tuple):
+                                t0 = td_val[0] if isinstance(td_val, tuple) else fmtc(it.get('total',0))
+                                t1 = td_val[1] if isinstance(td_val, tuple) else ""
+                                html += (f"<tr>"
+                                         f"<td {td_s} rowspan='2'>{it.get('dwg') or '—'}</td>"
+                                         f"<td {td_s} rowspan='2'>{it.get('desc') or '—'}</td>"
+                                         f"<td {td_r}><b>{cd[0]}</b></td>"
+                                         f"<td {td_r}>{fmtc(pp)}</td>"
+                                         f"<td {td_r}>{t0}</td></tr>")
+                                html += f"<tr><td {td_r}><b>{cd[1]}</b></td><td {td_r}>{fmtc(pp)}</td><td {td_r}>{t1}</td></tr>"
+                            else:
+                                total_it = fmtc(it.get('total',0))
+                                html += (f"<tr>"
+                                         f"<td {td_s}>{it.get('dwg') or '—'}</td>"
+                                         f"<td {td_s}>{it.get('desc') or '—'}</td>"
+                                         f"<td {td_r}><b>{cd}</b></td>"
+                                         f"<td {td_r}>{fmtc(pp)}</td>"
+                                         f"<td {td_r}>{total_it}</td></tr>")
+                    else:
+                        total_g = fmtc(float(c.get("total_neto", 0) or 0))
+                        html += (f"<tr><td {td_s}>{dwgs}</td><td {td_s}>{descs}</td>"
+                                 f"<td {td_r}><b>{c.get('cantidad_total','—')}</b></td>"
+                                 f"<td {td_r}>—</td><td {td_r}>{total_g}</td></tr>")
+                    html += "</table>"
+                    st.markdown(html, unsafe_allow_html=True)
+                with cols_row[4]: st.markdown(c.get("moneda","MXN"))
+                with cols_row[5]:
                     st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)
-                with cols_row[10]:
+                with cols_row[6]:
                     nuevo = st.selectbox("s", [e for e in ESTADOS if e != status_actual],
                         key=f"hs_{ci}", label_visibility="collapsed")
                     if st.button("Actualizar", key=f"hu_{ci}", use_container_width=True):

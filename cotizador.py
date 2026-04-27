@@ -2700,60 +2700,47 @@ with tab3:
                 with cols_row[0]: st.markdown(f"**{c.get('numero','')}**")
                 with cols_row[1]: st.markdown(fecha_raw[:16])
                 with cols_row[2]: st.markdown(c.get("cliente","—"))
-                # Tabla HTML interna para alineación perfecta entre items
+                # Sub-tabla HTML — única forma de garantizar alineación perfecta
                 items_lista = c.get("items_lista", [])
-                with cols_row[3]:
-                    # Núm. Dibujo
-                    if items_lista:
-                        for it in items_lista:
-                            st.markdown(it.get("dwg") or "—")
-                    else:
-                        st.markdown(dwgs)
-                with cols_row[4]:
-                    # Descripción
-                    if items_lista:
-                        for it in items_lista:
-                            st.markdown(it.get("desc") or "—")
-                    else:
-                        st.markdown(descs)
-                with cols_row[5]:
-                    # Cantidad
-                    if items_lista:
-                        for it in items_lista:
-                            cd = it.get("cant_display", str(it.get("cant",0)))
-                            if isinstance(cd, tuple):
-                                st.markdown(f"**{cd[0]}**")
-                                st.markdown(f"**{cd[1]}**")
-                            else:
-                                st.markdown(f"**{cd}**")
-                    else:
-                        st.markdown(f"**{c.get('cantidad_total','—')}**")
-                with cols_row[6]:
-                    # P/Pza
-                    if items_lista:
-                        for it in items_lista:
-                            pp = it.get("precio_pza", 0)
-                            cd = it.get("cant_display", "")
-                            if isinstance(cd, tuple):
-                                # Por proyecto: mismo precio para MOQ y EAU
-                                st.markdown(f"**{fmtc(pp)}**")
-                                st.markdown(f"**{fmtc(pp)}**")
-                            else:
-                                st.markdown(f"**{fmtc(pp)}**")
-                    else:
-                        st.markdown("—")
-                with cols_row[7]:
-                    # Total
-                    if items_lista:
-                        for it in items_lista:
-                            td = it.get("total_display")
-                            if isinstance(td, tuple):
-                                st.markdown(td[0])
-                                st.markdown(td[1])
-                            else:
-                                st.markdown(fmtc(it.get("total", 0)))
-                    else:
-                        st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
+
+                def render_items_html(items):
+                    ROW_H = "28px"
+                    td = f"style='height:{ROW_H};padding:2px 4px;vertical-align:middle;border-bottom:0.5px solid #e5e7eb;font-size:13px'"
+                    rows_dwg = rows_desc = rows_cant = rows_ppza = rows_total = ""
+                    for it in items:
+                        cd = it.get("cant_display", str(it.get("cant",0)))
+                        td_val = it.get("total_display")
+                        pp = it.get("precio_pza", 0)
+                        if isinstance(cd, tuple):
+                            rows_dwg   += f"<tr><td {td} rowspan='2'>{it.get('dwg') or '—'}</td></tr>"
+                            rows_desc  += f"<tr><td {td} rowspan='2'>{it.get('desc') or '—'}</td></tr>"
+                            rows_cant  += f"<tr><td {td}><b>{cd[0]}</b></td></tr><tr><td {td}><b>{cd[1]}</b></td></tr>"
+                            rows_ppza  += f"<tr><td {td}><b>{fmtc(pp)}</b></td></tr><tr><td {td}><b>{fmtc(pp)}</b></td></tr>"
+                            t0 = td_val[0] if isinstance(td_val, tuple) else fmtc(it.get('total',0))
+                            t1 = td_val[1] if isinstance(td_val, tuple) else ""
+                            rows_total += f"<tr><td {td}>{t0}</td></tr>" + (f"<tr><td {td}>{t1}</td></tr>" if t1 else "")
+                        else:
+                            rows_dwg   += f"<tr><td {td}>{it.get('dwg') or '—'}</td></tr>"
+                            rows_desc  += f"<tr><td {td}>{it.get('desc') or '—'}</td></tr>"
+                            rows_cant  += f"<tr><td {td}><b>{cd}</b></td></tr>"
+                            rows_ppza  += f"<tr><td {td}><b>{fmtc(pp)}</b></td></tr>"
+                            rows_total += f"<tr><td {td}>{fmtc(it.get('total',0))}</td></tr>"
+                    return rows_dwg, rows_desc, rows_cant, rows_ppza, rows_total
+
+                if items_lista:
+                    rdwg, rdesc, rcant, rppza, rtotal = render_items_html(items_lista)
+                    ts = "style='border-collapse:collapse;width:100%'"
+                    with cols_row[3]: st.markdown(f"<table {ts}>{rdwg}</table>",   unsafe_allow_html=True)
+                    with cols_row[4]: st.markdown(f"<table {ts}>{rdesc}</table>",  unsafe_allow_html=True)
+                    with cols_row[5]: st.markdown(f"<table {ts}>{rcant}</table>",  unsafe_allow_html=True)
+                    with cols_row[6]: st.markdown(f"<table {ts}>{rppza}</table>",  unsafe_allow_html=True)
+                    with cols_row[7]: st.markdown(f"<table {ts}>{rtotal}</table>", unsafe_allow_html=True)
+                else:
+                    with cols_row[3]: st.markdown(dwgs)
+                    with cols_row[4]: st.markdown(descs)
+                    with cols_row[5]: st.markdown(f"**{c.get('cantidad_total','—')}**")
+                    with cols_row[6]: st.markdown("—")
+                    with cols_row[7]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
                 with cols_row[8]: st.markdown(c.get("moneda","MXN"))
                 with cols_row[9]:
                     st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)

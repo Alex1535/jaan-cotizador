@@ -1061,7 +1061,7 @@ def cargar_cotizaciones():
                         moq  = int(p.get("moq", 0) or 0)
                         eau  = int(p.get("eau", 0) or 0)
                         cant = eau
-                        cant_display = f"MOQ: {moq}  |  EAU: {eau}"
+                        cant_display = (f"MOQ: {moq}", f"EAU: {eau}")
                         # Calcular total para MOQ y EAU por separado
                         try:
                             p_moq = dict(p); p_moq["cantidad"] = moq; p_moq["tipo_pedido"] = "Pedido único"
@@ -1071,7 +1071,7 @@ def cargar_cotizaciones():
                         except Exception:
                             total_moq = total_eau = 0
                         total_pieza = total_eau
-                        total_display = "MOQ: " + fmtc(total_moq) + "  |  EAU: " + fmtc(total_eau)
+                        total_display = ("MOQ: " + fmtc(total_moq), "EAU: " + fmtc(total_eau))
                     else:
                         cant = int(p.get("cantidad", 0) or 0)
                         cant_display = str(cant)
@@ -2430,11 +2430,20 @@ with tab3:
                             st.markdown(it.get("desc") or "—")
                     with cols_row[5]:
                         for it in items_lista:
-                            st.markdown(f"**{it.get('cant_display', it.get('cant',0))}**")
+                            cd = it.get("cant_display", str(it.get("cant",0)))
+                            if isinstance(cd, tuple):
+                                for line in cd:
+                                    st.markdown(f"**{line}**")
+                            else:
+                                st.markdown(f"**{cd}**")
                     with cols_row[6]:
                         for it in items_lista:
                             td = it.get("total_display")
-                            st.markdown(td if td else fmtc(it.get("total", 0)))
+                            if isinstance(td, tuple):
+                                for line in td:
+                                    st.markdown(line)
+                            else:
+                                st.markdown(fmtc(it.get("total", 0)))
                 else:
                     with cols_row[3]: st.markdown(dwgs)
                     with cols_row[4]: st.markdown(descs)

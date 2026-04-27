@@ -183,29 +183,25 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
     if not token:
         return None, f"Token error: {err}"
 
-    # Buscar o crear carpeta JAAN-Planos
+    # Obtener folder ID desde Secrets (carpeta compartida con el SA en Drive del usuario)
     folder_id = st.session_state.get("_drive_folder_id")
     if not folder_id:
-        r = requests.get(
-            "https://www.googleapis.com/drive/v3/files",
-            headers={"Authorization": f"Bearer {token}"},
-            params={
-                "q": "name='JAAN-Planos' and mimeType='application/vnd.google-apps.folder' and trashed=false",
-                "fields": "files(id,name)", "spaces": "drive"
-            }
-        )
-        if r.status_code == 200:
-            files = r.json().get("files", [])
-            if files:
-                folder_id = files[0]["id"]
-            else:
-                rc = requests.post(
-                    "https://www.googleapis.com/drive/v3/files",
-                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                    json={"name": "JAAN-Planos", "mimeType": "application/vnd.google-apps.folder"}
-                )
-                if rc.status_code in (200, 201):
-                    folder_id = rc.json().get("id")
+        # Primero intentar desde Secrets (recomendado)
+        folder_id = st.secrets.get("DRIVE_FOLDER_ID", "").strip()
+        if not folder_id:
+            # Fallback: buscar carpeta accesible por el SA
+            r = requests.get(
+                "https://www.googleapis.com/drive/v3/files",
+                headers={"Authorization": f"Bearer {token}"},
+                params={
+                    "q": "name='JAAN-Planos' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+                    "fields": "files(id,name)", "spaces": "drive"
+                }
+            )
+            if r.status_code == 200:
+                files = r.json().get("files", [])
+                if files:
+                    folder_id = files[0]["id"]
         if folder_id:
             st.session_state["_drive_folder_id"] = folder_id
 
@@ -559,6 +555,7 @@ def nueva_pieza(idx, defaults):
         "cotizacion_trat_b64": "",
         "plano_nombre": "",
         "plano_b64": "",
+        "plano_drive_id": "",
         "plano_tipo": "",
         "cantidad":      10,
         "demanda_mensual": 0,
@@ -880,13 +877,13 @@ def guardar_cotizacion():
     total_neto = total + iva
 
     def piezas_sin_b64(piezas):
-        """Elimina TODOS los campos base64 — los archivos van a Drive o se omiten"""
+        """Elimina campos base64 pesados conservando IDs de Drive"""
         limpias = []
         for p in piezas:
             pc = dict(p)
-            # Limpiar plano b64 siempre (ya está en Drive o es demasiado grande)
+            # Limpiar b64 pero CONSERVAR drive_id y nombre
             pc["plano_b64"] = ""
-            # Limpiar cotizaciones de proveedor si son grandes
+            # plano_drive_id, plano_nombre, plano_tipo se conservan
             mp = dict(pc.get("materia_prima", {}))
             mp["cotizacion_mp_b64"] = ""
             pc["materia_prima"] = mp
@@ -1368,7 +1365,10 @@ with tab1:
                                         f'type="application/pdf" width="100%" height="500px"></object>',
                                         unsafe_allow_html=True)
                 else:
-                    st.warning("⚠️ No se pudo recuperar el plano.")
+                    if drive_id:
+                        st.warning("⚠️ No se pudo descargar el plano de Drive. Verifica la conexión.")
+                    else:
+                        st.info("ℹ️ El plano no está vinculado a Drive. Vuelve a subirlo para guardarlo correctamente.")
                 st.markdown("---")
 
             if plano_file is not None:

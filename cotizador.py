@@ -23,9 +23,10 @@ def cargar_usuarios():
         parts = entry.strip().split(":")
         if len(parts) >= 4:
             usuarios[parts[0].strip()] = {
-                "password": parts[1].strip(),
-                "nombre":   parts[2].strip(),
-                "rol":      parts[3].strip(),
+                "password":      parts[1].strip(),
+                "nombre":        parts[2].strip(),
+                "rol":           parts[3].strip(),
+                "smtp_password": parts[4].strip() if len(parts) >= 5 else "",
             }
     return usuarios
 
@@ -54,7 +55,7 @@ def login_screen():
             usuarios = cargar_usuarios()
             email_key = email.strip().lower()
             if email_key in usuarios and usuarios[email_key]["password"] == password:
-                st.session_state.usuario     = {"email": email_key, "nombre": usuarios[email_key]["nombre"], "rol": usuarios[email_key]["rol"]}
+                st.session_state.usuario     = {"email": email_key, "nombre": usuarios[email_key]["nombre"], "rol": usuarios[email_key]["rol"], "smtp_password": usuarios[email_key].get("smtp_password","")}
                 st.session_state.autenticado = True
                 st.rerun()
             else:
@@ -870,6 +871,192 @@ simbolo = "USD $" if moneda_cot == "USD" else "$"
 
 
 # ── Guardar cotización en Google Sheets ──────────────────────────────────────
+
+def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ciudad, pais,
+                           moneda_cot, tipo_cambio, margen_global, vigencia, t_entrega,
+                           cond_pago, total_general, iva, total_neto):
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+    import io
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter,
+                            rightMargin=0.75*inch, leftMargin=0.75*inch,
+                            topMargin=0.75*inch, bottomMargin=0.75*inch)
+
+    NAVY  = colors.HexColor("#0f1b3d")
+    BLUE  = colors.HexColor("#185FA5")
+    LGRAY = colors.HexColor("#f8f9fc")
+    GRAY  = colors.HexColor("#6b7280")
+    GREEN = colors.HexColor("#16a34a")
+    WHITE = colors.white
+    BLACK = colors.HexColor("#111827")
+
+    def ps(name, size=9, color=None, bold=False, align=TA_LEFT, leading=None):
+        return ParagraphStyle(name, fontSize=size,
+            textColor=color or BLACK,
+            fontName="Helvetica-Bold" if bold else "Helvetica",
+            alignment=align,
+            leading=leading or (size+3))
+
+    story = []
+
+    # Header
+    hdr = Table([[
+        Paragraph("JAAN Manufacturing · Cotizador Profesional", ps("h1",18,WHITE,True)),
+        Paragraph(f"Cotización: <b>{num_cot}</b><br/>{datetime.now().strftime('%d/%m/%Y')}",
+                  ps("hr",10,WHITE,True,TA_RIGHT))
+    ]], colWidths=[4.5*inch, 2.5*inch])
+    hdr.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,-1),NAVY),
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+        ("TOPPADDING",(0,0),(-1,-1),14),("BOTTOMPADDING",(0,0),(-1,-1),14),
+        ("LEFTPADDING",(0,0),(0,-1),16),("RIGHTPADDING",(-1,0),(-1,-1),16),
+        ("LINEBELOW",(0,0),(-1,-1),3,BLUE),
+    ]))
+    story.append(hdr)
+    story.append(Spacer(1,0.2*inch))
+
+    # Cliente
+    dir_c = ", ".join(filter(None,[direccion,cp,ciudad,pais]))
+    ct = Table([
+        [Paragraph("CLIENTE",ps("l1",8,GRAY)),Paragraph("ATENCIÓN A",ps("l2",8,GRAY)),Paragraph("DIRECCIÓN",ps("l3",8,GRAY))],
+        [Paragraph(cliente or "—",ps("v1",10)),Paragraph(atencion or "—",ps("v2",10)),Paragraph(dir_c or "—",ps("v3",10))],
+    ], colWidths=[2.33*inch,2.33*inch,2.34*inch])
+    ct.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,0),LGRAY),
+        ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+        ("LEFTPADDING",(0,0),(-1,-1),8),
+        ("LINEBELOW",(0,-1),(-1,-1),0.5,colors.HexColor("#dde1ea")),
+    ]))
+    story.append(ct)
+    story.append(Spacer(1,0.15*inch))
+
+    # Tabla piezas
+    story.append(Paragraph("Resumen de piezas", ps("h2",11,NAVY,True)))
+    story.append(Spacer(1,0.08*inch))
+    col_w = [0.3*inch,1.0*inch,1.4*inch,0.8*inch,0.7*inch,0.9*inch,0.7*inch,1.0*inch]
+    rows = [[Paragraph(h, ps(f"th{i}",8,WHITE,True)) for i,h in
+             enumerate(["#","Núm. Dibujo","Descripción","Material","Tratamiento","P. Unitario","Cant.","Total"])]]
+    for i,p in enumerate(piezas):
+        res = calcular_pieza(p, margen_global)
+        mp  = p.get("materia_prima",{})
+        cant = p.get("cantidad",0) if p.get("tipo_pedido")!="Por proyecto" else p.get("eau",0)
+        rows.append([
+            Paragraph(str(i+1),          ps(f"td{i}0",8)),
+            Paragraph(p.get("num_dibujo","—"), ps(f"td{i}1",8)),
+            Paragraph(p.get("descripcion","—"), ps(f"td{i}2",8)),
+            Paragraph(mp.get("material","—"),   ps(f"td{i}3",8)),
+            Paragraph(p.get("tratamiento","Ninguno"), ps(f"td{i}4",8)),
+            Paragraph(fmtc(res["precio_pza"]),  ps(f"td{i}5",8,align=TA_RIGHT)),
+            Paragraph(str(cant),                ps(f"td{i}6",8,align=TA_RIGHT)),
+            Paragraph(fmtc(res["total"]),       ps(f"td{i}7",8,align=TA_RIGHT)),
+        ])
+    pt = Table(rows, colWidths=col_w, repeatRows=1)
+    pt.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,0),NAVY),
+        ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE,LGRAY]),
+        ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+        ("LEFTPADDING",(0,0),(-1,-1),5),("RIGHTPADDING",(0,0),(-1,-1),5),
+        ("LINEBELOW",(0,0),(-1,-1),0.3,colors.HexColor("#dde1ea")),
+        ("LINEBELOW",(0,0),(-1,0),1,BLUE),
+    ]))
+    story.append(pt)
+    story.append(Spacer(1,0.2*inch))
+
+    # Totales
+    tt = Table([
+        ["", Paragraph("Subtotal:",   ps("ts1",9,align=TA_RIGHT)), Paragraph(fmtc(total_general), ps("tv1",9,bold=True,align=TA_RIGHT))],
+        ["", Paragraph("IVA (16%):", ps("ts2",9,GRAY,align=TA_RIGHT)), Paragraph(fmtc(iva), ps("tv2",9,GRAY,align=TA_RIGHT))],
+        ["", Paragraph("TOTAL NETO:", ps("ts3",11,NAVY,True,TA_RIGHT)), Paragraph(fmtc(total_neto), ps("tv3",13,GREEN,True,TA_RIGHT))],
+    ], colWidths=[4.7*inch,1.3*inch,1.0*inch])
+    tt.setStyle(TableStyle([
+        ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ("LINEABOVE",(1,-1),(-1,-1),1,NAVY),
+    ]))
+    story.append(tt)
+    story.append(Spacer(1,0.2*inch))
+
+    # Condiciones
+    cdt = Table([
+        [Paragraph("Vigencia",ps("cl1",8,GRAY)),Paragraph("Tiempo de entrega",ps("cl2",8,GRAY)),
+         Paragraph("Condiciones de pago",ps("cl3",8,GRAY)),Paragraph("Moneda",ps("cl4",8,GRAY))],
+        [Paragraph(vigencia,ps("cv1",9)),Paragraph(t_entrega,ps("cv2",9)),
+         Paragraph(cond_pago,ps("cv3",9)),Paragraph(moneda_cot,ps("cv4",9))],
+    ], colWidths=[1.5*inch,1.7*inch,2.5*inch,1.3*inch])
+    cdt.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,0),LGRAY),
+        ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+        ("LEFTPADDING",(0,0),(-1,-1),8),
+        ("BOX",(0,0),(-1,-1),0.5,colors.HexColor("#dde1ea")),
+        ("LINEBELOW",(0,0),(-1,0),0.5,colors.HexColor("#dde1ea")),
+        ("LINEBEFORE",(1,0),(-1,-1),0.5,colors.HexColor("#dde1ea")),
+    ]))
+    story.append(cdt)
+    story.append(Spacer(1,0.3*inch))
+
+    # Footer
+    story.append(HRFlowable(width="100%",thickness=0.5,color=colors.HexColor("#dde1ea")))
+    story.append(Spacer(1,0.1*inch))
+    story.append(Paragraph(
+        "JAAN Manufacturing · Sistemas de Manufactura Industrial JAAN CNC S.A. de C.V. · RFC SAM2008079G8",
+        ps("ft",7,GRAY,align=TA_CENTER)))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.read()
+
+
+def enviar_cotizacion_email(pdf_bytes, email_destino, num_cot, cliente,
+                            total_neto, moneda_cot,
+                            asunto=None, cuerpo=None,
+                            smtp_user=None, smtp_pass=None, from_name=None):
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.application import MIMEApplication
+
+    smtp_server = st.secrets.get("SMTP_SERVER", "smtp.office365.com")
+    smtp_port   = int(st.secrets.get("SMTP_PORT", 587))
+    _from_name  = from_name or st.secrets.get("SMTP_FROM_NAME", "JAAN Manufacturing")
+    _user       = smtp_user or st.secrets.get("SMTP_USER", "")
+    _pass       = smtp_pass or st.secrets.get("SMTP_PASSWORD", "")
+    _asunto     = asunto or f"Cotización {num_cot} — JAAN Manufacturing"
+    _cuerpo     = (cuerpo or "").strip() or (
+        f"Estimado/a {cliente},\n\n"
+        f"Adjunto la cotización {num_cot} por {fmtc(total_neto)} {moneda_cot}.\n\n"
+        f"Quedamos a sus órdenes para cualquier aclaración.\n\n"
+        f"Atentamente,\n{_from_name}"
+    )
+
+    if not _user or not _pass:
+        return False, "No hay credenciales SMTP configuradas para este usuario"
+
+    msg = MIMEMultipart()
+    msg["From"]    = f"{_from_name} <{_user}>"
+    msg["To"]      = email_destino
+    msg["Subject"] = _asunto
+    msg.attach(MIMEText(_cuerpo, "plain", "utf-8"))
+    pdf_part = MIMEApplication(pdf_bytes, _subtype="pdf")
+    pdf_part.add_header("Content-Disposition", "attachment",
+                        filename=f"Cotizacion_{num_cot}.pdf")
+    msg.attach(pdf_part)
+
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=15) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(_user, _pass)
+            server.sendmail(_user, email_destino, msg.as_string())
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+
 def guardar_cotizacion():
     total = sum(calcular_pieza(p, margen_global).get("total", 0)
                 for p in st.session_state.piezas)
@@ -2367,6 +2554,91 @@ with tab2:
     if st.button("💾 Guardar cotización", use_container_width=True):
         guardar_cotizacion()
 
+    st.markdown("---")
+    st.markdown("#### 📤 Enviar cotización al cliente")
+
+    # ── Datos del usuario remitente ──────────────────────────────────────
+    usuario_actual   = st.session_state.get("usuario", {})
+    smtp_user_actual = usuario_actual.get("email", "")
+    nombre_user      = usuario_actual.get("nombre", "JAAN Manufacturing")
+    smtp_pass_actual = st.secrets.get(f"SMTP_{smtp_user_actual}", "")
+
+    if not smtp_pass_actual:
+        st.info(f"ℹ️ Para enviar como **{smtp_user_actual}**, agrega `SMTP_{smtp_user_actual}` a los Secrets de Streamlit.")
+
+    ecol1, ecol2 = st.columns([2, 1])
+    with ecol1:
+        email_cliente = st.text_input("📧 Email del cliente",
+            key="sb_email_cliente", placeholder="cliente@empresa.com")
+    with ecol2:
+        st.markdown(
+            f"<div style='padding-top:28px;font-size:12px;color:#6b7280'>"
+            f"📤 Remitente:<br><b>{smtp_user_actual or 'No configurado'}</b></div>",
+            unsafe_allow_html=True)
+
+    asunto = st.text_input("📌 Asunto",
+        value=f"Cotización {num_cot} — JAAN Manufacturing",
+        key=f"sb_email_asunto_{num_cot}")
+
+    default_body = (
+        f"Estimado/a {cliente or 'cliente'},\n\n"
+        f"Nos complace hacerle llegar la cotización {num_cot} correspondiente a su solicitud.\n\n"
+        f"Adjunto encontrará el detalle completo con un total de {fmtc(total_neto)} {moneda_cot}.\n\n"
+        f"Quedamos a sus órdenes para cualquier aclaración o ajuste que requiera.\n\n"
+        f"Atentamente,\n{nombre_user}\nJAAN Manufacturing\n"
+        f"Sistemas de Manufactura Industrial JAAN CNC S.A. de C.V."
+    )
+    body_key = f"sb_email_body_{num_cot}"
+    if body_key not in st.session_state:
+        st.session_state[body_key] = default_body
+    cuerpo_email = st.text_area("✉️ Redactar mensaje", key=body_key, height=220)
+
+
+    # Generar PDF
+    pdf_cache_key = f"_pdf_{num_cot}"
+    if pdf_cache_key not in st.session_state:
+        try:
+            _pdf = generar_pdf_cotizacion(
+                st.session_state.piezas, num_cot, cliente, atencion,
+                direccion, cp, ciudad, pais,
+                moneda_cot, tipo_cambio, margen_global,
+                vigencia, t_entrega, cond_pago,
+                total_general, iva, total_neto)
+            st.session_state[pdf_cache_key] = _pdf
+        except Exception as _e:
+            st.session_state[pdf_cache_key] = None
+            st.warning(f"⚠️ PDF no disponible: {_e}")
+
+    pdf_bytes = st.session_state.get(pdf_cache_key)
+
+    bcol1, bcol2 = st.columns(2)
+    with bcol1:
+        if pdf_bytes:
+            st.download_button("📥 Descargar PDF",
+                data=pdf_bytes,
+                file_name=f"Cotizacion_{num_cot}.pdf",
+                mime="application/pdf",
+                use_container_width=True)
+        else:
+            st.button("📥 Descargar PDF", disabled=True, use_container_width=True)
+    with bcol2:
+        can_send = bool(email_cliente and "@" in email_cliente and pdf_bytes and smtp_pass_actual)
+        if st.button("📨 Enviar al cliente", disabled=not can_send,
+                     use_container_width=True, type="primary"):
+            with st.spinner(f"Enviando desde {smtp_user_actual} a {email_cliente}..."):
+                ok_send, err_send = enviar_cotizacion_email(
+                    pdf_bytes, email_cliente, num_cot, cliente, total_neto, moneda_cot,
+                    asunto=asunto, cuerpo=cuerpo_email,
+                    smtp_user=smtp_user_actual, smtp_pass=smtp_pass_actual,
+                    from_name=nombre_user)
+            if ok_send:
+                ok_st, _ = actualizar_status_gsheet(num_cot, "enviada")
+                st.success(f"✅ Cotización enviada a {email_cliente}" +
+                           (" · Status → Enviada" if ok_st else ""))
+                st.session_state.pop(f"_pdf_{num_cot}", None)
+            else:
+                st.error(f"❌ Error al enviar: {err_send}")
+
 # ══ TAB 3: HISTORIAL ══════════════════════════════════════════════════════════
 with tab3:
     st.markdown("#### 🗂️ Historial de cotizaciones")
@@ -2398,9 +2670,9 @@ with tab3:
         if buscar_cli: filtradas = [c for c in filtradas if buscar_cli.upper() in (c.get("cliente","")).upper()]
         if buscar_dwg: filtradas = [c for c in filtradas if buscar_dwg.upper() in (c.get("num_dibujos","")).upper()]
 
-        ESTADOS = ["borrador", "enviada", "ganada", "perdida"]
-        ICONOS  = {"borrador": "📝", "enviada": "📤", "ganada": "✅", "perdida": "❌"}
-        COLORES = {"borrador": "#6b7280", "enviada": "#185FA5", "ganada": "#27500A", "perdida": "#991b1b"}
+        ESTADOS = ["borrador", "enviada", "colocada"]
+        ICONOS  = {"borrador": "📝", "enviada": "📤", "colocada": "🏭"}
+        COLORES = {"borrador": "#6b7280", "enviada": "#185FA5", "colocada": "#15803d"}
 
         if filtradas:
             # Tabla con status editable inline

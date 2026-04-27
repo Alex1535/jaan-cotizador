@@ -1344,7 +1344,7 @@ def actualizar_status_gsheet(numero, nuevo_status):
     return False, f"Error {update_resp.status_code}: {update_resp.text[:200]}"
 
 
-tab1, tab2, tab3 = st.tabs(["📐 Piezas y Ruteo", "📄 Cotización", "🗂️ Historial"])
+tab1, tab2, tab3 = st.tabs(["· Piezas y Ruteo", "· Cotización", "· Historial"])
 
 # Inject expander colors via components.html (executes in real iframe with DOM access)
 import streamlit.components.v1 as components

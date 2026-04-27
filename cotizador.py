@@ -1060,8 +1060,8 @@ def cargar_cotizaciones():
                     if es_proyecto:
                         moq  = int(p.get("moq", 0) or 0)
                         eau  = int(p.get("eau", 0) or 0)
-                        cant = moq + eau
-                        cant_display = str(cant)
+                        cant = eau  # usar EAU como referencia para cálculos
+                        cant_display = f"MOQ: {moq}  |  EAU: {eau}"
                     else:
                         cant = int(p.get("cantidad", 0) or 0)
                         cant_display = str(cant)

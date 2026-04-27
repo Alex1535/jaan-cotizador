@@ -135,36 +135,85 @@ def get_or_create_sheet_id(token):
     return None, f"Sheet no accesible con ID: {sheet_id}"
 
 
-def append_to_gsheet(values):
-    """Agrega una fila al Google Sheet via REST API"""
+GSHEET_HEADERS = ["numero","fecha","usuario_email","cliente","atencion",
+                  "ciudad","moneda","tipo_cambio","margen_global",
+                  "subtotal","iva","total_neto","vigencia",
+                  "tiempo_entrega","cond_pago","datos_json"]
+
+def _get_token_and_sheet():
+    """Helper: retorna (token, sheet_id, error)"""
     token, err = get_gsheet_token()
     if not token:
-        return False, err
-    import requests
+        return None, None, err
     sheet_id, err2 = get_or_create_sheet_id(token)
     if not sheet_id:
-        return False, err2
-    # Agregar encabezados si es nuevo
+        return None, None, err2
+    return token, sheet_id, None
+
+def _ensure_headers(token, sheet_id):
+    """Crea la fila de encabezados si el sheet está vacío"""
+    import requests
     check = requests.get(
         f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1",
         headers={"Authorization": f"Bearer {token}"})
     if check.status_code == 200 and not check.json().get("values"):
-        headers = ["numero","fecha","usuario_email","cliente","atencion",
-                   "ciudad","moneda","tipo_cambio","margen_global",
-                   "subtotal","iva","total_neto","vigencia",
-                   "tiempo_entrega","cond_pago","datos_json"]
         requests.post(
             f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1:append?valueInputOption=RAW",
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            json={"values": [headers]})
-    # Agregar fila
-    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS"
+            json={"values": [GSHEET_HEADERS]})
+
+def _find_row_number(token, sheet_id, numero_cot):
+    """Busca en columna A el número de cotización. Retorna número de fila (1-based) o None."""
+    import requests
+    resp = requests.get(
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A2:A2000",
+        headers={"Authorization": f"Bearer {token}"})
+    if resp.status_code != 200:
+        return None
+    rows = resp.json().get("values", [])
+    for i, row in enumerate(rows, 2):   # fila 2 en adelante (1 es header)
+        if row and row[0].strip() == numero_cot.strip():
+            return i
+    return None
+
+def append_to_gsheet(values):
+    """Agrega una fila nueva al Google Sheet"""
+    import requests
+    token, sheet_id, err = _get_token_and_sheet()
+    if not token:
+        return False, err
+    _ensure_headers(token, sheet_id)
+    url = (f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}"
+           f"/values/A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS")
     resp = requests.post(url,
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         json={"values": [values]})
     if resp.status_code == 200:
         return True, None
     return False, f"Error {resp.status_code}: {resp.text[:200]}"
+
+def update_gsheet_row(numero_cot, values):
+    """Actualiza la fila existente de una cotización. Si no existe, la agrega."""
+    import requests
+    token, sheet_id, err = _get_token_and_sheet()
+    if not token:
+        return False, err
+    _ensure_headers(token, sheet_id)
+    row_num = _find_row_number(token, sheet_id, numero_cot)
+    if row_num is None:
+        # No existe → insertar como nueva
+        return append_to_gsheet(values)
+    # Existe → sobreescribir esa fila completa
+    n_cols = len(values)
+    end_col = chr(ord("A") + n_cols - 1) if n_cols <= 26 else "Z"
+    range_str = f"A{row_num}:{end_col}{row_num}"
+    resp = requests.put(
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{range_str}?valueInputOption=RAW",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={"values": [values]})
+    if resp.status_code == 200:
+        return True, None
+    return False, f"Error actualizando fila {row_num}: {resp.status_code} {resp.text[:200]}"
 
 
 def get_gsheet():
@@ -765,8 +814,8 @@ def guardar_cotizacion():
         }, default=str, ensure_ascii=False)
     ]
 
-    # Usar REST API directamente
-    ok, err2 = append_to_gsheet(fila)
+    # Upsert: actualiza si ya existe, inserta si es nueva
+    ok, err2 = update_gsheet_row(num_cot, fila)
     if ok:
         st.success(f"✅ Cotización {num_cot} guardada en Google Sheets — {len(st.session_state.piezas)} pieza(s)")
     else:
@@ -785,7 +834,7 @@ def guardar_cotizacion():
 
 
 def cargar_cotizaciones():
-    """Lee cotizaciones desde Google Sheets"""
+    """Lee cotizaciones desde Google Sheets, deduplicando por número (más reciente gana)"""
     import requests
     token, err = get_gsheet_token()
     if not token:
@@ -797,7 +846,7 @@ def cargar_cotizaciones():
     
     try:
         resp = requests.get(
-            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1:Z1000",
+            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1:Z2000",
             headers={"Authorization": f"Bearer {token}"})
         if resp.status_code != 200:
             return st.session_state.get("cotizaciones", [])
@@ -808,15 +857,18 @@ def cargar_cotizaciones():
             return []
         
         headers = values[0]
-        result = []
+        # Recorrer de abajo hacia arriba para que la entrada más reciente
+        # de cada número quede primero en el dict (deduplicación automática)
+        seen = {}
         for row in reversed(values[1:]):
             if not row or not row[0]:
                 continue
-            d = {}
-            for i, h in enumerate(headers):
-                d[h] = row[i] if i < len(row) else ""
-            result.append(d)
-        return result
+            numero = row[0].strip()
+            d = {h: (row[i] if i < len(row) else "") for i, h in enumerate(headers)}
+            seen[numero] = d   # sobrescribe con la más reciente (iteramos reversed → última fila gana)
+
+        # Revertir para mostrar más recientes primero en historial
+        return list(reversed(list(seen.values())))
     except Exception:
         return st.session_state.get("cotizaciones", [])
 
@@ -1890,38 +1942,7 @@ with tab2:
             st.markdown("---")
 
     if st.button("💾 Guardar cotización", use_container_width=True):
-        # Guardar en memoria local
-        cot = {
-            "numero":     num_cot,
-            "fecha":      datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "cliente":    cliente, "atencion": atencion, "ciudad": ciudad,
-            "piezas":     len(st.session_state.piezas),
-            "subtotal":   total_general, "iva": iva, "total_neto": total_neto,
-            "margen":     margen_global,
-            "items": [{
-                "num_dibujo":  p["num_dibujo"],
-                "descripcion": p["descripcion"],
-                "material":    p["materia_prima"]["material"],
-                "tratamiento": p["tratamiento"],
-                "cantidad":    p["cantidad"],
-                "turnos":      p.get("turnos", 1),
-                "precio_pza":  calcular_pieza(p, margen_global)["precio_pza"],
-                "total":       calcular_pieza(p, margen_global)["total"],
-            } for p in st.session_state.piezas],
-        }
-        st.session_state.cotizaciones.append(cot)
-
-        # Guardar en Supabase
-        ok, result = guardar_cotizacion_supabase(
-            num_cot, cliente, atencion, ciudad,
-            moneda_cot, tipo_cambio, margen_global,
-            total_general, iva, total_neto,
-            vigencia, t_entrega, cond_pago
-        )
-        if ok:
-            st.success(f"✅ {num_cot} guardada en la nube — {len(st.session_state.piezas)} pieza(s)")
-        else:
-            st.warning(f"⚠️ Guardada localmente. Error Supabase: {result}")
+        guardar_cotizacion()
 
 # ══ TAB 3: HISTORIAL ══════════════════════════════════════════════════════════
 with tab3:

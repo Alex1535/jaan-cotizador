@@ -2364,7 +2364,7 @@ with tab3:
 
         if filtradas:
             # Tabla con status editable inline
-            cols_header = st.columns([1.2, 1.1, 1.5, 1.1, 1.4, 0.7, 1.0, 0.8, 0.9, 1.5])
+            cols_header = st.columns([1.0, 1.5, 1.5, 1.0, 2.0, 0.6, 1.1, 0.6, 0.9, 1.5])
             for col, h in zip(cols_header, ["Cotización", "Fecha", "Cliente", "Núm. Dibujo", "Descripción", "Cant.", "Total", "Moneda", "Status", "Cambiar status"]):
                 with col:
                     st.markdown(f"<span style='font-size:11px;font-weight:600;color:#9aa3b8;text-transform:uppercase;letter-spacing:0.06em'>{h}</span>", unsafe_allow_html=True)
@@ -2381,9 +2381,9 @@ with tab3:
                 descs = c.get("descripciones", "—") or "—"
 
                 fecha_raw = c.get("fecha", c.get("created_at",""))
-                cols_row = st.columns([1.2, 1.1, 1.5, 1.1, 1.4, 0.7, 1.0, 0.8, 0.9, 1.5])
+                cols_row = st.columns([1.0, 1.5, 1.5, 1.0, 2.0, 0.6, 1.1, 0.6, 0.9, 1.5])
                 with cols_row[0]: st.markdown(f"**{c.get('numero','')}**")
-                with cols_row[1]: st.markdown(f"<span style='font-size:12px'>{fecha_raw[:16]}</span>", unsafe_allow_html=True)
+                with cols_row[1]: st.markdown(fecha_raw[:16])
                 with cols_row[2]: st.markdown(c.get("cliente","—"))
                 with cols_row[3]: st.markdown(dwgs)
                 with cols_row[4]: st.markdown(descs)

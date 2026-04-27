@@ -2033,7 +2033,7 @@ with tab3:
                 with cols_row[0]: st.markdown(f"**{c.get('numero','')}**")
                 with cols_row[1]: st.markdown(c.get("fecha", c.get("created_at",""))[:10])
                 with cols_row[2]: st.markdown(c.get("cliente","—"))
-                with cols_row[3]: st.markdown(f"<span style='font-size:12px;color:#374151'>{dwgs}</span>", unsafe_allow_html=True)
+                with cols_row[3]: st.markdown(dwgs)
                 with cols_row[4]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
                 with cols_row[5]: st.markdown(c.get("moneda","MXN"))
                 with cols_row[6]:

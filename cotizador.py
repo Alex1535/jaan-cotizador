@@ -1551,10 +1551,10 @@ with tab1:
                     peso_d    = peso * (1 + desp/100)
                     costo_mat = peso_d * precio_kg
                     st.markdown(
-                        f"<div class='peso-result'>"
-                        f"Peso/pza: <b>{peso*1000:.1f} g</b><br>"
-                        f"c/desp.: <b>{peso_d*1000:.1f} g</b><br>"
-                        f"Costo: <b>{fmtc(costo_mat)}</b>"
+                        f"<div class='peso-result' style='font-size:15px'>"
+                        f"Peso/pza: <b>{peso:.4f} kg</b><br>"
+                        f"c/desp.: <b>{peso_d:.4f} kg</b><br>"
+                        f"<span style='font-size:18px'>Costo: <b>{fmtc(costo_mat)}</b></span>"
                         f"</div>",
                         unsafe_allow_html=True)
             elif modo == "Por tramo":

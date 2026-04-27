@@ -2016,8 +2016,8 @@ with tab3:
 
         if filtradas:
             # Tabla con status editable inline
-            cols_header = st.columns([1.4, 1.0, 1.8, 1.6, 1.2, 0.9, 1.0, 1.7])
-            for col, h in zip(cols_header, ["Cotización", "Fecha", "Cliente", "Núm. Dibujo", "Total", "Moneda", "Status", "Cambiar status"]):
+            cols_header = st.columns([1.3, 1.0, 1.6, 1.2, 1.6, 1.1, 0.8, 0.9, 1.6])
+            for col, h in zip(cols_header, ["Cotización", "Fecha", "Cliente", "Núm. Dibujo", "Descripción", "Total", "Moneda", "Status", "Cambiar status"]):
                 with col:
                     st.markdown(f"<span style='font-size:11px;font-weight:600;color:#9aa3b8;text-transform:uppercase;letter-spacing:0.06em'>{h}</span>", unsafe_allow_html=True)
             st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
@@ -2029,20 +2029,20 @@ with tab3:
                 color  = COLORES.get(status_actual, "#6b7280")
                 icono  = ICONOS.get(status_actual, "📝")
                 # Mostrar núm. dibujos (pueden ser varios separados por |)
-                dwgs  = c.get("num_dibujos",   "") or ""
-                descs = c.get("descripciones", "") or ""
-                dwg_display = (dwgs + ("\n" + descs if descs else "")) if (dwgs or descs) else "—"
+                dwgs  = c.get("num_dibujos",   "—") or "—"
+                descs = c.get("descripciones", "—") or "—"
 
-                cols_row = st.columns([1.4, 1.0, 1.8, 1.6, 1.2, 0.9, 1.0, 1.7])
+                cols_row = st.columns([1.3, 1.0, 1.6, 1.2, 1.6, 1.1, 0.8, 0.9, 1.6])
                 with cols_row[0]: st.markdown(f"**{c.get('numero','')}**")
                 with cols_row[1]: st.markdown(c.get("fecha", c.get("created_at",""))[:10])
                 with cols_row[2]: st.markdown(c.get("cliente","—"))
-                with cols_row[3]: st.markdown(dwg_display)
-                with cols_row[4]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
-                with cols_row[5]: st.markdown(c.get("moneda","MXN"))
-                with cols_row[6]:
-                    st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)
+                with cols_row[3]: st.markdown(dwgs)
+                with cols_row[4]: st.markdown(descs)
+                with cols_row[5]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
+                with cols_row[6]: st.markdown(c.get("moneda","MXN"))
                 with cols_row[7]:
+                    st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)
+                with cols_row[8]:
                     nuevo = st.selectbox("s", [e for e in ESTADOS if e != status_actual],
                         key=f"hs_{ci}", label_visibility="collapsed")
                     if st.button("Actualizar", key=f"hu_{ci}", use_container_width=True):

@@ -1647,45 +1647,44 @@ with tab1:
                 st.session_state.piezas[pi]["dias_trat"] = 0 if trat=="Ninguno" else dias_trat
 
             # ── Proveedor de tratamiento + cotización adjunta ────────────
-            if trat != "Ninguno":
-                st.markdown("---")
-                prov_t1, prov_t2 = st.columns([2, 2])
-                with prov_t1:
-                    prov_trat = st.text_input(
-                        "🏭 Proveedor de tratamiento",
-                        value=pieza.get("proveedor_trat", ""),
-                        key=f"provtrat_{pieza['id']}",
-                        placeholder="Nombre del proveedor"
+            st.markdown("---")
+            prov_t1, prov_t2 = st.columns([2, 2])
+            with prov_t1:
+                prov_trat = st.text_input(
+                    "🏭 Proveedor de tratamiento",
+                    value=pieza.get("proveedor_trat", ""),
+                    key=f"provtrat_{pieza['id']}",
+                    placeholder="Nombre del proveedor"
+                )
+                st.session_state.piezas[pi]["proveedor_trat"] = prov_trat
+            with prov_t2:
+                cot_file = st.file_uploader(
+                    "📎 Cotización del proveedor (PDF/imagen)",
+                    type=["pdf", "png", "jpg", "jpeg"],
+                    key=f"cotfile_{pieza['id']}",
+                    help="Se guardará junto con la cotización"
+                )
+                if cot_file is not None:
+                    import base64 as _b64
+                    file_bytes = cot_file.read()
+                    b64_str = _b64.b64encode(file_bytes).decode("utf-8")
+                    st.session_state.piezas[pi]["cotizacion_trat_nombre"] = cot_file.name
+                    st.session_state.piezas[pi]["cotizacion_trat_b64"]    = b64_str
+                    st.success(f"✅ Archivo cargado: {cot_file.name}")
+                # Mostrar archivo existente si ya hay uno guardado
+                nombre_guardado = pieza.get("cotizacion_trat_nombre", "")
+                b64_guardado    = pieza.get("cotizacion_trat_b64", "")
+                if nombre_guardado and b64_guardado and cot_file is None:
+                    import base64 as _b64
+                    file_bytes_g = _b64.b64decode(b64_guardado)
+                    st.markdown(f"📄 Archivo guardado: **{nombre_guardado}**")
+                    st.download_button(
+                        f"⬇️ Descargar {nombre_guardado}",
+                        data=file_bytes_g,
+                        file_name=nombre_guardado,
+                        mime="application/octet-stream",
+                        key=f"dlcot_{pieza['id']}"
                     )
-                    st.session_state.piezas[pi]["proveedor_trat"] = prov_trat
-                with prov_t2:
-                    cot_file = st.file_uploader(
-                        "📎 Cotización del proveedor (PDF/imagen)",
-                        type=["pdf", "png", "jpg", "jpeg"],
-                        key=f"cotfile_{pieza['id']}",
-                        help="Se guardará junto con la cotización"
-                    )
-                    if cot_file is not None:
-                        import base64 as _b64
-                        file_bytes = cot_file.read()
-                        b64_str = _b64.b64encode(file_bytes).decode("utf-8")
-                        st.session_state.piezas[pi]["cotizacion_trat_nombre"] = cot_file.name
-                        st.session_state.piezas[pi]["cotizacion_trat_b64"]    = b64_str
-                        st.success(f"✅ Archivo cargado: {cot_file.name}")
-                    # Mostrar archivo existente si ya hay uno guardado
-                    nombre_guardado = pieza.get("cotizacion_trat_nombre", "")
-                    b64_guardado    = pieza.get("cotizacion_trat_b64", "")
-                    if nombre_guardado and b64_guardado and cot_file is None:
-                        import base64 as _b64
-                        file_bytes_g = _b64.b64decode(b64_guardado)
-                        st.markdown(f"📄 Archivo guardado: **{nombre_guardado}**")
-                        st.download_button(
-                            f"⬇️ Descargar {nombre_guardado}",
-                            data=file_bytes_g,
-                            file_name=nombre_guardado,
-                            mime="application/octet-stream",
-                            key=f"dlcot_{pieza['id']}"
-                        )
 
             # Demanda mensual (para semáforo de turnos)
             demanda = st.number_input("📦 Demanda mensual requerida (pzas/mes)",

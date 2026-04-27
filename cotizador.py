@@ -136,7 +136,7 @@ def get_or_create_sheet_id(token):
 
 
 GSHEET_HEADERS = ["numero","fecha","usuario_email","cliente","atencion",
-                  "ciudad","moneda","tipo_cambio","margen_global",
+                  "direccion","cp","ciudad","pais","moneda","tipo_cambio","margen_global",
                   "subtotal","iva","total_neto","vigencia",
                   "tiempo_entrega","cond_pago","datos_json"]
 
@@ -725,13 +725,22 @@ with st.sidebar:
 
     st.markdown("### 📋 Datos de la cotización")
     # Transferir valores cargados desde historial a keys persistentes (una sola vez)
-    if "_cliente"  in st.session_state: st.session_state["sb_cliente"]  = st.session_state.pop("_cliente")
-    if "_atencion" in st.session_state: st.session_state["sb_atencion"] = st.session_state.pop("_atencion")
-    if "_ciudad"   in st.session_state: st.session_state["sb_ciudad"]   = st.session_state.pop("_ciudad")
+    if "_cliente"   in st.session_state: st.session_state["sb_cliente"]   = st.session_state.pop("_cliente")
+    if "_atencion"  in st.session_state: st.session_state["sb_atencion"]  = st.session_state.pop("_atencion")
+    if "_ciudad"    in st.session_state: st.session_state["sb_ciudad"]    = st.session_state.pop("_ciudad")
+    if "_direccion" in st.session_state: st.session_state["sb_direccion"] = st.session_state.pop("_direccion")
+    if "_cp"        in st.session_state: st.session_state["sb_cp"]        = st.session_state.pop("_cp")
+    if "_pais"      in st.session_state: st.session_state["sb_pais"]      = st.session_state.pop("_pais")
     # Widgets con key persistente — sobreviven a cualquier rerun
-    cliente  = st.text_input("Cliente",    key="sb_cliente",  placeholder="Nombre del cliente")
-    atencion = st.text_input("Atención a", key="sb_atencion", placeholder="Nombre del contacto")
-    ciudad   = st.text_input("Ciudad",     key="sb_ciudad",   placeholder="Ciudad, Estado")
+    cliente   = st.text_input("Cliente",     key="sb_cliente",   placeholder="Nombre del cliente")
+    atencion  = st.text_input("Atención a",  key="sb_atencion",  placeholder="Nombre del contacto")
+    direccion = st.text_input("Dirección",   key="sb_direccion", placeholder="Calle, número, colonia")
+    col_cp, col_ciudad = st.columns([1, 2])
+    with col_cp:
+        cp      = st.text_input("C.P.",      key="sb_cp",        placeholder="00000")
+    with col_ciudad:
+        ciudad  = st.text_input("Ciudad",    key="sb_ciudad",    placeholder="Ciudad, Estado")
+    pais      = st.text_input("País",        key="sb_pais",      placeholder="México")
 
     # ── Consecutivo automático por sufijo ────────────────────────────
     sufijo_default = st.session_state.get("sufijo_cot", "COT")
@@ -831,7 +840,7 @@ def guardar_cotizacion():
         num_cot,
         datetime.now().strftime("%d/%m/%Y %H:%M"),
         st.session_state.get("usuario", {}).get("email", ""),
-        cliente, atencion, ciudad,
+        cliente, atencion, direccion, cp, ciudad, pais,
         moneda_cot, str(tipo_cambio), str(margen_global),
         str(round(total, 2)), str(round(iva, 2)), str(round(total_neto, 2)),
         vigencia, t_entrega, cond_pago,
@@ -2258,9 +2267,12 @@ with tab3:
                             st.session_state.num_cot_generado = cot_sel.get("numero", "")
                             st.session_state.sufijo_cot      = cot_sel.get("numero", "").split("-")[0] if "-" in cot_sel.get("numero","") else "COT"
                             st.session_state.sufijo_anterior = st.session_state.sufijo_cot
-                            st.session_state["_cliente"]     = cot_sel.get("cliente", "")
-                            st.session_state["_atencion"]    = cot_sel.get("atencion", "")
-                            st.session_state["_ciudad"]      = cot_sel.get("ciudad", "")
+                            st.session_state["_cliente"]    = cot_sel.get("cliente", "")
+                            st.session_state["_atencion"]   = cot_sel.get("atencion", "")
+                            st.session_state["_direccion"]  = cot_sel.get("direccion", "")
+                            st.session_state["_cp"]         = cot_sel.get("cp", "")
+                            st.session_state["_ciudad"]     = cot_sel.get("ciudad", "")
+                            st.session_state["_pais"]       = cot_sel.get("pais", "")
                             st.session_state["_moneda"]      = cot_sel.get("moneda", "MXN")
                             st.session_state["_tipo_cambio"] = float(cot_sel.get("tipo_cambio", 17.31) or 17.31)
                             st.session_state["_margen"]      = int(float(cot_sel.get("margen_global", 35) or 35))

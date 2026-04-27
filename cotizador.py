@@ -232,7 +232,7 @@ if not st.session_state.autenticado:
 
 st.markdown("""
 <style>
-    /* ══ HEADER — funciona en light y dark (fondo fijo navy) ══════════ */
+    /* ── Header (navy fijo, funciona light y dark) ── */
     .main-header {
         background: #0f1b3d !important;
         padding: 18px 28px 16px; border-radius: 10px;
@@ -241,82 +241,72 @@ st.markdown("""
     .main-header h1 { color:#fff !important; margin:0; font-size:20px; font-weight:500; }
     .main-header p  { color:rgba(255,255,255,0.5) !important; margin:4px 0 0; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; }
 
-    /* ══ RESULT BOX — funciona en ambos modos ══════════════════════════ */
+    /* ── Cajas de resultado (navy fijo) ── */
     .result-box { background:#0f1b3d; border-radius:10px; padding:18px 20px; color:white; text-align:center; }
     .result-box .price { font-size:32px; font-weight:500; }
     .result-box .label { font-size:10px; opacity:0.6; text-transform:uppercase; letter-spacing:0.06em; }
-    .semaforo-box  { border-radius:8px; padding:10px 14px; margin-top:8px; font-size:13px; }
-    .peso-result   { background:#EAF3DE; border:0.5px solid #639922; border-radius:8px; padding:10px 14px; font-weight:500; color:#3B6D11; font-size:13px; }
-    .op-header     { font-size:10px; font-weight:500; letter-spacing:0.06em; text-transform:uppercase; }
+    .semaforo-box { border-radius:8px; padding:10px 14px; margin-top:8px; font-size:13px; }
+    .peso-result  { background:#EAF3DE; border:0.5px solid #639922; border-radius:8px; padding:10px 14px; font-weight:500; color:#3B6D11; font-size:13px; }
+    .op-header    { font-size:10px; font-weight:500; letter-spacing:0.06em; text-transform:uppercase; }
 
-    /* ══ SOLO LIGHT MODE ════════════════════════════════════════════════
-       Envolvemos todo en :not([data-theme="dark"]) para que en dark
-       Streamlit use su tema nativo sin interferencia
-    ═══════════════════════════════════════════════════════════════════ */
-    .stApp:not([data-theme="dark"]) .pieza-card {
-        background:#ffffff; border:0.5px solid #dde1ea;
-        border-left:3px solid #185FA5; border-radius:10px;
-        padding:16px 20px; margin-bottom:14px;
+    /* ── Pieza card (borde acento azul, fondo transparente) ── */
+    .pieza-card {
+        border: 0.5px solid rgba(24,95,165,0.3);
+        border-left: 3px solid #185FA5;
+        border-radius: 10px; padding: 16px 20px; margin-bottom: 14px;
     }
-    .stApp:not([data-theme="dark"]) .op-params-box {
-        background:#f8f9fc; border:0.5px solid #dde1ea; border-radius:8px; padding:12px 14px; margin:6px 0;
-    }
-    .stApp:not([data-theme="dark"]) .mat-prima-box {
-        background:#f8f9fc; border:0.5px solid #dde1ea; border-radius:8px; padding:14px; margin:6px 0;
-    }
-    .stApp:not([data-theme="dark"]) .total-box {
-        background:#f8f9fc; border:0.5px solid #dde1ea;
-        border-left:3px solid #185FA5; border-radius:10px; padding:18px 20px; text-align:center;
-    }
-    .stApp:not([data-theme="dark"]) div[data-testid="stSidebarContent"] { background:#f8f9fc !important; }
 
-    .stApp:not([data-theme="dark"]) input[class*="st-"],
-    .stApp:not([data-theme="dark"]) textarea[class*="st-"] {
-        border:2px solid #8fafd4 !important; border-radius:6px !important;
-        background:#ffffff !important; color:#0f1b3d !important;
+    /* ── Total box ── */
+    .total-box {
+        border: 0.5px solid rgba(24,95,165,0.3);
+        border-left: 3px solid #185FA5;
+        border-radius: 10px; padding: 18px 20px; text-align: center;
     }
-    .stApp:not([data-theme="dark"]) input[class*="st-"]:focus,
-    .stApp:not([data-theme="dark"]) textarea[class*="st-"]:focus {
-        border:2px solid #185FA5 !important; box-shadow:0 0 0 3px rgba(24,95,165,0.2) !important;
-    }
-    .stApp:not([data-theme="dark"]) div[data-testid="stNumberInput"] input {
-        background:#ffffff !important; color:#0f1b3d !important; border:2px solid #8fafd4 !important; border-radius:6px !important;
-    }
-    .stApp:not([data-theme="dark"]) div[data-baseweb="select"] > div {
-        border:2px solid #8fafd4 !important; border-radius:6px !important;
-        background:#ffffff !important; color:#0f1b3d !important;
-    }
-    .stApp:not([data-theme="dark"]) div[data-baseweb="select"] > div:focus-within {
-        border:2px solid #185FA5 !important; box-shadow:0 0 0 3px rgba(24,95,165,0.2) !important;
-    }
-    .stApp:not([data-theme="dark"]) div[data-testid="stExpander"] {
-        border:0.5px solid #b5d4f4 !important; border-left:3px solid #185FA5 !important;
-        border-radius:8px !important; margin-bottom:6px !important; background:#E6F1FB !important;
-    }
-    .stApp:not([data-theme="dark"]) div[data-testid="stExpanderHeader"] {
-        font-weight:500 !important; font-size:13px !important; color:#0C447C !important;
-        background:#E6F1FB !important; padding:10px 14px !important; border-radius:8px !important;
-    }
-    .stApp:not([data-theme="dark"]) div[data-testid="stExpanderHeader"] p {
-        font-size:13px !important; font-weight:500 !important; color:#0C447C !important;
-    }
-    .stApp:not([data-theme="dark"]) div[data-testid="stExpanderHeader"] svg { stroke:#185FA5 !important; }
-    .stApp:not([data-theme="dark"]) div[data-testid="stExpanderDetails"] {
-        background:#ffffff !important; border-top:0.5px solid #b5d4f4 !important;
-    }
-    .stApp:not([data-theme="dark"]) .stButton > button {
-        background:#0f1b3d !important; color:white !important; border:none !important;
-        border-radius:8px !important; padding:8px 20px !important; font-weight:500 !important;
+
+    /* ── Botones ── */
+    .stButton > button {
+        background:#0f1b3d !important; color:white !important;
+        border:none !important; border-radius:8px !important;
+        padding:8px 20px !important; font-weight:500 !important;
         transition:background 0.15s !important;
     }
-    .stApp:not([data-theme="dark"]) .stButton > button:hover { background:#185FA5 !important; }
+    .stButton > button:hover { background:#185FA5 !important; }
 
-    /* ══ DARK MODE — cero interferencia, Streamlit nativo ═════════════
-       Solo mantenemos el acento azul en bordes para consistencia de marca
-    ═══════════════════════════════════════════════════════════════════ */
-    .stApp[data-theme="dark"] .pieza-card { border-left:3px solid #185FA5 !important; border-radius:10px !important; padding:16px 20px !important; margin-bottom:14px !important; }
-    .stApp[data-theme="dark"] .total-box  { border-left:3px solid #185FA5 !important; border-radius:10px !important; padding:18px 20px !important; text-align:center !important; }
-    .stApp[data-theme="dark"] div[data-testid="stExpander"] { border-left:3px solid #185FA5 !important; border-radius:8px !important; margin-bottom:6px !important; }
+    /* ── Sidebar (solo light — en dark Streamlit lo maneja) ── */
+    div[data-testid="stSidebarContent"] { background:#f8f9fc; }
+
+    /* ── Inputs con borde visible ── */
+    input[class*="st-"], textarea[class*="st-"] {
+        border: 2px solid #8fafd4 !important;
+        border-radius: 6px !important;
+    }
+    input[class*="st-"]:focus, textarea[class*="st-"]:focus {
+        border: 2px solid #185FA5 !important;
+        box-shadow: 0 0 0 3px rgba(24,95,165,0.2) !important;
+    }
+    div[data-baseweb="select"] > div {
+        border: 2px solid #8fafd4 !important;
+        border-radius: 6px !important;
+    }
+    div[data-baseweb="select"] > div:focus-within {
+        border: 2px solid #185FA5 !important;
+        box-shadow: 0 0 0 3px rgba(24,95,165,0.2) !important;
+    }
+
+    /* ── Expanders — solo borde y acento, sin forzar fondo ── */
+    div[data-testid="stExpander"] {
+        border: 0.5px solid rgba(24,95,165,0.4) !important;
+        border-left: 3px solid #185FA5 !important;
+        border-radius: 8px !important;
+        margin-bottom: 6px !important;
+    }
+    div[data-testid="stExpanderHeader"] {
+        font-weight: 500 !important;
+        font-size: 13px !important;
+        padding: 10px 14px !important;
+        border-radius: 8px !important;
+    }
+    div[data-testid="stExpanderHeader"] svg { stroke: #185FA5 !important; }
 </style>
 """, unsafe_allow_html=True)
 

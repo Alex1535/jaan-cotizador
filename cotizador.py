@@ -1045,17 +1045,22 @@ def cargar_cotizaciones():
                 else:
                     datos = {}
                 piezas = datos.get("piezas", []) if isinstance(datos, dict) else (datos if isinstance(datos, list) else [])
-                nums  = [str(p.get("num_dibujo","")).strip() for p in piezas if p.get("num_dibujo","").strip()]
-                descs = [str(p.get("descripcion","")).strip() for p in piezas if p.get("descripcion","").strip()]
-                # Cantidad total (suma de todas las piezas)
+                # Construir lista de items: [{dwg, desc, cant}, ...]
+                items = []
                 total_cant = 0
                 for p in piezas:
+                    dwg  = str(p.get("num_dibujo","")).strip()
+                    desc = str(p.get("descripcion","")).strip()
                     if p.get("tipo_pedido") == "Por proyecto":
-                        total_cant += int(p.get("eau", 0) or 0)
+                        cant = int(p.get("eau", 0) or 0)
                     else:
-                        total_cant += int(p.get("cantidad", 0) or 0)
-                d["num_dibujos"]   = " | ".join(nums)
-                d["descripciones"] = " | ".join(descs)
+                        cant = int(p.get("cantidad", 0) or 0)
+                    total_cant += cant
+                    if dwg or desc:
+                        items.append({"dwg": dwg, "desc": desc, "cant": cant})
+                d["items_lista"]   = items
+                d["num_dibujos"]   = " | ".join(i["dwg"]  for i in items if i["dwg"])
+                d["descripciones"] = " | ".join(i["desc"] for i in items if i["desc"])
                 d["cantidad_total"] = total_cant
             except Exception:
                 d["num_dibujos"]   = ""
@@ -2385,9 +2390,19 @@ with tab3:
                 with cols_row[0]: st.markdown(f"**{c.get('numero','')}**")
                 with cols_row[1]: st.markdown(fecha_raw[:16])
                 with cols_row[2]: st.markdown(c.get("cliente","—"))
-                with cols_row[3]: st.markdown(dwgs)
-                with cols_row[4]: st.markdown(descs)
-                with cols_row[5]: st.markdown(f"**{c.get('cantidad_total', '—')}**")
+                # Mostrar items verticalmente (dwg / desc / cant por línea)
+                items_lista = c.get("items_lista", [])
+                if items_lista:
+                    dwg_html  = "<br>".join(i["dwg"]        for i in items_lista)
+                    desc_html = "<br>".join(i["desc"]       for i in items_lista)
+                    cant_html = "<br>".join(f"<b>{i['cant']}</b>" for i in items_lista)
+                else:
+                    dwg_html  = dwgs
+                    desc_html = descs
+                    cant_html = f"<b>{c.get('cantidad_total','—')}</b>"
+                with cols_row[3]: st.markdown(dwg_html,  unsafe_allow_html=True)
+                with cols_row[4]: st.markdown(desc_html, unsafe_allow_html=True)
+                with cols_row[5]: st.markdown(cant_html, unsafe_allow_html=True)
                 with cols_row[6]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
                 with cols_row[7]: st.markdown(c.get("moneda","MXN"))
                 with cols_row[8]:

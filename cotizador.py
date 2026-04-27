@@ -2700,46 +2700,60 @@ with tab3:
                 with cols_row[0]: st.markdown(f"**{c.get('numero','')}**")
                 with cols_row[1]: st.markdown(fecha_raw[:16])
                 with cols_row[2]: st.markdown(c.get("cliente","—"))
-                # Mostrar items verticalmente usando st.markdown simple por item
+                # Tabla HTML interna para alineación perfecta entre items
                 items_lista = c.get("items_lista", [])
-                if items_lista:
-                    with cols_row[3]:
+                with cols_row[3]:
+                    # Núm. Dibujo
+                    if items_lista:
                         for it in items_lista:
                             st.markdown(it.get("dwg") or "—")
-                    with cols_row[4]:
+                    else:
+                        st.markdown(dwgs)
+                with cols_row[4]:
+                    # Descripción
+                    if items_lista:
                         for it in items_lista:
                             st.markdown(it.get("desc") or "—")
-                    with cols_row[5]:
+                    else:
+                        st.markdown(descs)
+                with cols_row[5]:
+                    # Cantidad
+                    if items_lista:
                         for it in items_lista:
                             cd = it.get("cant_display", str(it.get("cant",0)))
                             if isinstance(cd, tuple):
-                                for line in cd:
-                                    st.markdown(f"**{line}**")
+                                st.markdown(f"**{cd[0]}**")
+                                st.markdown(f"**{cd[1]}**")
                             else:
                                 st.markdown(f"**{cd}**")
-                    with cols_row[6]:
+                    else:
+                        st.markdown(f"**{c.get('cantidad_total','—')}**")
+                with cols_row[6]:
+                    # P/Pza
+                    if items_lista:
                         for it in items_lista:
                             pp = it.get("precio_pza", 0)
                             cd = it.get("cant_display", "")
-                            # Para por proyecto mostrar mismo precio (es independiente de cant)
                             if isinstance(cd, tuple):
+                                # Por proyecto: mismo precio para MOQ y EAU
                                 st.markdown(f"**{fmtc(pp)}**")
                                 st.markdown(f"**{fmtc(pp)}**")
                             else:
                                 st.markdown(f"**{fmtc(pp)}**")
-                    with cols_row[7]:
+                    else:
+                        st.markdown("—")
+                with cols_row[7]:
+                    # Total
+                    if items_lista:
                         for it in items_lista:
                             td = it.get("total_display")
                             if isinstance(td, tuple):
-                                for line in td:
-                                    st.markdown(line)
+                                st.markdown(td[0])
+                                st.markdown(td[1])
                             else:
                                 st.markdown(fmtc(it.get("total", 0)))
-                else:
-                    with cols_row[3]: st.markdown(dwgs)
-                    with cols_row[4]: st.markdown(descs)
-                    with cols_row[5]: st.markdown(f"**{c.get('cantidad_total','—')}**")
-                    with cols_row[6]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
+                    else:
+                        st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
                 with cols_row[8]: st.markdown(c.get("moneda","MXN"))
                 with cols_row[9]:
                     st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)

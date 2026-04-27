@@ -1056,19 +1056,26 @@ def cargar_cotizaciones():
                 for p in piezas:
                     dwg  = str(p.get("num_dibujo","")).strip()
                     desc = str(p.get("descripcion","")).strip()
-                    if p.get("tipo_pedido") == "Por proyecto":
-                        cant = int(p.get("eau", 0) or 0)
+                    es_proyecto = p.get("tipo_pedido") == "Por proyecto"
+                    if es_proyecto:
+                        moq  = int(p.get("moq", 0) or 0)
+                        eau  = int(p.get("eau", 0) or 0)
+                        cant = eau
+                        cant_display = f"MOQ: {moq}\nEAU: {eau}"
                     else:
                         cant = int(p.get("cantidad", 0) or 0)
+                        cant_display = str(cant)
                     total_cant += cant
-                    # Calcular total por pieza desde datos guardados
                     try:
                         res = calcular_pieza(p, margen_g)
                         total_pieza = res.get("total", 0)
                     except Exception:
                         total_pieza = 0
                     if dwg or desc:
-                        items.append({"dwg": dwg, "desc": desc, "cant": cant, "total": total_pieza})
+                        items.append({"dwg": dwg, "desc": desc, "cant": cant,
+                                      "cant_display": cant_display,
+                                      "es_proyecto": es_proyecto,
+                                      "total": total_pieza})
                 d["items_lista"]   = items
                 d["num_dibujos"]   = " | ".join(i["dwg"]  for i in items if i["dwg"])
                 d["descripciones"] = " | ".join(i["desc"] for i in items if i["desc"])
@@ -2412,7 +2419,13 @@ with tab3:
                             st.markdown(it.get("desc") or "—")
                     with cols_row[5]:
                         for it in items_lista:
-                            st.markdown(f"**{it.get('cant',0)}**")
+                            cd = it.get("cant_display", str(it.get("cant",0)))
+                            if "\n" in cd:
+                                moq_line, eau_line = cd.split("\n")
+                                st.markdown(f"**{moq_line}**")
+                                st.markdown(f"**{eau_line}**")
+                            else:
+                                st.markdown(f"**{cd}**")
                     with cols_row[6]:
                         for it in items_lista:
                             st.markdown(fmtc(it.get("total", 0)))

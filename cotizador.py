@@ -2416,8 +2416,8 @@ with tab3:
                 with cols_row[5]: st.markdown(cant_html, unsafe_allow_html=True)
                 with cols_row[6]:
                     if items_lista and any(i.get("total",0) for i in items_lista):
-                        total_html = "<br>".join(fmtc(i.get("total",0)) for i in items_lista)
-                        st.markdown(total_html, unsafe_allow_html=True)
+                        for idx_i, item_i in enumerate(items_lista):
+                            st.markdown(fmtc(item_i.get("total", 0)))
                     else:
                         st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
                 with cols_row[7]: st.markdown(c.get("moneda","MXN"))

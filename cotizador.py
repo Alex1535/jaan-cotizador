@@ -1082,9 +1082,15 @@ def cargar_cotizaciones():
                         total_display = None
                     total_cant += cant
                     if dwg or desc:
+                        try:
+                            precio_pza = calcular_pieza(p, margen_g).get("precio_pza", 0)
+                        except Exception:
+                            precio_pza = 0
+                        # Para por proyecto: precio/pza es el mismo (independiente de cant)
                         items.append({"dwg": dwg, "desc": desc, "cant": cant,
                                       "cant_display": cant_display,
                                       "es_proyecto": es_proyecto,
+                                      "precio_pza": precio_pza,
                                       "total": total_pieza,
                                       "total_display": total_display})
                 d["items_lista"]   = items
@@ -2398,8 +2404,8 @@ with tab3:
 
         if filtradas:
             # Tabla con status editable inline
-            cols_header = st.columns([1.0, 1.5, 1.5, 1.0, 2.0, 0.6, 1.1, 0.6, 0.9, 1.5])
-            for col, h in zip(cols_header, ["Cotización", "Fecha", "Cliente", "Núm. Dibujo", "Descripción", "Cant.", "Total", "Moneda", "Status", "Cambiar status"]):
+            cols_header = st.columns([1.0, 1.5, 1.5, 1.0, 1.8, 0.6, 1.0, 1.0, 0.8, 0.9, 1.5])
+            for col, h in zip(cols_header, ["Cotización", "Fecha", "Cliente", "Núm. Dibujo", "Descripción", "Cant.", "P/Pza", "Total", "Moneda", "Status", "Cambiar status"]):
                 with col:
                     st.markdown(f"<span style='font-size:11px;font-weight:600;color:#9aa3b8;text-transform:uppercase;letter-spacing:0.06em'>{h}</span>", unsafe_allow_html=True)
             st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
@@ -2415,7 +2421,7 @@ with tab3:
                 descs = c.get("descripciones", "—") or "—"
 
                 fecha_raw = c.get("fecha", c.get("created_at",""))
-                cols_row = st.columns([1.0, 1.5, 1.5, 1.0, 2.0, 0.6, 1.1, 0.6, 0.9, 1.5])
+                cols_row = st.columns([1.0, 1.5, 1.5, 1.0, 1.8, 0.6, 1.0, 1.0, 0.8, 0.9, 1.5])
                 with cols_row[0]: st.markdown(f"**{c.get('numero','')}**")
                 with cols_row[1]: st.markdown(fecha_raw[:16])
                 with cols_row[2]: st.markdown(c.get("cliente","—"))
@@ -2438,6 +2444,16 @@ with tab3:
                                 st.markdown(f"**{cd}**")
                     with cols_row[6]:
                         for it in items_lista:
+                            pp = it.get("precio_pza", 0)
+                            cd = it.get("cant_display", "")
+                            # Para por proyecto mostrar mismo precio (es independiente de cant)
+                            if isinstance(cd, tuple):
+                                st.markdown(f"**{fmtc(pp)}**")
+                                st.markdown(f"**{fmtc(pp)}**")
+                            else:
+                                st.markdown(f"**{fmtc(pp)}**")
+                    with cols_row[7]:
+                        for it in items_lista:
                             td = it.get("total_display")
                             if isinstance(td, tuple):
                                 for line in td:
@@ -2449,10 +2465,10 @@ with tab3:
                     with cols_row[4]: st.markdown(descs)
                     with cols_row[5]: st.markdown(f"**{c.get('cantidad_total','—')}**")
                     with cols_row[6]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
-                with cols_row[7]: st.markdown(c.get("moneda","MXN"))
-                with cols_row[8]:
-                    st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)
+                with cols_row[8]: st.markdown(c.get("moneda","MXN"))
                 with cols_row[9]:
+                    st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)
+                with cols_row[10]:
                     nuevo = st.selectbox("s", [e for e in ESTADOS if e != status_actual],
                         key=f"hs_{ci}", label_visibility="collapsed")
                     if st.button("Actualizar", key=f"hu_{ci}", use_container_width=True):

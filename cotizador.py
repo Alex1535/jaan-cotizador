@@ -272,9 +272,6 @@ st.markdown("""
     }
     .stButton > button:hover { background:#185FA5 !important; }
 
-    /* ── Sidebar (solo light — en dark Streamlit lo maneja) ── */
-    div[data-testid="stSidebarContent"] { background:#f8f9fc; }
-
     /* ── Inputs con borde visible ── */
     input[class*="st-"], textarea[class*="st-"] {
         border: 2px solid #8fafd4 !important;

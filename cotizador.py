@@ -888,6 +888,16 @@ def cargar_cotizaciones():
                 continue
             numero = row[0].strip()
             d = {h: (row[i] if i < len(row) else "") for i, h in enumerate(headers)}
+            # Extraer num_dibujos desde datos_json para poder buscar por ellos
+            try:
+                import json as _json
+                datos_raw = d.get("datos_json", "{}")
+                datos = _json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                piezas = datos.get("piezas", datos) if isinstance(datos, dict) else datos
+                nums = [str(p.get("num_dibujo","")).strip() for p in piezas if p.get("num_dibujo","").strip()]
+                d["num_dibujos"] = " | ".join(nums)
+            except Exception:
+                d["num_dibujos"] = ""
             seen[numero] = d   # sobrescribe con la más reciente (iteramos reversed → última fila gana)
 
         # Revertir para mostrar más recientes primero en historial
@@ -1996,6 +2006,7 @@ with tab3:
         filtradas = cotizaciones_db
         if buscar_cot: filtradas = [c for c in filtradas if buscar_cot.upper() in (c.get("numero","")).upper()]
         if buscar_cli: filtradas = [c for c in filtradas if buscar_cli.upper() in (c.get("cliente","")).upper()]
+        if buscar_dwg: filtradas = [c for c in filtradas if buscar_dwg.upper() in (c.get("num_dibujos","")).upper()]
 
         ESTADOS = ["borrador", "enviada", "ganada", "perdida"]
         ICONOS  = {"borrador": "📝", "enviada": "📤", "ganada": "✅", "perdida": "❌"}
@@ -2003,8 +2014,8 @@ with tab3:
 
         if filtradas:
             # Tabla con status editable inline
-            cols_header = st.columns([1.5, 1.2, 2, 1.5, 1, 1, 1.8])
-            for col, h in zip(cols_header, ["Cotización", "Fecha", "Cliente", "Total", "Moneda", "Status", "Cambiar status"]):
+            cols_header = st.columns([1.4, 1.0, 1.8, 1.6, 1.2, 0.9, 1.0, 1.7])
+            for col, h in zip(cols_header, ["Cotización", "Fecha", "Cliente", "Núm. Dibujo", "Total", "Moneda", "Status", "Cambiar status"]):
                 with col:
                     st.markdown(f"<span style='font-size:11px;font-weight:600;color:#9aa3b8;text-transform:uppercase;letter-spacing:0.06em'>{h}</span>", unsafe_allow_html=True)
             st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
@@ -2015,16 +2026,19 @@ with tab3:
                     status_actual = "borrador"
                 color  = COLORES.get(status_actual, "#6b7280")
                 icono  = ICONOS.get(status_actual, "📝")
+                # Mostrar núm. dibujos (pueden ser varios separados por |)
+                dwgs = c.get("num_dibujos", "—") or "—"
 
-                cols_row = st.columns([1.5, 1.2, 2, 1.5, 1, 1, 1.8])
+                cols_row = st.columns([1.4, 1.0, 1.8, 1.6, 1.2, 0.9, 1.0, 1.7])
                 with cols_row[0]: st.markdown(f"**{c.get('numero','')}**")
                 with cols_row[1]: st.markdown(c.get("fecha", c.get("created_at",""))[:10])
                 with cols_row[2]: st.markdown(c.get("cliente","—"))
-                with cols_row[3]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
-                with cols_row[4]: st.markdown(c.get("moneda","MXN"))
-                with cols_row[5]:
-                    st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)
+                with cols_row[3]: st.markdown(f"<span style='font-size:12px;color:#374151'>{dwgs}</span>", unsafe_allow_html=True)
+                with cols_row[4]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
+                with cols_row[5]: st.markdown(c.get("moneda","MXN"))
                 with cols_row[6]:
+                    st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)
+                with cols_row[7]:
                     nuevo = st.selectbox("s", [e for e in ESTADOS if e != status_actual],
                         key=f"hs_{ci}", label_visibility="collapsed")
                     if st.button("Actualizar", key=f"hu_{ci}", use_container_width=True):

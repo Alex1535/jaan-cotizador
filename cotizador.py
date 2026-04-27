@@ -1980,8 +1980,8 @@ with tab1:
             with r4:
                 st.markdown(
                     f"<div style='padding:4px 0'>"
-                    f"<div style='font-size:12px;color:#6b7280;font-weight:500'>Precio/pza</div>"
-                    f"<div style='font-size:26px;font-weight:700;color:#16a34a'>{fmtc(res['precio_pza'])}</div>"
+                    f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
+                    f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
                     f"</div>", unsafe_allow_html=True)
 
             st.markdown(
@@ -2010,8 +2010,8 @@ with tab1:
             with r4:
                 st.markdown(
                     f"<div style='padding:4px 0'>"
-                    f"<div style='font-size:12px;color:#6b7280;font-weight:500'>Precio/pza</div>"
-                    f"<div style='font-size:26px;font-weight:700;color:#16a34a'>{fmtc(res['precio_pza'])}</div>"
+                    f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
+                    f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
                     f"</div>", unsafe_allow_html=True)
             r5.metric(f"Total {cant} pzas", fmtc(res["total"]))
 

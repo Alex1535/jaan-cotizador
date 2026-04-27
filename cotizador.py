@@ -1060,22 +1060,33 @@ def cargar_cotizaciones():
                     if es_proyecto:
                         moq  = int(p.get("moq", 0) or 0)
                         eau  = int(p.get("eau", 0) or 0)
-                        cant = eau  # usar EAU como referencia para cálculos
+                        cant = eau
                         cant_display = f"MOQ: {moq}  |  EAU: {eau}"
+                        # Calcular total para MOQ y EAU por separado
+                        try:
+                            p_moq = dict(p); p_moq["cantidad"] = moq; p_moq["tipo_pedido"] = "Pedido único"
+                            p_eau = dict(p); p_eau["cantidad"] = eau; p_eau["tipo_pedido"] = "Pedido único"
+                            total_moq = calcular_pieza(p_moq, margen_g).get("total", 0)
+                            total_eau = calcular_pieza(p_eau, margen_g).get("total", 0)
+                        except Exception:
+                            total_moq = total_eau = 0
+                        total_pieza = total_eau
+                        total_display = "MOQ: " + fmtc(total_moq) + "\nEAU: " + fmtc(total_eau)
                     else:
                         cant = int(p.get("cantidad", 0) or 0)
                         cant_display = str(cant)
+                        try:
+                            total_pieza = calcular_pieza(p, margen_g).get("total", 0)
+                        except Exception:
+                            total_pieza = 0
+                        total_display = None
                     total_cant += cant
-                    try:
-                        res = calcular_pieza(p, margen_g)
-                        total_pieza = res.get("total", 0)
-                    except Exception:
-                        total_pieza = 0
                     if dwg or desc:
                         items.append({"dwg": dwg, "desc": desc, "cant": cant,
                                       "cant_display": cant_display,
                                       "es_proyecto": es_proyecto,
-                                      "total": total_pieza})
+                                      "total": total_pieza,
+                                      "total_display": total_display})
                 d["items_lista"]   = items
                 d["num_dibujos"]   = " | ".join(i["dwg"]  for i in items if i["dwg"])
                 d["descripciones"] = " | ".join(i["desc"] for i in items if i["desc"])
@@ -2422,7 +2433,12 @@ with tab3:
                             st.markdown(f"**{it.get('cant_display', it.get('cant',0))}**")
                     with cols_row[6]:
                         for it in items_lista:
-                            st.markdown(fmtc(it.get("total", 0)))
+                            td = it.get("total_display")
+                            if td:
+                                for line in td.split("\n"):
+                                    st.markdown(line)
+                            else:
+                                st.markdown(fmtc(it.get("total", 0)))
                 else:
                     with cols_row[3]: st.markdown(dwgs)
                     with cols_row[4]: st.markdown(descs)

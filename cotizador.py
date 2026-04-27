@@ -718,9 +718,14 @@ with st.sidebar:
     st.markdown("---")
 
     st.markdown("### 📋 Datos de la cotización")
-    cliente     = st.text_input("Cliente",     value=st.session_state.pop("_cliente","")     or "", placeholder="Nombre del cliente")
-    atencion    = st.text_input("Atención a",  value=st.session_state.pop("_atencion","")    or "", placeholder="Nombre del contacto")
-    ciudad      = st.text_input("Ciudad",      value=st.session_state.pop("_ciudad","")      or "", placeholder="Ciudad, Estado")
+    # Transferir valores cargados desde historial a keys persistentes (una sola vez)
+    if "_cliente"  in st.session_state: st.session_state["sb_cliente"]  = st.session_state.pop("_cliente")
+    if "_atencion" in st.session_state: st.session_state["sb_atencion"] = st.session_state.pop("_atencion")
+    if "_ciudad"   in st.session_state: st.session_state["sb_ciudad"]   = st.session_state.pop("_ciudad")
+    # Widgets con key persistente — sobreviven a cualquier rerun
+    cliente  = st.text_input("Cliente",    key="sb_cliente",  placeholder="Nombre del cliente")
+    atencion = st.text_input("Atención a", key="sb_atencion", placeholder="Nombre del contacto")
+    ciudad   = st.text_input("Ciudad",     key="sb_ciudad",   placeholder="Ciudad, Estado")
 
     # ── Consecutivo automático por sufijo ────────────────────────────
     sufijo_default = st.session_state.get("sufijo_cot", "COT")
@@ -762,23 +767,41 @@ with st.sidebar:
         st.session_state["num_cot_generado"] = get_siguiente_numero(sufijo)
         st.session_state["sufijo_anterior"] = sufijo
 
+    # Transferir valores cargados desde historial a keys persistentes (una sola vez)
+    if "_tipo_cambio" in st.session_state: st.session_state["sb_tipo_cambio"] = st.session_state.pop("_tipo_cambio")
+    if "_moneda"      in st.session_state: st.session_state["sb_moneda"]      = st.session_state.pop("_moneda")
+    if "_margen"      in st.session_state: st.session_state["sb_margen"]      = st.session_state.pop("_margen")
+    if "_vigencia"    in st.session_state: st.session_state["sb_vigencia"]    = st.session_state.pop("_vigencia")
+    if "_t_entrega"   in st.session_state: st.session_state["sb_t_entrega"]   = st.session_state.pop("_t_entrega")
+    if "_cond_pago"   in st.session_state: st.session_state["sb_cond_pago"]   = st.session_state.pop("_cond_pago")
+
+    # Inicializar defaults si no existen aún
+    if "sb_tipo_cambio" not in st.session_state: st.session_state["sb_tipo_cambio"] = 17.31
+    if "sb_moneda"      not in st.session_state: st.session_state["sb_moneda"]      = "MXN"
+    if "sb_margen"      not in st.session_state: st.session_state["sb_margen"]      = 35
+    if "sb_vigencia"    not in st.session_state: st.session_state["sb_vigencia"]    = "15 Días"
+    if "sb_t_entrega"   not in st.session_state: st.session_state["sb_t_entrega"]   = "22-30 días hábiles"
+    if "sb_cond_pago"   not in st.session_state: st.session_state["sb_cond_pago"]   = "40% anticipo - 60% contra-entrega"
+
     num_cot = st.text_input("Núm. cotización",
                 value=st.session_state.get("num_cot_generado", f"{sufijo}-001"),
                 help="Editable — se genera automáticamente")
-    tipo_cambio = st.number_input("Tipo de cambio USD/MXN", value=17.31, step=0.01)
+    tipo_cambio = st.number_input("Tipo de cambio USD/MXN", key="sb_tipo_cambio", step=0.01)
     moneda_cot  = st.radio("Moneda de la cotización", ["MXN", "USD"],
+                    index=["MXN","USD"].index(st.session_state.get("sb_moneda","MXN")),
                     horizontal=True,
                     help="Toda la cotización se mostrará en la moneda seleccionada")
+    st.session_state["sb_moneda"] = moneda_cot
 
     st.markdown("---")
     st.markdown("### ⚙️ Cotización")
-    margen_global = st.slider("Margen de utilidad (%)", 0, 100, 35)
+    margen_global = st.slider("Margen de utilidad (%)", 0, 100, key="sb_margen")
 
     st.markdown("---")
     st.markdown("### 📦 Condiciones generales")
-    vigencia  = st.text_input("Vigencia",            value="15 Días")
-    t_entrega = st.text_input("Tiempo de entrega",   value="22-30 días hábiles")
-    cond_pago = st.text_input("Condiciones de pago", value="40% anticipo - 60% contra-entrega")
+    vigencia  = st.text_input("Vigencia",            key="sb_vigencia")
+    t_entrega = st.text_input("Tiempo de entrega",   key="sb_t_entrega")
+    cond_pago = st.text_input("Condiciones de pago", key="sb_cond_pago")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TABS

@@ -232,195 +232,137 @@ if not st.session_state.autenticado:
 
 st.markdown("""
 <style>
-    /* ══════════════════════════════════════════════════════
-       VARIABLES — light mode por defecto
-    ══════════════════════════════════════════════════════ */
-    :root {
-        --jaan-navy:      #0f1b3d;
-        --jaan-blue:      #185FA5;
-        --jaan-blue-lt:   #E6F1FB;
-        --jaan-blue-mid:  #b5d4f4;
-        --jaan-bg:        #f8f9fc;
-        --jaan-card:      #ffffff;
-        --jaan-border:    #dde1ea;
-        --jaan-input-bg:  #ffffff;
-        --jaan-input-bdr: #8fafd4;
-        --jaan-text:      #0f1b3d;
-        --jaan-text-muted:#6b7280;
-        --jaan-expander-bg: #E6F1FB;
-        --jaan-expander-txt:#0C447C;
-        --jaan-detail-bg:  #ffffff;
-        --jaan-sidebar-bg: #f8f9fc;
-        --jaan-total-bg:   #f8f9fc;
-    }
-
-    /* ── Dark mode overrides ────────────────────────────── */
-    @media (prefers-color-scheme: dark) {
-        :root {
-            --jaan-bg:         #0e1117;
-            --jaan-card:       #1a1f2e;
-            --jaan-border:     #2d3548;
-            --jaan-input-bg:   #1e2535;
-            --jaan-input-bdr:  #3d5a8a;
-            --jaan-text:       #e8ecf4;
-            --jaan-text-muted: #8a94a8;
-            --jaan-expander-bg:#1a2640;
-            --jaan-expander-txt:#7ab3e8;
-            --jaan-detail-bg:  #151b2b;
-            --jaan-sidebar-bg: #0e1117;
-            --jaan-total-bg:   #1a1f2e;
-            --jaan-blue-lt:    #1a2640;
-            --jaan-blue-mid:   #2d4a72;
-        }
-    }
-    /* Streamlit dark mode class override */
-    [data-theme="dark"] {
-        --jaan-bg:         #0e1117;
-        --jaan-card:       #1a1f2e;
-        --jaan-border:     #2d3548;
-        --jaan-input-bg:   #1e2535;
-        --jaan-input-bdr:  #3d5a8a;
-        --jaan-text:       #e8ecf4;
-        --jaan-text-muted: #8a94a8;
-        --jaan-expander-bg:#1a2640;
-        --jaan-expander-txt:#7ab3e8;
-        --jaan-detail-bg:  #151b2b;
-        --jaan-sidebar-bg: #0e1117;
-        --jaan-total-bg:   #1a1f2e;
-        --jaan-blue-lt:    #1a2640;
-        --jaan-blue-mid:   #2d4a72;
-    }
-
-    /* ── Header — siempre navy oscuro ───────────────────── */
+    /* ══ LIGHT MODE (default) ══════════════════════════════════════════ */
     .main-header {
-        background: var(--jaan-navy);
-        padding: 18px 28px 16px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        border-bottom: 3px solid var(--jaan-blue);
+        background: #0f1b3d; padding: 18px 28px 16px;
+        border-radius: 10px; margin-bottom: 20px;
+        border-bottom: 3px solid #185FA5;
     }
-    .main-header h1 { color:#fff; margin:0; font-size:20px; font-weight:500; letter-spacing:0.01em; }
-    .main-header p  { color:rgba(255,255,255,0.5); margin:4px 0 0; font-size:11px; letter-spacing:0.04em; text-transform:uppercase; }
+    .main-header h1 { color:#fff; margin:0; font-size:20px; font-weight:500; }
+    .main-header p  { color:rgba(255,255,255,0.5); margin:4px 0 0; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; }
 
-    /* ── Pieza card ─────────────────────────────────────── */
     .pieza-card {
-        background: var(--jaan-card);
-        border: 0.5px solid var(--jaan-border);
-        border-left: 3px solid var(--jaan-blue);
-        border-radius: 10px;
-        padding: 16px 20px;
-        margin-bottom: 14px;
+        background: #ffffff; border: 0.5px solid #dde1ea;
+        border-left: 3px solid #185FA5; border-radius: 10px;
+        padding: 16px 20px; margin-bottom: 14px;
     }
+    .op-params-box { background:#f8f9fc; border:0.5px solid #dde1ea; border-radius:8px; padding:12px 14px; margin:6px 0; }
+    .mat-prima-box { background:#f8f9fc; border:0.5px solid #dde1ea; border-radius:8px; padding:14px; margin:6px 0; }
+    .semaforo-box  { border-radius:8px; padding:10px 14px; margin-top:8px; font-size:13px; }
+    .peso-result   { background:#EAF3DE; border:0.5px solid #639922; border-radius:8px; padding:10px 14px; font-weight:500; color:#3B6D11; font-size:13px; }
+    .op-header     { color:#9aa3b8; font-size:10px; font-weight:500; letter-spacing:0.06em; text-transform:uppercase; }
 
-    /* ── Inner boxes ────────────────────────────────────── */
-    .op-params-box {
-        background: var(--jaan-bg); border: 0.5px solid var(--jaan-border);
-        border-radius: 8px; padding: 12px 14px; margin: 6px 0;
-    }
-    .semaforo-box { border-radius: 8px; padding: 10px 14px; margin-top: 8px; font-size: 13px; }
-    .mat-prima-box {
-        background: var(--jaan-bg); border: 0.5px solid var(--jaan-border);
-        border-radius: 8px; padding: 14px; margin: 6px 0;
-    }
-    .peso-result {
-        background: #EAF3DE; border: 0.5px solid #639922;
-        border-radius: 8px; padding: 10px 14px;
-        font-weight: 500; color: #3B6D11; font-size: 13px;
-    }
-    .op-header { color: var(--jaan-text-muted); font-size: 10px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; }
-
-    /* ── Resultado / totales ────────────────────────────── */
-    .result-box { background: var(--jaan-navy); border-radius: 10px; padding: 18px 20px; color: white; text-align: center; }
-    .result-box .price { font-size: 32px; font-weight: 500; }
-    .result-box .label { font-size: 10px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.06em; }
+    .result-box { background:#0f1b3d; border-radius:10px; padding:18px 20px; color:white; text-align:center; }
+    .result-box .price { font-size:32px; font-weight:500; }
+    .result-box .label { font-size:10px; opacity:0.6; text-transform:uppercase; letter-spacing:0.06em; }
     .total-box {
-        background: var(--jaan-total-bg);
-        border: 0.5px solid var(--jaan-border);
-        border-left: 3px solid var(--jaan-blue);
-        border-radius: 10px; padding: 18px 20px; text-align: center;
+        background:#f8f9fc; border:0.5px solid #dde1ea;
+        border-left:3px solid #185FA5; border-radius:10px; padding:18px 20px; text-align:center;
     }
 
-    /* ── Botones ────────────────────────────────────────── */
+    /* Botones */
     .stButton > button {
-        background: var(--jaan-navy) !important; color: white !important;
-        border: none !important; border-radius: 8px !important;
-        padding: 8px 20px !important; font-weight: 500 !important;
-        letter-spacing: 0.02em !important; transition: background 0.15s !important;
+        background:#0f1b3d !important; color:white !important;
+        border:none !important; border-radius:8px !important;
+        padding:8px 20px !important; font-weight:500 !important;
+        transition:background 0.15s !important;
     }
-    .stButton > button:hover { background: var(--jaan-blue) !important; }
+    .stButton > button:hover { background:#185FA5 !important; }
 
-    /* ── Sidebar ────────────────────────────────────────── */
-    div[data-testid="stSidebarContent"] { background: var(--jaan-sidebar-bg) !important; }
+    /* Sidebar light */
+    div[data-testid="stSidebarContent"] { background:#f8f9fc !important; }
 
-    /* ── Inputs — funciona en light y dark ──────────────── */
+    /* Inputs light */
     input[class*="st-"], textarea[class*="st-"] {
-        border: 2px solid var(--jaan-input-bdr) !important;
-        border-radius: 6px !important;
-        background: var(--jaan-input-bg) !important;
-        color: var(--jaan-text) !important;
+        border:2px solid #8fafd4 !important; border-radius:6px !important;
+        background:#ffffff !important; color:#0f1b3d !important;
     }
     input[class*="st-"]:focus, textarea[class*="st-"]:focus {
-        border: 2px solid var(--jaan-blue) !important;
-        box-shadow: 0 0 0 3px rgba(24,95,165,0.25) !important;
-        outline: none !important;
+        border:2px solid #185FA5 !important;
+        box-shadow:0 0 0 3px rgba(24,95,165,0.2) !important;
     }
-    /* Number input */
     div[data-testid="stNumberInput"] input {
-        background: var(--jaan-input-bg) !important;
-        color: var(--jaan-text) !important;
-        border: 2px solid var(--jaan-input-bdr) !important;
-        border-radius: 6px !important;
+        background:#ffffff !important; color:#0f1b3d !important;
+        border:2px solid #8fafd4 !important; border-radius:6px !important;
     }
-    /* Selectbox */
     div[data-baseweb="select"] > div {
-        border: 2px solid var(--jaan-input-bdr) !important;
-        border-radius: 6px !important;
-        background: var(--jaan-input-bg) !important;
-        color: var(--jaan-text) !important;
+        border:2px solid #8fafd4 !important; border-radius:6px !important;
+        background:#ffffff !important; color:#0f1b3d !important;
     }
     div[data-baseweb="select"] > div:focus-within {
-        border: 2px solid var(--jaan-blue) !important;
-        box-shadow: 0 0 0 3px rgba(24,95,165,0.25) !important;
-    }
-    /* Selectbox dropdown menu */
-    ul[data-testid="stSelectboxVirtualDropdown"],
-    div[data-baseweb="popover"] {
-        background: var(--jaan-card) !important;
-        border: 1px solid var(--jaan-border) !important;
+        border:2px solid #185FA5 !important;
+        box-shadow:0 0 0 3px rgba(24,95,165,0.2) !important;
     }
 
-    /* ── Expanders ──────────────────────────────────────── */
+    /* Expanders light */
     div[data-testid="stExpander"] {
-        border: 0.5px solid var(--jaan-blue-mid) !important;
-        border-left: 3px solid var(--jaan-blue) !important;
-        border-radius: 8px !important;
-        margin-bottom: 6px !important;
-        background: var(--jaan-expander-bg) !important;
+        border:0.5px solid #b5d4f4 !important; border-left:3px solid #185FA5 !important;
+        border-radius:8px !important; margin-bottom:6px !important;
+        background:#E6F1FB !important;
     }
     div[data-testid="stExpanderHeader"] {
-        font-weight: 500 !important; font-size: 13px !important;
-        color: var(--jaan-expander-txt) !important;
-        background: var(--jaan-expander-bg) !important;
-        padding: 10px 14px !important; border-radius: 8px !important;
+        font-weight:500 !important; font-size:13px !important;
+        color:#0C447C !important; background:#E6F1FB !important;
+        padding:10px 14px !important; border-radius:8px !important;
     }
-    div[data-testid="stExpanderHeader"] p {
-        font-size: 13px !important; font-weight: 500 !important;
-        color: var(--jaan-expander-txt) !important;
-    }
-    div[data-testid="stExpanderHeader"] svg { stroke: var(--jaan-blue) !important; }
-    div[data-testid="stExpanderDetails"] {
-        background: var(--jaan-detail-bg) !important;
-        border-top: 0.5px solid var(--jaan-blue-mid) !important;
-    }
+    div[data-testid="stExpanderHeader"] p { font-size:13px !important; font-weight:500 !important; color:#0C447C !important; }
+    div[data-testid="stExpanderHeader"] svg { stroke:#185FA5 !important; }
+    div[data-testid="stExpanderDetails"] { background:#ffffff !important; border-top:0.5px solid #b5d4f4 !important; }
 
-    /* ── Tabs ───────────────────────────────────────────── */
-    div[data-testid="stTabs"] button[aria-selected="true"] {
-        border-bottom: 3px solid var(--jaan-blue) !important;
-        color: var(--jaan-blue) !important;
-    }
+    /* ══ DARK MODE ══════════════════════════════════════════════════════
+       Streamlit añade clase .dark al body o usa atributo data-theme
+    ════════════════════════════════════════════════════════════════════ */
+    /* Selector principal dark de Streamlit */
+    .stApp[data-theme="dark"] .pieza-card,
+    [data-theme="dark"] .pieza-card { background:#1a1f2e !important; border-color:#2d3548 !important; }
 
-    /* ── Dataframe / table ──────────────────────────────── */
-    div[data-testid="stDataFrame"] { border: 0.5px solid var(--jaan-border) !important; border-radius: 8px !important; }
+    [data-theme="dark"] .op-params-box,
+    [data-theme="dark"] .mat-prima-box { background:#151b2b !important; border-color:#2d3548 !important; }
+
+    [data-theme="dark"] .total-box { background:#1a1f2e !important; border-color:#2d3548 !important; }
+
+    [data-theme="dark"] div[data-testid="stSidebarContent"] { background:#0e1117 !important; }
+
+    [data-theme="dark"] input[class*="st-"],
+    [data-theme="dark"] textarea[class*="st-"] {
+        background:#1e2535 !important; color:#e8ecf4 !important;
+        border:2px solid #3d5a8a !important;
+    }
+    [data-theme="dark"] div[data-testid="stNumberInput"] input {
+        background:#1e2535 !important; color:#e8ecf4 !important;
+        border:2px solid #3d5a8a !important;
+    }
+    [data-theme="dark"] div[data-baseweb="select"] > div {
+        background:#1e2535 !important; color:#e8ecf4 !important;
+        border:2px solid #3d5a8a !important;
+    }
+    [data-theme="dark"] div[data-testid="stExpander"] {
+        background:#1a2640 !important; border-color:#2d4a72 !important;
+    }
+    [data-theme="dark"] div[data-testid="stExpanderHeader"] {
+        background:#1a2640 !important; color:#7ab3e8 !important;
+    }
+    [data-theme="dark"] div[data-testid="stExpanderHeader"] p { color:#7ab3e8 !important; }
+    [data-theme="dark"] div[data-testid="stExpanderDetails"] { background:#151b2b !important; border-color:#2d4a72 !important; }
+
+    [data-theme="dark"] .stButton > button { background:#1e3a5f !important; }
+    [data-theme="dark"] .stButton > button:hover { background:#185FA5 !important; }
+
+    /* Fallback: media query para sistemas que usan prefers-color-scheme */
+    @media (prefers-color-scheme: dark) {
+        .pieza-card { background:#1a1f2e !important; border-color:#2d3548 !important; }
+        .op-params-box, .mat-prima-box { background:#151b2b !important; border-color:#2d3548 !important; }
+        .total-box { background:#1a1f2e !important; border-color:#2d3548 !important; }
+        div[data-testid="stSidebarContent"] { background:#0e1117 !important; }
+        input[class*="st-"], textarea[class*="st-"] { background:#1e2535 !important; color:#e8ecf4 !important; border:2px solid #3d5a8a !important; }
+        div[data-testid="stNumberInput"] input { background:#1e2535 !important; color:#e8ecf4 !important; border:2px solid #3d5a8a !important; }
+        div[data-baseweb="select"] > div { background:#1e2535 !important; color:#e8ecf4 !important; border:2px solid #3d5a8a !important; }
+        div[data-testid="stExpander"] { background:#1a2640 !important; border-color:#2d4a72 !important; }
+        div[data-testid="stExpanderHeader"] { background:#1a2640 !important; color:#7ab3e8 !important; }
+        div[data-testid="stExpanderHeader"] p { color:#7ab3e8 !important; }
+        div[data-testid="stExpanderDetails"] { background:#151b2b !important; border-color:#2d4a72 !important; }
+        .stButton > button { background:#1e3a5f !important; }
+    }
 </style>
 """, unsafe_allow_html=True)
 

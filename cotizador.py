@@ -929,29 +929,77 @@ def cargar_cotizaciones():
             return []
         
         headers = values[0]
-        # Recorrer de abajo hacia arriba para que la entrada más reciente
-        # de cada número quede primero en el dict (deduplicación automática)
+        import json as _json
+
+        # Headers canónicos actuales — usados para mapear columnas nuevas
+        CANONICAL = ["numero","fecha","usuario_email","cliente","atencion",
+                     "direccion","cp","ciudad","pais","moneda","tipo_cambio",
+                     "margen_global","subtotal","iva","total_neto","vigencia",
+                     "tiempo_entrega","cond_pago","datos_json","status"]
+
+        def parse_row(headers, row):
+            """Mapea una fila tolerando schemas viejos (sin direccion/cp/pais)."""
+            d = {}
+            # Mapeo directo por header real de la fila
+            for i, h in enumerate(headers):
+                d[h] = row[i] if i < len(row) else ""
+
+            # Si faltan campos nuevos (schema viejo), intentar reubicar datos_json
+            # buscando la última celda que contenga JSON válido con "piezas"
+            if not d.get("datos_json","").strip().startswith("{"):
+                for cell in reversed(row):
+                    cell = cell.strip() if cell else ""
+                    if cell.startswith("{") and '"piezas"' in cell:
+                        try:
+                            _json.loads(cell)
+                            d["datos_json"] = cell
+                            break
+                        except Exception:
+                            pass
+
+            # Para schemas viejos sin direccion/cp/pais, dejar vacíos
+            for campo in ["direccion","cp","pais"]:
+                if campo not in d:
+                    d[campo] = ""
+
+            # Reparar moneda/total_neto si cayeron en columna equivocada
+            # (schema viejo: columna 6=ciudad era moneda, columna 11=total_neto)
+            if d.get("moneda","") in ("", "0") and len(row) > 6:
+                # Intentar detectar moneda buscando MXN/USD en la fila
+                for cell in row:
+                    if cell in ("MXN", "USD"):
+                        d["moneda"] = cell
+                        break
+            if not d.get("moneda",""):
+                d["moneda"] = "MXN"
+
+            return d
+
         seen = {}
         for row in reversed(values[1:]):
             if not row or not row[0]:
                 continue
             numero = row[0].strip()
-            d = {h: (row[i] if i < len(row) else "") for i, h in enumerate(headers)}
-            # Extraer num_dibujos desde datos_json para poder buscar por ellos
+            d = parse_row(headers, row)
+
+            # Extraer num_dibujos y descripciones desde datos_json
             try:
-                import json as _json
                 datos_raw = d.get("datos_json", "{}")
-                datos = _json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
-                piezas = datos.get("piezas", datos) if isinstance(datos, dict) else datos
-                nums = [str(p.get("num_dibujo","")).strip() for p in piezas if p.get("num_dibujo","").strip()]
+                if isinstance(datos_raw, str) and datos_raw.strip():
+                    datos = _json.loads(datos_raw)
+                else:
+                    datos = {}
+                piezas = datos.get("piezas", []) if isinstance(datos, dict) else (datos if isinstance(datos, list) else [])
+                nums  = [str(p.get("num_dibujo","")).strip() for p in piezas if p.get("num_dibujo","").strip()]
                 descs = [str(p.get("descripcion","")).strip() for p in piezas if p.get("descripcion","").strip()]
-                d["num_dibujos"]  = " | ".join(nums)
+                d["num_dibujos"]   = " | ".join(nums)
                 d["descripciones"] = " | ".join(descs)
             except Exception:
-                d["num_dibujos"] = ""
-            seen[numero] = d   # sobrescribe con la más reciente (iteramos reversed → última fila gana)
+                d["num_dibujos"]   = ""
+                d["descripciones"] = ""
 
-        # Revertir para mostrar más recientes primero en historial
+            seen[numero] = d
+
         return list(reversed(list(seen.values())))
     except Exception:
         return st.session_state.get("cotizaciones", [])
@@ -2200,7 +2248,22 @@ with tab3:
                     if st.button(f"📂 Cargar cotización {sel_num}", type="primary"):
                         try:
                             datos_raw = cot_sel.get("datos_json", "{}")
-                            datos = json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
+                            # Buscar JSON válido si datos_json está vacío o corrupto
+                            if not (isinstance(datos_raw, str) and datos_raw.strip().startswith("{")):
+                                datos_raw = "{}"
+                                # Intentar recuperarlo de cualquier celda de la fila
+                                for v in cot_sel.values():
+                                    if isinstance(v, str) and v.strip().startswith("{") and '"piezas"' in v:
+                                        try:
+                                            json.loads(v)
+                                            datos_raw = v
+                                            break
+                                        except Exception:
+                                            pass
+                            try:
+                                datos = json.loads(datos_raw)
+                            except Exception:
+                                datos = {}
                             # Manejar ambos formatos: lista directa o dict con "piezas"
                             if isinstance(datos, list):
                                 piezas_cargadas = datos

@@ -1045,9 +1045,14 @@ def cargar_cotizaciones():
                 else:
                     datos = {}
                 piezas = datos.get("piezas", []) if isinstance(datos, dict) else (datos if isinstance(datos, list) else [])
-                # Construir lista de items: [{dwg, desc, cant}, ...]
+                # Construir lista de items: [{dwg, desc, cant, total}, ...]
                 items = []
                 total_cant = 0
+                margen_g = 35
+                try:
+                    margen_g = int(float(d.get("margen_global", 35) or 35))
+                except Exception:
+                    margen_g = 35
                 for p in piezas:
                     dwg  = str(p.get("num_dibujo","")).strip()
                     desc = str(p.get("descripcion","")).strip()
@@ -1056,8 +1061,14 @@ def cargar_cotizaciones():
                     else:
                         cant = int(p.get("cantidad", 0) or 0)
                     total_cant += cant
+                    # Calcular total por pieza desde datos guardados
+                    try:
+                        res = calcular_pieza(p, margen_g)
+                        total_pieza = res.get("total", 0)
+                    except Exception:
+                        total_pieza = 0
                     if dwg or desc:
-                        items.append({"dwg": dwg, "desc": desc, "cant": cant})
+                        items.append({"dwg": dwg, "desc": desc, "cant": cant, "total": total_pieza})
                 d["items_lista"]   = items
                 d["num_dibujos"]   = " | ".join(i["dwg"]  for i in items if i["dwg"])
                 d["descripciones"] = " | ".join(i["desc"] for i in items if i["desc"])
@@ -2403,7 +2414,12 @@ with tab3:
                 with cols_row[3]: st.markdown(dwg_html,  unsafe_allow_html=True)
                 with cols_row[4]: st.markdown(desc_html, unsafe_allow_html=True)
                 with cols_row[5]: st.markdown(cant_html, unsafe_allow_html=True)
-                with cols_row[6]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
+                with cols_row[6]:
+                    if items_lista and any(i.get("total",0) for i in items_lista):
+                        total_html = "<br>".join(fmtc(i.get("total",0)) for i in items_lista)
+                        st.markdown(total_html, unsafe_allow_html=True)
+                    else:
+                        st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
                 with cols_row[7]: st.markdown(c.get("moneda","MXN"))
                 with cols_row[8]:
                     st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)

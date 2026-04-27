@@ -2401,23 +2401,26 @@ with tab3:
                 with cols_row[0]: st.markdown(f"**{c.get('numero','')}**")
                 with cols_row[1]: st.markdown(fecha_raw[:16])
                 with cols_row[2]: st.markdown(c.get("cliente","—"))
-                # Mostrar items verticalmente — todo en HTML para alineación perfecta
+                # Mostrar items verticalmente usando st.markdown simple por item
                 items_lista = c.get("items_lista", [])
-                lh = "line-height:2.1em"  # altura de línea igual para todas las celdas
                 if items_lista:
-                    dwg_html   = "<br>".join(f"<span style='{lh}'>{i['dwg'] or '—'}</span>"  for i in items_lista)
-                    desc_html  = "<br>".join(f"<span style='{lh}'>{i['desc'] or '—'}</span>" for i in items_lista)
-                    cant_html  = "<br>".join(f"<span style='{lh}'><b>{i['cant']}</b></span>"  for i in items_lista)
-                    total_html = "<br>".join(f"<span style='{lh}'>{fmtc(i.get('total',0))}</span>" for i in items_lista)
+                    with cols_row[3]:
+                        for it in items_lista:
+                            st.markdown(it.get("dwg") or "—")
+                    with cols_row[4]:
+                        for it in items_lista:
+                            st.markdown(it.get("desc") or "—")
+                    with cols_row[5]:
+                        for it in items_lista:
+                            st.markdown(f"**{it.get('cant',0)}**")
+                    with cols_row[6]:
+                        for it in items_lista:
+                            st.markdown(fmtc(it.get("total", 0)))
                 else:
-                    dwg_html   = dwgs
-                    desc_html  = descs
-                    cant_html  = f"<b>{c.get('cantidad_total','—')}</b>"
-                    total_html = fmtc(float(c.get("total_neto", 0) or 0))
-                with cols_row[3]: st.markdown(dwg_html,   unsafe_allow_html=True)
-                with cols_row[4]: st.markdown(desc_html,  unsafe_allow_html=True)
-                with cols_row[5]: st.markdown(cant_html,  unsafe_allow_html=True)
-                with cols_row[6]: st.markdown(total_html, unsafe_allow_html=True)
+                    with cols_row[3]: st.markdown(dwgs)
+                    with cols_row[4]: st.markdown(descs)
+                    with cols_row[5]: st.markdown(f"**{c.get('cantidad_total','—')}**")
+                    with cols_row[6]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
                 with cols_row[7]: st.markdown(c.get("moneda","MXN"))
                 with cols_row[8]:
                     st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)

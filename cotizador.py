@@ -880,6 +880,22 @@ def guardar_cotizacion():
     iva        = total * 0.16
     total_neto = total + iva
 
+    def piezas_sin_b64(piezas):
+        """Elimina campos base64 pesados — los archivos van a Drive"""
+        limpias = []
+        for p in piezas:
+            pc = dict(p)
+            if pc.get("plano_drive_id"):
+                pc["plano_b64"] = ""
+            mp = dict(pc.get("materia_prima", {}))
+            if len(mp.get("cotizacion_mp_b64", "")) > 10000:
+                mp["cotizacion_mp_b64"] = ""
+            pc["materia_prima"] = mp
+            if len(pc.get("cotizacion_trat_b64", "")) > 10000:
+                pc["cotizacion_trat_b64"] = ""
+            limpias.append(pc)
+        return limpias
+
     fila = [
         num_cot,
         datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -889,7 +905,7 @@ def guardar_cotizacion():
         str(round(total, 2)), str(round(iva, 2)), str(round(total_neto, 2)),
         vigencia, t_entrega, cond_pago,
         json.dumps({
-            "piezas": st.session_state.piezas,
+            "piezas": piezas_sin_b64(st.session_state.piezas),
             "cond_generales": {"vigencia": vigencia,
                                "tiempo_entrega": t_entrega,
                                "cond_pago": cond_pago}

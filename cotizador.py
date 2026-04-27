@@ -791,17 +791,50 @@ with st.sidebar:
     if "_cond_pago"   in st.session_state: st.session_state["sb_cond_pago"]   = st.session_state.pop("_cond_pago")
 
     # Inicializar defaults si no existen aún
-    if "sb_tipo_cambio" not in st.session_state: st.session_state["sb_tipo_cambio"] = 17.31
     if "sb_moneda"      not in st.session_state: st.session_state["sb_moneda"]      = "MXN"
     if "sb_margen"      not in st.session_state: st.session_state["sb_margen"]      = 35
     if "sb_vigencia"    not in st.session_state: st.session_state["sb_vigencia"]    = "15 Días"
     if "sb_t_entrega"   not in st.session_state: st.session_state["sb_t_entrega"]   = "22-30 días hábiles"
     if "sb_cond_pago"   not in st.session_state: st.session_state["sb_cond_pago"]   = "40% anticipo - 60% contra-entrega"
 
+    # ── Tipo de cambio automático (se actualiza una vez por día) ─────
+    @st.cache_data(ttl=86400)   # cache 24 horas
+    def obtener_tipo_cambio():
+        import requests as _req
+        try:
+            r = _req.get("https://api.frankfurter.app/latest?from=USD&to=MXN", timeout=5)
+            if r.status_code == 200:
+                tc = r.json()["rates"]["MXN"]
+                return round(tc, 4)
+        except Exception:
+            pass
+        try:
+            r = _req.get("https://open.er-api.com/v6/latest/USD", timeout=5)
+            if r.status_code == 200:
+                tc = r.json()["rates"]["MXN"]
+                return round(tc, 4)
+        except Exception:
+            pass
+        return 17.31   # fallback
+
+    # Cargar TC automático solo si no hay uno manual/cargado del historial
+    if "sb_tipo_cambio" not in st.session_state:
+        st.session_state["sb_tipo_cambio"] = obtener_tipo_cambio()
+
     num_cot = st.text_input("Núm. cotización",
                 value=st.session_state.get("num_cot_generado", f"{sufijo}-001"),
                 help="Editable — se genera automáticamente")
-    tipo_cambio = st.number_input("Tipo de cambio USD/MXN", key="sb_tipo_cambio", step=0.01)
+
+    # Mostrar fuente y fecha del TC
+    tc_auto = obtener_tipo_cambio()
+    st.caption(f"💱 TC de referencia hoy: **${tc_auto:,.4f}** · Fuente: Frankfurter (BCE) · Editable")
+    tipo_cambio = st.number_input("Tipo de cambio USD/MXN", key="sb_tipo_cambio", step=0.01,
+                    help="Se actualiza automáticamente cada 24h — puedes editarlo manualmente")
+    col_tc = st.columns([1])
+    with col_tc[0]:
+        if st.button("🔄 Usar TC del día", use_container_width=True):
+            st.session_state["sb_tipo_cambio"] = tc_auto
+            st.rerun()
     moneda_cot  = st.radio("Moneda de la cotización", ["MXN", "USD"],
                     index=["MXN","USD"].index(st.session_state.get("sb_moneda","MXN")),
                     horizontal=True,

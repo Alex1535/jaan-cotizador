@@ -176,6 +176,74 @@ def _find_row_number(token, sheet_id, numero_cot):
             return i
     return None
 
+def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
+    """Sube un archivo a Google Drive y retorna el file_id"""
+    import requests, json
+    token, err = get_gsheet_token()
+    if not token:
+        return None, err
+    # Crear carpeta JAAN-Planos si no existe
+    folder_id = st.session_state.get("_drive_folder_id")
+    if not folder_id:
+        # Buscar carpeta existente
+        r = requests.get(
+            "https://www.googleapis.com/drive/v3/files",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"q": "name='JAAN-Planos' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+                    "fields": "files(id,name)"}
+        )
+        files = r.json().get("files", [])
+        if files:
+            folder_id = files[0]["id"]
+        else:
+            # Crear carpeta
+            rc = requests.post(
+                "https://www.googleapis.com/drive/v3/files",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json={"name": "JAAN-Planos", "mimeType": "application/vnd.google-apps.folder"}
+            )
+            folder_id = rc.json().get("id")
+        st.session_state["_drive_folder_id"] = folder_id
+
+    # Subir archivo con multipart
+    import io
+    metadata = json.dumps({"name": filename, "parents": [folder_id] if folder_id else []})
+    boundary = "jaan_boundary_xyz"
+    CRLF = "\r\n"
+    body = (
+        f"--{boundary}{CRLF}Content-Type: application/json; charset=UTF-8{CRLF}{CRLF}"
+        f"{metadata}{CRLF}"
+        f"--{boundary}{CRLF}Content-Type: {mime_type}{CRLF}{CRLF}"
+    ).encode() + file_bytes + f"{CRLF}--{boundary}--".encode()
+
+    resp = requests.post(
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",
+        headers={"Authorization": f"Bearer {token}",
+                 "Content-Type": f"multipart/related; boundary={boundary}"},
+        data=body
+    )
+    if resp.status_code in (200, 201):
+        file_id = resp.json().get("id")
+        # Hacer el archivo accesible con el token (no público)
+        return file_id, None
+    return None, f"Error Drive: {resp.status_code} {resp.text[:200]}"
+
+
+def descargar_plano_drive(file_id):
+    """Descarga un archivo de Google Drive por su file_id"""
+    import requests
+    token, err = get_gsheet_token()
+    if not token:
+        return None, err
+    resp = requests.get(
+        f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    if resp.status_code == 200:
+        return resp.content, None
+    return None, f"Error descargando: {resp.status_code}"
+
+
 def append_to_gsheet(values):
     """Agrega una fila nueva al Google Sheet"""
     import requests
@@ -1160,11 +1228,25 @@ with tab1:
                 import base64 as b64mod
                 file_bytes_prev = plano_file.read()
                 plano_file.seek(0)
-                # Guardar plano en session_state piezas para persistencia
-                _b64_plano = b64mod.b64encode(file_bytes_prev).decode("utf-8")
-                st.session_state.piezas[pi]["plano_nombre"] = plano_file.name
-                st.session_state.piezas[pi]["plano_b64"]    = _b64_plano
-                st.session_state.piezas[pi]["plano_tipo"]   = "img" if plano_file.name.lower().endswith((".png",".jpg",".jpeg")) else "pdf"
+                is_img_type = plano_file.name.lower().endswith((".png",".jpg",".jpeg"))
+                # Subir a Google Drive si no está ya guardado con este nombre
+                if st.session_state.piezas[pi].get("plano_nombre") != plano_file.name:
+                    with st.spinner("☁️ Subiendo plano a Google Drive..."):
+                        mime = "image/png" if is_img_type else "application/pdf"
+                        file_id, drive_err = subir_plano_drive(file_bytes_prev, plano_file.name, mime)
+                    if file_id:
+                        st.session_state.piezas[pi]["plano_nombre"]    = plano_file.name
+                        st.session_state.piezas[pi]["plano_drive_id"]  = file_id
+                        st.session_state.piezas[pi]["plano_b64"]       = ""   # limpiar b64 viejo
+                        st.session_state.piezas[pi]["plano_tipo"]      = "img" if is_img_type else "pdf"
+                        st.success(f"☁️ Plano subido a Drive: {plano_file.name}")
+                    else:
+                        # Fallback: guardar en b64 si Drive falla
+                        _b64_plano = b64mod.b64encode(file_bytes_prev).decode("utf-8")
+                        st.session_state.piezas[pi]["plano_nombre"] = plano_file.name
+                        st.session_state.piezas[pi]["plano_b64"]    = _b64_plano
+                        st.session_state.piezas[pi]["plano_tipo"]   = "img" if is_img_type else "pdf"
+                        st.warning(f"⚠️ Drive no disponible, plano guardado localmente: {drive_err}")
                 is_img = plano_file.name.lower().endswith((".png",".jpg",".jpeg"))
                 st.markdown("**👁️ Vista previa del plano:**")
                 if is_img:
@@ -1216,41 +1298,61 @@ with tab1:
                 st.markdown("---")
 
             # Mostrar plano guardado si existe y no hay nuevo archivo subido
-            if plano_file is None and pieza.get("plano_b64") and pieza.get("plano_nombre"):
-                import base64 as b64mod
-                plano_bytes_saved = b64mod.b64decode(pieza["plano_b64"])
+            if plano_file is None and pieza.get("plano_nombre"):
+                drive_id = pieza.get("plano_drive_id", "")
+                b64_local = pieza.get("plano_b64", "")
                 st.markdown(f"**👁️ Plano guardado: {pieza['plano_nombre']}**")
-                if pieza.get("plano_tipo") == "img":
-                    st.image(plano_bytes_saved, use_container_width=True, caption=pieza["plano_nombre"])
+
+                # Obtener bytes: desde Drive o desde b64 local
+                plano_bytes_saved = None
+                if drive_id:
+                    cache_key = f"_plano_cache_{drive_id}"
+                    if cache_key not in st.session_state:
+                        with st.spinner("☁️ Descargando plano de Drive..."):
+                            plano_bytes_saved, _ = descargar_plano_drive(drive_id)
+                            if plano_bytes_saved:
+                                st.session_state[cache_key] = plano_bytes_saved
+                    else:
+                        plano_bytes_saved = st.session_state[cache_key]
+                elif b64_local:
+                    import base64 as b64mod
+                    plano_bytes_saved = b64mod.b64decode(b64_local)
+
+                if plano_bytes_saved:
+                    if pieza.get("plano_tipo") == "img":
+                        st.image(plano_bytes_saved, use_container_width=True, caption=pieza["plano_nombre"])
+                    else:
+                        sc1, sc2 = st.columns([1, 3])
+                        with sc1:
+                            st.markdown(f"📄 **{pieza['plano_nombre']}**")
+                            st.download_button(
+                                "⬇️ Descargar PDF",
+                                data=plano_bytes_saved,
+                                file_name=pieza["plano_nombre"],
+                                mime="application/pdf",
+                                key=f"dl_plano_saved_{pieza['id']}",
+                                use_container_width=True
+                            )
+                        with sc2:
+                            if st.toggle("🔍 Ver PDF guardado", key=f"toggle_saved_{pieza['id']}"):
+                                try:
+                                    import fitz
+                                    pdf_doc = fitz.open(stream=plano_bytes_saved, filetype="pdf")
+                                    for page_num in range(min(len(pdf_doc), 3)):
+                                        page = pdf_doc[page_num]
+                                        rect = page.rect
+                                        mat = fitz.Matrix(2, 2).prerotate(270) if rect.height > rect.width else fitz.Matrix(2, 2)
+                                        pix = page.get_pixmap(matrix=mat)
+                                        st.image(pix.tobytes("png"), use_container_width=True, caption=f"Página {page_num+1}")
+                                except ImportError:
+                                    import base64 as b64mod
+                                    pdf_b64_disp = b64mod.b64encode(plano_bytes_saved).decode()
+                                    st.markdown(
+                                        f'<object data="data:application/pdf;base64,{pdf_b64_disp}" '
+                                        f'type="application/pdf" width="100%" height="500px"></object>',
+                                        unsafe_allow_html=True)
                 else:
-                    pdf_b64_saved = pieza["plano_b64"]
-                    sc1, sc2 = st.columns([1, 3])
-                    with sc1:
-                        st.markdown(f"📄 **{pieza['plano_nombre']}**")
-                        st.download_button(
-                            "⬇️ Descargar PDF",
-                            data=plano_bytes_saved,
-                            file_name=pieza["plano_nombre"],
-                            mime="application/pdf",
-                            key=f"dl_plano_saved_{pieza['id']}",
-                            use_container_width=True
-                        )
-                    with sc2:
-                        if st.toggle("🔍 Ver PDF guardado", key=f"toggle_saved_{pieza['id']}"):
-                            try:
-                                import fitz
-                                pdf_doc = fitz.open(stream=plano_bytes_saved, filetype="pdf")
-                                for page_num in range(min(len(pdf_doc), 3)):
-                                    page = pdf_doc[page_num]
-                                    rect = page.rect
-                                    mat = fitz.Matrix(2, 2).prerotate(270) if rect.height > rect.width else fitz.Matrix(2, 2)
-                                    pix = page.get_pixmap(matrix=mat)
-                                    st.image(pix.tobytes("png"), use_container_width=True, caption=f"Página {page_num+1}")
-                            except ImportError:
-                                st.markdown(
-                                    f'<object data="data:application/pdf;base64,{pdf_b64_saved}" '
-                                    f'type="application/pdf" width="100%" height="500px"></object>',
-                                    unsafe_allow_html=True)
+                    st.warning("⚠️ No se pudo recuperar el plano.")
                 st.markdown("---")
 
             if plano_file is not None:

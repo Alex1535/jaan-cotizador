@@ -2221,6 +2221,8 @@ with tab3:
                                 "dim_", "cprevio_", "lbarra_", "lcorte_", "cbarra_",
                                 "plano_", "notas_plano_", "ia_engine_",
                                 "toggle_prev_", "analyze_",
+                                "provtrat_", "provmp_",
+                                "cotfile_", "cotmpfile_",
                             ]
                             keys_to_delete = [k for k in list(st.session_state.keys())
                                 if any(k.startswith(p) for p in prefixes_to_clear)]

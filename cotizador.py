@@ -952,41 +952,61 @@ def cargar_cotizaciones():
                         "tiempo_entrega","cond_pago","datos_json"]
 
         def parse_row(headers, row):
-            """Mapea una fila tolerando schemas viejos (sin direccion/cp/pais)."""
-            # Detectar schema por los headers reales de la fila del Sheet
-            # Si el header real tiene "direccion" usar schema nuevo, si no usar viejo
-            if "direccion" in headers:
-                schema = SCHEMA_NUEVO
-            else:
+            """Mapea una fila detectando automáticamente si es schema viejo o nuevo."""
+
+            # Siempre mapear primero por headers reales del Sheet
+            d_raw = {}
+            for i, h in enumerate(headers):
+                d_raw[h] = row[i] if i < len(row) else ""
+
+            # Detectar si esta FILA específica es de schema viejo:
+            # En schema viejo, la col "direccion" (pos 5) contiene ciudad
+            # y la col "moneda" (pos 9 nuevo) contiene un número (tipo_cambio)
+            # La clave: en schema viejo, datos_json está en col 15 (pos 15)
+            # En schema nuevo, datos_json está en col 18 (pos 18)
+            # Detectamos buscando cuál posición tiene JSON válido con "piezas"
+            datos_json_val = ""
+            datos_json_idx = -1
+            for i, cell in enumerate(row):
+                cell = (cell or "").strip()
+                if cell.startswith("{") and '"piezas"' in cell:
+                    try:
+                        _json.loads(cell)
+                        datos_json_val = cell
+                        datos_json_idx = i
+                        break
+                    except Exception:
+                        pass
+
+            # Si datos_json está en posición 15 → schema viejo (16 cols base)
+            # Si datos_json está en posición 18 → schema nuevo (19 cols base)
+            if datos_json_idx == 15 or (datos_json_idx == -1 and len(row) <= 17):
                 schema = SCHEMA_VIEJO
+            else:
+                schema = SCHEMA_NUEVO
 
             d = {}
             for i, h in enumerate(schema):
                 d[h] = row[i] if i < len(row) else ""
+
+            # Forzar datos_json encontrado
+            if datos_json_val:
+                d["datos_json"] = datos_json_val
 
             # Garantizar campos nuevos vacíos si schema viejo
             for campo in ["direccion","cp","pais"]:
                 if campo not in d:
                     d[campo] = ""
 
-            # Buscar datos_json si está vacío o corrupto (puede estar al final)
-            if not (d.get("datos_json","").strip().startswith("{")):
-                for cell in reversed(row):
-                    cell = (cell or "").strip()
-                    if cell.startswith("{") and '"piezas"' in cell:
-                        try:
-                            _json.loads(cell)
-                            d["datos_json"] = cell
-                            break
-                        except Exception:
-                            pass
-
             # Status puede estar como columna extra al final
             if "status" in headers:
                 si = headers.index("status")
                 d["status"] = row[si] if si < len(row) else ""
+            elif d_raw.get("status"):
+                d["status"] = d_raw["status"]
 
-            if not d.get("moneda",""):
+            # Sanear moneda
+            if d.get("moneda","") not in ("MXN","USD"):
                 d["moneda"] = "MXN"
 
             return d

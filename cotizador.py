@@ -895,7 +895,9 @@ def cargar_cotizaciones():
                 datos = _json.loads(datos_raw) if isinstance(datos_raw, str) else datos_raw
                 piezas = datos.get("piezas", datos) if isinstance(datos, dict) else datos
                 nums = [str(p.get("num_dibujo","")).strip() for p in piezas if p.get("num_dibujo","").strip()]
-                d["num_dibujos"] = " | ".join(nums)
+                descs = [str(p.get("descripcion","")).strip() for p in piezas if p.get("descripcion","").strip()]
+                d["num_dibujos"]  = " | ".join(nums)
+                d["descripciones"] = " | ".join(descs)
             except Exception:
                 d["num_dibujos"] = ""
             seen[numero] = d   # sobrescribe con la más reciente (iteramos reversed → última fila gana)
@@ -2027,13 +2029,15 @@ with tab3:
                 color  = COLORES.get(status_actual, "#6b7280")
                 icono  = ICONOS.get(status_actual, "📝")
                 # Mostrar núm. dibujos (pueden ser varios separados por |)
-                dwgs = c.get("num_dibujos", "—") or "—"
+                dwgs  = c.get("num_dibujos",   "") or ""
+                descs = c.get("descripciones", "") or ""
+                dwg_display = (dwgs + ("\n" + descs if descs else "")) if (dwgs or descs) else "—"
 
                 cols_row = st.columns([1.4, 1.0, 1.8, 1.6, 1.2, 0.9, 1.0, 1.7])
                 with cols_row[0]: st.markdown(f"**{c.get('numero','')}**")
                 with cols_row[1]: st.markdown(c.get("fecha", c.get("created_at",""))[:10])
                 with cols_row[2]: st.markdown(c.get("cliente","—"))
-                with cols_row[3]: st.markdown(dwgs)
+                with cols_row[3]: st.markdown(dwg_display)
                 with cols_row[4]: st.markdown(fmtc(float(c.get("total_neto", 0) or 0)))
                 with cols_row[5]: st.markdown(c.get("moneda","MXN"))
                 with cols_row[6]:

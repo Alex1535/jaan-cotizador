@@ -490,6 +490,9 @@ def nueva_pieza(idx, defaults):
         "proveedor_trat": "",
         "cotizacion_trat_nombre": "",
         "cotizacion_trat_b64": "",
+        "plano_nombre": "",
+        "plano_b64": "",
+        "plano_tipo": "",
         "cantidad":      10,
         "demanda_mensual": 0,
         "tipo_pedido":   "Pedido único",
@@ -1157,6 +1160,11 @@ with tab1:
                 import base64 as b64mod
                 file_bytes_prev = plano_file.read()
                 plano_file.seek(0)
+                # Guardar plano en session_state piezas para persistencia
+                _b64_plano = b64mod.b64encode(file_bytes_prev).decode("utf-8")
+                st.session_state.piezas[pi]["plano_nombre"] = plano_file.name
+                st.session_state.piezas[pi]["plano_b64"]    = _b64_plano
+                st.session_state.piezas[pi]["plano_tipo"]   = "img" if plano_file.name.lower().endswith((".png",".jpg",".jpeg")) else "pdf"
                 is_img = plano_file.name.lower().endswith((".png",".jpg",".jpeg"))
                 st.markdown("**👁️ Vista previa del plano:**")
                 if is_img:
@@ -1204,6 +1212,44 @@ with tab1:
                                     f'<p>Tu navegador no puede mostrar el PDF. '
                                     f'<a href="data:application/pdf;base64,{pdf_b64}" download="plano.pdf">Descargar PDF</a></p>'
                                     f'</object>',
+                                    unsafe_allow_html=True)
+                st.markdown("---")
+
+            # Mostrar plano guardado si existe y no hay nuevo archivo subido
+            if plano_file is None and pieza.get("plano_b64") and pieza.get("plano_nombre"):
+                import base64 as b64mod
+                plano_bytes_saved = b64mod.b64decode(pieza["plano_b64"])
+                st.markdown(f"**👁️ Plano guardado: {pieza['plano_nombre']}**")
+                if pieza.get("plano_tipo") == "img":
+                    st.image(plano_bytes_saved, use_container_width=True, caption=pieza["plano_nombre"])
+                else:
+                    pdf_b64_saved = pieza["plano_b64"]
+                    sc1, sc2 = st.columns([1, 3])
+                    with sc1:
+                        st.markdown(f"📄 **{pieza['plano_nombre']}**")
+                        st.download_button(
+                            "⬇️ Descargar PDF",
+                            data=plano_bytes_saved,
+                            file_name=pieza["plano_nombre"],
+                            mime="application/pdf",
+                            key=f"dl_plano_saved_{pieza['id']}",
+                            use_container_width=True
+                        )
+                    with sc2:
+                        if st.toggle("🔍 Ver PDF guardado", key=f"toggle_saved_{pieza['id']}"):
+                            try:
+                                import fitz
+                                pdf_doc = fitz.open(stream=plano_bytes_saved, filetype="pdf")
+                                for page_num in range(min(len(pdf_doc), 3)):
+                                    page = pdf_doc[page_num]
+                                    rect = page.rect
+                                    mat = fitz.Matrix(2, 2).prerotate(270) if rect.height > rect.width else fitz.Matrix(2, 2)
+                                    pix = page.get_pixmap(matrix=mat)
+                                    st.image(pix.tobytes("png"), use_container_width=True, caption=f"Página {page_num+1}")
+                            except ImportError:
+                                st.markdown(
+                                    f'<object data="data:application/pdf;base64,{pdf_b64_saved}" '
+                                    f'type="application/pdf" width="100%" height="500px"></object>',
                                     unsafe_allow_html=True)
                 st.markdown("---")
 
@@ -2342,6 +2388,8 @@ with tab3:
                                 st.session_state[f"provtrat_{pid}"] = p.get("proveedor_trat", "")
                                 # Proveedor materia prima
                                 st.session_state[f"provmp_{pid}"]   = p.get("materia_prima", {}).get("proveedor", "")
+                                # Plano — se restaura directo desde piezas_cargadas (no necesita widget key)
+                                # plano_b64, plano_nombre, plano_tipo están en el dict de la pieza
                                 # Nota: cotizacion_mp_b64 se restaura directo desde piezas_cargadas, no necesita key de widget
                                 # Márgenes
                                 st.session_state[f"mg_{pid}"]     = bool(p.get("usar_margen_global", False))

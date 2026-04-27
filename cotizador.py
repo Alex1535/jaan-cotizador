@@ -526,6 +526,9 @@ def nueva_materia_prima():
     return {"figura": "Redondo (barra)", "material": "Inox 303",
             "dims": [0.0,0.0,0.0,0.0], "precio_kg": 0.0,
             "desperdicio": 10.0, "costo_manual": 0.0, "modo": "Por tramo",
+            "proveedor": "",
+            "cotizacion_mp_nombre": "",
+            "cotizacion_mp_b64": "",
             # Campos para cálculo por tramo (todo en pulgadas)
             "largo_tramo":   31.5,    # pulgadas
             "largo_pieza":    1.575,  # pulgadas
@@ -547,6 +550,9 @@ def nueva_pieza(idx, defaults):
         "tratamiento":   "Ninguno",
         "costo_trat":    0.0,
         "dias_trat":     0,
+        "proveedor_trat": "",
+        "cotizacion_trat_nombre": "",
+        "cotizacion_trat_b64": "",
         "cantidad":      10,
         "demanda_mensual": 0,
         "tipo_pedido":   "Pedido único",
@@ -1579,6 +1585,46 @@ with tab1:
                     help="Ingresa el precio de la materia prima por pieza ya cortada"
                 )
                 st.session_state.piezas[pi]["materia_prima"]["costo_manual"] = costo_manual
+
+            # ── Proveedor de materia prima + cotización adjunta ─────────
+            st.markdown("---")
+            provmp_c1, provmp_c2 = st.columns([2, 2])
+            with provmp_c1:
+                prov_mp = st.text_input(
+                    "🏭 Proveedor de materia prima",
+                    value=mp.get("proveedor", ""),
+                    key=f"provmp_{pieza['id']}",
+                    placeholder="Nombre del proveedor"
+                )
+                st.session_state.piezas[pi]["materia_prima"]["proveedor"] = prov_mp
+            with provmp_c2:
+                cot_mp_file = st.file_uploader(
+                    "📎 Cotización del proveedor (PDF/imagen)",
+                    type=["pdf", "png", "jpg", "jpeg"],
+                    key=f"cotmpfile_{pieza['id']}",
+                    help="Se guardará junto con la cotización"
+                )
+                if cot_mp_file is not None:
+                    import base64 as _b64
+                    file_bytes_mp = cot_mp_file.read()
+                    b64_mp = _b64.b64encode(file_bytes_mp).decode("utf-8")
+                    st.session_state.piezas[pi]["materia_prima"]["cotizacion_mp_nombre"] = cot_mp_file.name
+                    st.session_state.piezas[pi]["materia_prima"]["cotizacion_mp_b64"]    = b64_mp
+                    st.success(f"✅ Archivo cargado: {cot_mp_file.name}")
+                # Mostrar archivo existente si ya hay uno guardado
+                nombre_mp_guardado = mp.get("cotizacion_mp_nombre", "")
+                b64_mp_guardado    = mp.get("cotizacion_mp_b64", "")
+                if nombre_mp_guardado and b64_mp_guardado and cot_mp_file is None:
+                    import base64 as _b64
+                    file_bytes_mg = _b64.b64decode(b64_mp_guardado)
+                    st.markdown(f"📄 Archivo guardado: **{nombre_mp_guardado}**")
+                    st.download_button(
+                        f"⬇️ Descargar {nombre_mp_guardado}",
+                        data=file_bytes_mg,
+                        file_name=nombre_mp_guardado,
+                        mime="application/octet-stream",
+                        key=f"dlcotmp_{pieza['id']}"
+                    )
             st.markdown("</div>", unsafe_allow_html=True)
 
         # ── Tratamiento, cantidad y demanda ──────────────────────────────────
@@ -1599,6 +1645,47 @@ with tab1:
                     value=int(pieza["dias_trat"]), key=f"dtrat_{pieza['id']}",
                     disabled=(trat=="Ninguno"))
                 st.session_state.piezas[pi]["dias_trat"] = 0 if trat=="Ninguno" else dias_trat
+
+            # ── Proveedor de tratamiento + cotización adjunta ────────────
+            if trat != "Ninguno":
+                st.markdown("---")
+                prov_t1, prov_t2 = st.columns([2, 2])
+                with prov_t1:
+                    prov_trat = st.text_input(
+                        "🏭 Proveedor de tratamiento",
+                        value=pieza.get("proveedor_trat", ""),
+                        key=f"provtrat_{pieza['id']}",
+                        placeholder="Nombre del proveedor"
+                    )
+                    st.session_state.piezas[pi]["proveedor_trat"] = prov_trat
+                with prov_t2:
+                    cot_file = st.file_uploader(
+                        "📎 Cotización del proveedor (PDF/imagen)",
+                        type=["pdf", "png", "jpg", "jpeg"],
+                        key=f"cotfile_{pieza['id']}",
+                        help="Se guardará junto con la cotización"
+                    )
+                    if cot_file is not None:
+                        import base64 as _b64
+                        file_bytes = cot_file.read()
+                        b64_str = _b64.b64encode(file_bytes).decode("utf-8")
+                        st.session_state.piezas[pi]["cotizacion_trat_nombre"] = cot_file.name
+                        st.session_state.piezas[pi]["cotizacion_trat_b64"]    = b64_str
+                        st.success(f"✅ Archivo cargado: {cot_file.name}")
+                    # Mostrar archivo existente si ya hay uno guardado
+                    nombre_guardado = pieza.get("cotizacion_trat_nombre", "")
+                    b64_guardado    = pieza.get("cotizacion_trat_b64", "")
+                    if nombre_guardado and b64_guardado and cot_file is None:
+                        import base64 as _b64
+                        file_bytes_g = _b64.b64decode(b64_guardado)
+                        st.markdown(f"📄 Archivo guardado: **{nombre_guardado}**")
+                        st.download_button(
+                            f"⬇️ Descargar {nombre_guardado}",
+                            data=file_bytes_g,
+                            file_name=nombre_guardado,
+                            mime="application/octet-stream",
+                            key=f"dlcot_{pieza['id']}"
+                        )
 
             # Demanda mensual (para semáforo de turnos)
             demanda = st.number_input("📦 Demanda mensual requerida (pzas/mes)",
@@ -2142,10 +2229,14 @@ with tab3:
                                 st.session_state[f"lcorte_{pid}"]  = float(mp.get("largo_corte", 26.0))
                                 st.session_state[f"cbarra_{pid}"]  = float(mp.get("costo_tramo", 0.0))
                                 # Tratamiento
-                                st.session_state[f"trat_{pid}"]   = p.get("tratamiento", "Ninguno")
-                                st.session_state[f"ctrat_{pid}"]  = float(p.get("costo_trat", 0.0))
-                                st.session_state[f"dtrat_{pid}"]  = int(p.get("dias_trat", 0))
-                                st.session_state[f"dem_{pid}"]    = int(p.get("demanda_mensual", 0))
+                                st.session_state[f"trat_{pid}"]     = p.get("tratamiento", "Ninguno")
+                                st.session_state[f"ctrat_{pid}"]    = float(p.get("costo_trat", 0.0))
+                                st.session_state[f"dtrat_{pid}"]    = int(p.get("dias_trat", 0))
+                                st.session_state[f"dem_{pid}"]      = int(p.get("demanda_mensual", 0))
+                                st.session_state[f"provtrat_{pid}"] = p.get("proveedor_trat", "")
+                                # Proveedor materia prima
+                                st.session_state[f"provmp_{pid}"]   = p.get("materia_prima", {}).get("proveedor", "")
+                                # Nota: cotizacion_mp_b64 se restaura directo desde piezas_cargadas, no necesita key de widget
                                 # Márgenes
                                 st.session_state[f"mg_{pid}"]     = bool(p.get("usar_margen_global", False))
                                 st.session_state[f"mmo_{pid}"]    = int(p.get("margen_mo", 35))

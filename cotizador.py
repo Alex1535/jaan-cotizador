@@ -177,37 +177,40 @@ def _find_row_number(token, sheet_id, numero_cot):
     return None
 
 def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
-    """Sube un archivo a Google Drive y retorna el file_id"""
-    import requests, json
+    """Sube un archivo a Google Drive del Service Account y retorna el file_id."""
+    import requests, json as _json
     token, err = get_gsheet_token()
     if not token:
-        return None, err
-    # Crear carpeta JAAN-Planos si no existe
+        return None, f"Token error: {err}"
+
+    # Buscar o crear carpeta JAAN-Planos
     folder_id = st.session_state.get("_drive_folder_id")
     if not folder_id:
-        # Buscar carpeta existente
         r = requests.get(
             "https://www.googleapis.com/drive/v3/files",
             headers={"Authorization": f"Bearer {token}"},
-            params={"q": "name='JAAN-Planos' and mimeType='application/vnd.google-apps.folder' and trashed=false",
-                    "fields": "files(id,name)"}
+            params={
+                "q": "name='JAAN-Planos' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+                "fields": "files(id,name)", "spaces": "drive"
+            }
         )
-        files = r.json().get("files", [])
-        if files:
-            folder_id = files[0]["id"]
-        else:
-            # Crear carpeta
-            rc = requests.post(
-                "https://www.googleapis.com/drive/v3/files",
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                json={"name": "JAAN-Planos", "mimeType": "application/vnd.google-apps.folder"}
-            )
-            folder_id = rc.json().get("id")
-        st.session_state["_drive_folder_id"] = folder_id
+        if r.status_code == 200:
+            files = r.json().get("files", [])
+            if files:
+                folder_id = files[0]["id"]
+            else:
+                rc = requests.post(
+                    "https://www.googleapis.com/drive/v3/files",
+                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                    json={"name": "JAAN-Planos", "mimeType": "application/vnd.google-apps.folder"}
+                )
+                if rc.status_code in (200, 201):
+                    folder_id = rc.json().get("id")
+        if folder_id:
+            st.session_state["_drive_folder_id"] = folder_id
 
-    # Subir archivo con multipart
-    import io
-    metadata = json.dumps({"name": filename, "parents": [folder_id] if folder_id else []})
+    # Subir archivo multipart
+    metadata = _json.dumps({"name": filename, "parents": [folder_id] if folder_id else []})
     boundary = "jaan_boundary_xyz"
     CRLF = "\r\n"
     body = (
@@ -217,18 +220,14 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
     ).encode() + file_bytes + f"{CRLF}--{boundary}--".encode()
 
     resp = requests.post(
-        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name",
         headers={"Authorization": f"Bearer {token}",
                  "Content-Type": f"multipart/related; boundary={boundary}"},
         data=body
     )
     if resp.status_code in (200, 201):
-        file_id = resp.json().get("id")
-        # Hacer el archivo accesible con el token (no público)
-        return file_id, None
-    return None, f"Error Drive: {resp.status_code} {resp.text[:200]}"
-
-
+        return resp.json().get("id"), None
+    return None, f"Error Drive {resp.status_code}: {resp.text[:300]}"
 def descargar_plano_drive(file_id):
     """Descarga un archivo de Google Drive por su file_id"""
     import requests
@@ -881,18 +880,17 @@ def guardar_cotizacion():
     total_neto = total + iva
 
     def piezas_sin_b64(piezas):
-        """Elimina campos base64 pesados — los archivos van a Drive"""
+        """Elimina TODOS los campos base64 — los archivos van a Drive o se omiten"""
         limpias = []
         for p in piezas:
             pc = dict(p)
-            if pc.get("plano_drive_id"):
-                pc["plano_b64"] = ""
+            # Limpiar plano b64 siempre (ya está en Drive o es demasiado grande)
+            pc["plano_b64"] = ""
+            # Limpiar cotizaciones de proveedor si son grandes
             mp = dict(pc.get("materia_prima", {}))
-            if len(mp.get("cotizacion_mp_b64", "")) > 10000:
-                mp["cotizacion_mp_b64"] = ""
+            mp["cotizacion_mp_b64"] = ""
             pc["materia_prima"] = mp
-            if len(pc.get("cotizacion_trat_b64", "")) > 10000:
-                pc["cotizacion_trat_b64"] = ""
+            pc["cotizacion_trat_b64"] = ""
             limpias.append(pc)
         return limpias
 
@@ -1253,16 +1251,18 @@ with tab1:
                     if file_id:
                         st.session_state.piezas[pi]["plano_nombre"]    = plano_file.name
                         st.session_state.piezas[pi]["plano_drive_id"]  = file_id
-                        st.session_state.piezas[pi]["plano_b64"]       = ""   # limpiar b64 viejo
+                        st.session_state.piezas[pi]["plano_b64"]       = ""
                         st.session_state.piezas[pi]["plano_tipo"]      = "img" if is_img_type else "pdf"
-                        st.success(f"☁️ Plano subido a Drive: {plano_file.name}")
+                        st.success(f"☁️ Plano subido a Drive correctamente: {plano_file.name}")
                     else:
-                        # Fallback: guardar en b64 si Drive falla
-                        _b64_plano = b64mod.b64encode(file_bytes_prev).decode("utf-8")
-                        st.session_state.piezas[pi]["plano_nombre"] = plano_file.name
-                        st.session_state.piezas[pi]["plano_b64"]    = _b64_plano
-                        st.session_state.piezas[pi]["plano_tipo"]   = "img" if is_img_type else "pdf"
-                        st.warning(f"⚠️ Drive no disponible, plano guardado localmente: {drive_err}")
+                        # Drive falló — mostrar error real para diagnóstico
+                        st.error(f"❌ Error subiendo a Drive: {drive_err}")
+                        st.info("💡 Verifica que el Service Account tenga la API de Drive habilitada en Google Cloud Console.")
+                        # Guardar solo nombre y tipo (sin b64 para no exceder Sheet)
+                        st.session_state.piezas[pi]["plano_nombre"]   = plano_file.name
+                        st.session_state.piezas[pi]["plano_drive_id"] = ""
+                        st.session_state.piezas[pi]["plano_b64"]      = ""
+                        st.session_state.piezas[pi]["plano_tipo"]     = "img" if is_img_type else "pdf"
                 is_img = plano_file.name.lower().endswith((".png",".jpg",".jpeg"))
                 st.markdown("**👁️ Vista previa del plano:**")
                 if is_img:

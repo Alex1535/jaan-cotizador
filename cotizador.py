@@ -232,30 +232,16 @@ if not st.session_state.autenticado:
 
 st.markdown("""
 <style>
-    /* Solo aplicar estilos custom en LIGHT MODE
-       En dark mode Streamlit maneja el tema nativamente */
-
-    /* ── Header — siempre navy (funciona en ambos modos) ── */
+    /* ══ HEADER — funciona en light y dark (fondo fijo navy) ══════════ */
     .main-header {
         background: #0f1b3d !important;
-        padding: 18px 28px 16px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        border-bottom: 3px solid #185FA5;
+        padding: 18px 28px 16px; border-radius: 10px;
+        margin-bottom: 20px; border-bottom: 3px solid #185FA5;
     }
     .main-header h1 { color:#fff !important; margin:0; font-size:20px; font-weight:500; }
     .main-header p  { color:rgba(255,255,255,0.5) !important; margin:4px 0 0; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; }
 
-    /* ── Botones — funciona en ambos modos ── */
-    .stButton > button {
-        background:#0f1b3d !important; color:white !important;
-        border:none !important; border-radius:8px !important;
-        padding:8px 20px !important; font-weight:500 !important;
-        transition:background 0.15s !important;
-    }
-    .stButton > button:hover { background:#185FA5 !important; }
-
-    /* ── Cajas de resultado — funciona en ambos modos ── */
+    /* ══ RESULT BOX — funciona en ambos modos ══════════════════════════ */
     .result-box { background:#0f1b3d; border-radius:10px; padding:18px 20px; color:white; text-align:center; }
     .result-box .price { font-size:32px; font-weight:500; }
     .result-box .label { font-size:10px; opacity:0.6; text-transform:uppercase; letter-spacing:0.06em; }
@@ -264,17 +250,13 @@ st.markdown("""
     .op-header     { font-size:10px; font-weight:500; letter-spacing:0.06em; text-transform:uppercase; }
 
     /* ══ SOLO LIGHT MODE ════════════════════════════════════════════════
-       Usamos :not([class*="dark"]) para no interferir con dark mode nativo
+       Envolvemos todo en :not([data-theme="dark"]) para que en dark
+       Streamlit use su tema nativo sin interferencia
     ═══════════════════════════════════════════════════════════════════ */
-
-    /* Detectar light mode: el body de Streamlit NO tiene class dark */
     .stApp:not([data-theme="dark"]) .pieza-card {
-        background: #ffffff;
-        border: 0.5px solid #dde1ea;
-        border-left: 3px solid #185FA5;
-        border-radius: 10px;
-        padding: 16px 20px;
-        margin-bottom: 14px;
+        background:#ffffff; border:0.5px solid #dde1ea;
+        border-left:3px solid #185FA5; border-radius:10px;
+        padding:16px 20px; margin-bottom:14px;
     }
     .stApp:not([data-theme="dark"]) .op-params-box {
         background:#f8f9fc; border:0.5px solid #dde1ea; border-radius:8px; padding:12px 14px; margin:6px 0;
@@ -286,9 +268,8 @@ st.markdown("""
         background:#f8f9fc; border:0.5px solid #dde1ea;
         border-left:3px solid #185FA5; border-radius:10px; padding:18px 20px; text-align:center;
     }
-    .stApp:not([data-theme="dark"]) div[data-testid="stSidebarContent"] {
-        background:#f8f9fc !important;
-    }
+    .stApp:not([data-theme="dark"]) div[data-testid="stSidebarContent"] { background:#f8f9fc !important; }
+
     .stApp:not([data-theme="dark"]) input[class*="st-"],
     .stApp:not([data-theme="dark"]) textarea[class*="st-"] {
         border:2px solid #8fafd4 !important; border-radius:6px !important;
@@ -296,64 +277,46 @@ st.markdown("""
     }
     .stApp:not([data-theme="dark"]) input[class*="st-"]:focus,
     .stApp:not([data-theme="dark"]) textarea[class*="st-"]:focus {
-        border:2px solid #185FA5 !important;
-        box-shadow:0 0 0 3px rgba(24,95,165,0.2) !important;
+        border:2px solid #185FA5 !important; box-shadow:0 0 0 3px rgba(24,95,165,0.2) !important;
     }
     .stApp:not([data-theme="dark"]) div[data-testid="stNumberInput"] input {
-        background:#ffffff !important; color:#0f1b3d !important;
-        border:2px solid #8fafd4 !important; border-radius:6px !important;
+        background:#ffffff !important; color:#0f1b3d !important; border:2px solid #8fafd4 !important; border-radius:6px !important;
     }
     .stApp:not([data-theme="dark"]) div[data-baseweb="select"] > div {
         border:2px solid #8fafd4 !important; border-radius:6px !important;
         background:#ffffff !important; color:#0f1b3d !important;
     }
     .stApp:not([data-theme="dark"]) div[data-baseweb="select"] > div:focus-within {
-        border:2px solid #185FA5 !important;
-        box-shadow:0 0 0 3px rgba(24,95,165,0.2) !important;
+        border:2px solid #185FA5 !important; box-shadow:0 0 0 3px rgba(24,95,165,0.2) !important;
     }
     .stApp:not([data-theme="dark"]) div[data-testid="stExpander"] {
         border:0.5px solid #b5d4f4 !important; border-left:3px solid #185FA5 !important;
         border-radius:8px !important; margin-bottom:6px !important; background:#E6F1FB !important;
     }
     .stApp:not([data-theme="dark"]) div[data-testid="stExpanderHeader"] {
-        font-weight:500 !important; font-size:13px !important;
-        color:#0C447C !important; background:#E6F1FB !important;
-        padding:10px 14px !important; border-radius:8px !important;
+        font-weight:500 !important; font-size:13px !important; color:#0C447C !important;
+        background:#E6F1FB !important; padding:10px 14px !important; border-radius:8px !important;
     }
     .stApp:not([data-theme="dark"]) div[data-testid="stExpanderHeader"] p {
         font-size:13px !important; font-weight:500 !important; color:#0C447C !important;
     }
-    .stApp:not([data-theme="dark"]) div[data-testid="stExpanderHeader"] svg {
-        stroke:#185FA5 !important;
-    }
+    .stApp:not([data-theme="dark"]) div[data-testid="stExpanderHeader"] svg { stroke:#185FA5 !important; }
     .stApp:not([data-theme="dark"]) div[data-testid="stExpanderDetails"] {
         background:#ffffff !important; border-top:0.5px solid #b5d4f4 !important;
     }
+    .stApp:not([data-theme="dark"]) .stButton > button {
+        background:#0f1b3d !important; color:white !important; border:none !important;
+        border-radius:8px !important; padding:8px 20px !important; font-weight:500 !important;
+        transition:background 0.15s !important;
+    }
+    .stApp:not([data-theme="dark"]) .stButton > button:hover { background:#185FA5 !important; }
 
-    /* ══ DARK MODE — solo ajustes mínimos sobre el tema nativo ═════════ */
-    .stApp[data-theme="dark"] .pieza-card {
-        border-left: 3px solid #185FA5 !important;
-        border-radius: 10px !important;
-        padding: 16px 20px !important;
-        margin-bottom: 14px !important;
-    }
-    .stApp[data-theme="dark"] .total-box {
-        border-left: 3px solid #185FA5 !important;
-        border-radius: 10px !important; padding: 18px 20px !important; text-align:center !important;
-    }
-    .stApp[data-theme="dark"] div[data-testid="stExpander"] {
-        border-left: 3px solid #185FA5 !important;
-        border-radius: 8px !important; margin-bottom: 6px !important;
-    }
-    .stApp[data-theme="dark"] div[data-testid="stExpanderHeader"] svg {
-        stroke: #185FA5 !important;
-    }
-    .stApp[data-theme="dark"] .stButton > button {
-        background: #185FA5 !important;
-    }
-    .stApp[data-theme="dark"] .stButton > button:hover {
-        background: #0f1b3d !important;
-    }
+    /* ══ DARK MODE — cero interferencia, Streamlit nativo ═════════════
+       Solo mantenemos el acento azul en bordes para consistencia de marca
+    ═══════════════════════════════════════════════════════════════════ */
+    .stApp[data-theme="dark"] .pieza-card { border-left:3px solid #185FA5 !important; border-radius:10px !important; padding:16px 20px !important; margin-bottom:14px !important; }
+    .stApp[data-theme="dark"] .total-box  { border-left:3px solid #185FA5 !important; border-radius:10px !important; padding:18px 20px !important; text-align:center !important; }
+    .stApp[data-theme="dark"] div[data-testid="stExpander"] { border-left:3px solid #185FA5 !important; border-radius:8px !important; margin-bottom:6px !important; }
 </style>
 """, unsafe_allow_html=True)
 

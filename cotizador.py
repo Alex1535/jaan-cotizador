@@ -836,8 +836,10 @@ with st.sidebar:
     if st.button("🔄 Usar TC del día", use_container_width=True):
         st.session_state["_reset_tc"] = tc_auto
         st.rerun()
+    _moneda_val = st.session_state.get("sb_moneda","MXN")
+    _moneda_idx = ["MXN","USD"].index(_moneda_val) if _moneda_val in ["MXN","USD"] else 0
     moneda_cot  = st.radio("Moneda de la cotización", ["MXN", "USD"],
-                    index=["MXN","USD"].index(st.session_state.get("sb_moneda","MXN")),
+                    index=_moneda_idx,
                     horizontal=True,
                     help="Toda la cotización se mostrará en la moneda seleccionada")
     st.session_state["sb_moneda"] = moneda_cot
@@ -2386,7 +2388,8 @@ with tab3:
                             st.session_state["_cp"]         = cot_sel.get("cp", "")
                             st.session_state["_ciudad"]     = cot_sel.get("ciudad", "")
                             st.session_state["_pais"]       = cot_sel.get("pais", "")
-                            st.session_state["_moneda"]      = cot_sel.get("moneda", "MXN")
+                            _m = cot_sel.get("moneda", "MXN")
+                            st.session_state["_moneda"] = _m if _m in ("MXN","USD") else "MXN"
                             try:
                                 st.session_state["_tipo_cambio"] = float(cot_sel.get("tipo_cambio", 17.31) or 17.31)
                             except (ValueError, TypeError):

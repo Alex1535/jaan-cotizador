@@ -1071,7 +1071,7 @@ def cargar_cotizaciones():
                         except Exception:
                             total_moq = total_eau = 0
                         total_pieza = total_eau
-                        total_display = "MOQ: " + fmtc(total_moq) + "\nEAU: " + fmtc(total_eau)
+                        total_display = "MOQ: " + fmtc(total_moq) + "  |  EAU: " + fmtc(total_eau)
                     else:
                         cant = int(p.get("cantidad", 0) or 0)
                         cant_display = str(cant)
@@ -2434,11 +2434,7 @@ with tab3:
                     with cols_row[6]:
                         for it in items_lista:
                             td = it.get("total_display")
-                            if td:
-                                for line in td.split("\n"):
-                                    st.markdown(line)
-                            else:
-                                st.markdown(fmtc(it.get("total", 0)))
+                            st.markdown(td if td else fmtc(it.get("total", 0)))
                 else:
                     with cols_row[3]: st.markdown(dwgs)
                     with cols_row[4]: st.markdown(descs)

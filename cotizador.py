@@ -820,6 +820,9 @@ with st.sidebar:
     # Cargar TC automático solo si no hay uno manual/cargado del historial
     if "sb_tipo_cambio" not in st.session_state:
         st.session_state["sb_tipo_cambio"] = obtener_tipo_cambio()
+    # Aplicar reset TC antes de renderizar el widget (evita StreamlitAPIException)
+    if "_reset_tc" in st.session_state:
+        st.session_state["sb_tipo_cambio"] = st.session_state.pop("_reset_tc")
 
     num_cot = st.text_input("Núm. cotización",
                 value=st.session_state.get("num_cot_generado", f"{sufijo}-001"),
@@ -833,9 +836,6 @@ with st.sidebar:
     if st.button("🔄 Usar TC del día", use_container_width=True):
         st.session_state["_reset_tc"] = tc_auto
         st.rerun()
-    # Aplicar reset en el siguiente rerun (fuera del widget)
-    if "_reset_tc" in st.session_state:
-        st.session_state["sb_tipo_cambio"] = st.session_state.pop("_reset_tc")
     moneda_cot  = st.radio("Moneda de la cotización", ["MXN", "USD"],
                     index=["MXN","USD"].index(st.session_state.get("sb_moneda","MXN")),
                     horizontal=True,

@@ -830,11 +830,12 @@ with st.sidebar:
     st.caption(f"💱 TC de referencia hoy: **${tc_auto:,.4f}** · Fuente: Frankfurter (BCE) · Editable")
     tipo_cambio = st.number_input("Tipo de cambio USD/MXN", key="sb_tipo_cambio", step=0.01,
                     help="Se actualiza automáticamente cada 24h — puedes editarlo manualmente")
-    col_tc = st.columns([1])
-    with col_tc[0]:
-        if st.button("🔄 Usar TC del día", use_container_width=True):
-            st.session_state["sb_tipo_cambio"] = tc_auto
-            st.rerun()
+    if st.button("🔄 Usar TC del día", use_container_width=True):
+        st.session_state["_reset_tc"] = tc_auto
+        st.rerun()
+    # Aplicar reset en el siguiente rerun (fuera del widget)
+    if "_reset_tc" in st.session_state:
+        st.session_state["sb_tipo_cambio"] = st.session_state.pop("_reset_tc")
     moneda_cot  = st.radio("Moneda de la cotización", ["MXN", "USD"],
                     index=["MXN","USD"].index(st.session_state.get("sb_moneda","MXN")),
                     horizontal=True,

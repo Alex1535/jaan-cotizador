@@ -2517,10 +2517,10 @@ with tab2:
 
     st.markdown("---")
     c1, c2, c3, c4 = st.columns(4)
-    c1.info(f"📅 {vigencia}")
-    c2.info(f"🚚 {t_entrega}")
-    c3.info(f"💳 {cond_pago}")
-    c4.info(f"💱 {moneda_cot}")
+    c1.info(f"Vigencia: {vigencia}")
+    c2.info(f"Entrega: {t_entrega}")
+    c3.info(f"Pago: {cond_pago}")
+    c4.info(f"Moneda: {moneda_cot}")
 
     with st.expander("📊 Desglose detallado por pieza"):
         for i, pieza in enumerate(st.session_state.piezas):

@@ -1509,6 +1509,8 @@ with tab1:
 
             dims_labels = FIGURAS[figura]["dims"]
             if figura != "Otro / Manual" and modo == "Por kg":
+                MM_TO_IN = 1 / 25.4   # factor de conversión
+
                 dim_cols = st.columns(min(len(dims_labels), 4))
                 dims_vals = []
                 for di, (col, lbl) in enumerate(zip(dim_cols, dims_labels)):
@@ -1516,17 +1518,27 @@ with tab1:
                         val = st.number_input(lbl, min_value=0.0,
                             value=float(mp["dims"][di]) if di < len(mp["dims"]) else 0.0,
                             step=0.5, key=f"dim_{pieza['id']}_{di}")
+                        # Mostrar equivalente en pulgadas bajo el input
+                        if val > 0:
+                            st.caption(f"= {val * MM_TO_IN:.4f} in")
                         dims_vals.append(val)
                 while len(dims_vals) < 4:
                     dims_vals.append(0.0)
                 st.session_state.piezas[pi]["materia_prima"]["dims"] = dims_vals
                 vol  = calcular_volumen(figura, dims_vals[:len(dims_labels)])
                 peso = calcular_peso_kg(vol, MATERIALES_DENSIDAD.get(material, 7850))
+                # Volumen también en pulgadas cúbicas (1 cm³ = 0.0610237 in³)
+                vol_in3 = vol * 0.0610237
+
                 cp1, cp2, cp3 = st.columns(3)
                 with cp1:
                     precio_kg = st.number_input("Precio material ($/kg)", min_value=0.0,
                         value=float(mp["precio_kg"]), step=5.0, key=f"pkg_{pieza['id']}")
                     st.session_state.piezas[pi]["materia_prima"]["precio_kg"] = precio_kg
+                    # Precio por libra para referencia
+                    if precio_kg > 0:
+                        precio_lb = precio_kg * 0.453592
+                        st.caption(f"= ${precio_lb:.2f}/lb")
                 with cp2:
                     desp = st.number_input("Desperdicio (%)", min_value=0.0, max_value=80.0,
                         value=float(mp["desperdicio"]), step=1.0, key=f"desp_{pieza['id']}")
@@ -1534,10 +1546,14 @@ with tab1:
                 with cp3:
                     peso_d    = peso * (1 + desp/100)
                     costo_mat = peso_d * precio_kg
+                    # Conversiones
+                    peso_lb   = peso * 2.20462
+                    peso_d_lb = peso_d * 2.20462
                     st.markdown(
                         f"<div class='peso-result'>"
-                        f"Peso/pza: <b>{peso*1000:.1f} g</b><br>"
-                        f"c/desp.: <b>{peso_d*1000:.1f} g</b><br>"
+                        f"Peso/pza: <b>{peso*1000:.1f} g</b> · <b>{peso_lb:.4f} lb</b><br>"
+                        f"c/desp.: <b>{peso_d*1000:.1f} g</b> · <b>{peso_d_lb:.4f} lb</b><br>"
+                        f"Vol: <b>{vol:.3f} cm³</b> · <b>{vol_in3:.4f} in³</b><br>"
                         f"Costo: <b>{fmtc(costo_mat)}</b>"
                         f"</div>",
                         unsafe_allow_html=True)

@@ -604,8 +604,26 @@ def nueva_pieza(idx, defaults):
     }
 
 
+def _ensure_logistica(pieza):
+    """Garantiza que el dict logistica tenga todas las keys necesarias"""
+    default = {
+        "aplica": False, "costo_global": 0.0, "modo_global": "fijo",
+        "peso_pza_log": 0.0, "tramos": [], "comercio_exterior": False,
+        "incoterm": "EXW", "arancel_pct": 0.0, "seguro_pct": 0.0,
+        "agente_aduanal": 0.0, "embalaje": 0.0, "comentarios_log": "",
+    }
+    if "logistica" not in pieza or not isinstance(pieza["logistica"], dict):
+        pieza["logistica"] = default.copy()
+    else:
+        for k, v in default.items():
+            if k not in pieza["logistica"]:
+                pieza["logistica"][k] = v
+    return pieza
+
+
 def calcular_pieza(pieza, margen_pct):
     """Cálculo completo usando los parámetros operativos PROPIOS de la pieza"""
+    _ensure_logistica(pieza)
     ops      = pieza["operaciones"]
     cantidad = pieza["cantidad"]
     mp       = pieza["materia_prima"]
@@ -1479,6 +1497,10 @@ with tab1:
     piezas_a_eliminar = []
 
     for pi, pieza in enumerate(st.session_state.piezas):
+        # Garantizar que logistica esté inicializada en piezas viejas
+        _ensure_logistica(st.session_state.piezas[pi])
+        pieza = st.session_state.piezas[pi]  # refrescar referencia
+
         st.markdown("<div class='pieza-card'>", unsafe_allow_html=True)
 
         # ── Identificación ───────────────────────────────────────────────────

@@ -2558,8 +2558,6 @@ with tab1:
                         st.session_state.piezas[pi]["logistica"]["embalaje"] = embalaje
 
                     # Mostrar desglose de comercio exterior
-                    _s = subtotal if True else 0
-                    _base_ce_show = calcular_pieza({**pieza, "logistica": {**log, "aplica": True, "comercio_exterior": True}}, margen_global).get("subtotal", 0)
                     if arancel > 0 or seguro > 0 or agente > 0 or embalaje > 0:
                         res_ce = calcular_pieza(pieza, margen_global)
                         base_ce = res_ce.get("subtotal", 0)

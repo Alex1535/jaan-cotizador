@@ -2842,30 +2842,25 @@ with tab1:
                 f"</div>",
                 unsafe_allow_html=True)
         else:
-            r1, r2, r3, r4, r5 = st.columns(5)
+            _clt = res.get('costo_log_total', 0)
+            _precio_base = res['precio_pza'] - _clt
+            if _clt > 0:
+                r1, r2, r3, r4, r5, r6 = st.columns(6)
+            else:
+                r1, r2, r3, r4, r5 = st.columns(5)
+                r6 = None
             r1.metric("Maquinado/pza",    fmtc(res["costo_maq"]))
             r2.metric("Material/pza",     fmtc(res["costo_material"]))
             r3.metric("Tratamiento/pza",  fmtc(res["costo_trat"]))
-            with r4:
-                _clt = res.get('costo_log_total', 0)
-                _precio_base = res['precio_pza'] - _clt
-                if _clt > 0:
-                    st.markdown(
-                        f"<div style='padding:4px 0'>"
-                        f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
-                        f"<div style='display:flex;align-items:baseline;gap:10px'>"
-                        f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
-                        f"<div style='font-size:12px;color:#6b7280;line-height:1.4'>"
-                        f"Prod: {fmtc(_precio_base)}<br>Log: +{fmtc(_clt)}</div>"
-                        f"</div>"
-                        f"</div>", unsafe_allow_html=True)
-                else:
-                    st.markdown(
-                        f"<div style='padding:4px 0'>"
-                        f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
-                        f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
-                        f"</div>", unsafe_allow_html=True)
-            r5.metric(f"Total {cant} pzas", fmtc(res["total"]))
+            if r6 is not None:
+                r4.metric("Logística/pza", fmtc(_clt))
+            with r5 if r6 is not None else r4:
+                st.markdown(
+                    f"<div style='padding:4px 0'>"
+                    f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
+                    f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
+                    f"</div>", unsafe_allow_html=True)
+            (r6 if r6 is not None else r5).metric(f"Total {cant} pzas", fmtc(res["total"]))
 
         st.markdown("</div>", unsafe_allow_html=True)
 

@@ -3325,7 +3325,8 @@ with tab3:
                         st.markdown(f"**Fecha:** {cot_sel.get('fecha', cot_sel.get('created_at',''))[:10]}")
                         st.markdown(f"**Moneda:** {cot_sel.get('moneda','MXN')}")
 
-                    if st.button(f"📂 Cargar cotización {sel_num}", type="primary"):
+                    cargar_auto = st.session_state.get("_last_loaded_cot") != sel_num
+                    if st.button(f"📂 Cargar cotización {sel_num}", type="primary") or cargar_auto:
                         try:
                             datos_raw = cot_sel.get("datos_json", "{}")
                             # Buscar JSON válido si datos_json está vacío o corrupto
@@ -3468,6 +3469,7 @@ with tab3:
                             st.session_state["_t_entrega"]   = cond.get("tiempo_entrega", "22-30 días hábiles")
                             st.session_state["_cond_pago"]   = cond.get("cond_pago", "40% anticipo - 60% contra-entrega")
 
+                            st.session_state["_last_loaded_cot"] = sel_num
                             st.success(f"✅ Proyecto {sel_num} cargado completo — ve a Piezas y Ruteo")
                             st.rerun()
                         except Exception as e:

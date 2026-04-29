@@ -1805,8 +1805,9 @@ with tab1:
                             st.markdown(f"📄 **{nombre_plano}**")
                             st.link_button("🔗 Abrir PDF en Cloudinary", plano_url_saved, use_container_width=True)
                         with sc2:
+                            viewer_url = f"https://docs.google.com/viewer?url={plano_url_saved}&embedded=true"
                             st.markdown(
-                                f'<iframe src="{plano_url_saved}" width="100%" height="500px" '                                f'style="border:none;border-radius:8px"></iframe>',
+                                f'<iframe src="{viewer_url}" width="100%" height="500px" '                                f'style="border:none;border-radius:8px"></iframe>',
                                 unsafe_allow_html=True)
                 else:
                     plano_bytes_saved = None

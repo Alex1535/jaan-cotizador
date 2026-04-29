@@ -744,13 +744,15 @@ def calcular_pieza(pieza, margen_pct):
     utilidad   = util_mo + util_mat + util_trat
     precio_pza = subtotal + utilidad
 
-    # Logística % del valor se aplica sobre precio_pza base
+    # Logística % del valor se aplica sobre precio_pza base (precio de venta)
     if log.get("aplica", False) and log.get("modo_global") == "pct_valor":
         costo_log += precio_pza * (float(log.get("costo_global", 0.0)) / 100)
-    # Seguro y arancel sobre precio_pza
+    # Arancel y seguro se calculan sobre el COSTO de la mercancía (subtotal),
+    # no sobre el precio de venta — así funciona en comercio exterior real
     if log.get("aplica", False) and log.get("comercio_exterior", False):
-        costo_log += precio_pza * (float(log.get("seguro_pct", 0.0)) / 100)
-        costo_log += precio_pza * (float(log.get("arancel_pct", 0.0)) / 100)
+        base_ce = subtotal  # valor de factura = costo de producción sin utilidad
+        costo_log += base_ce * (float(log.get("seguro_pct", 0.0)) / 100)
+        costo_log += base_ce * (float(log.get("arancel_pct", 0.0)) / 100)
 
     # Margen de utilidad sobre logística
     margen_log_pct = pieza.get("margen_log", 0)
@@ -2531,29 +2533,45 @@ with tab1:
                             min_value=0.0, max_value=100.0,
                             value=float(log.get("arancel_pct", 0.0)),
                             step=0.5, key=f"log_arancel_{pieza['id']}",
-                            help="% sobre valor de la mercancía")
+                            help="% aplicado sobre el costo de producción (valor de factura). Ej: arancel de importación USA→MX")
                         st.session_state.piezas[pi]["logistica"]["arancel_pct"] = arancel
                     with ce3:
-                        seguro = st.number_input("Seguro (%)",
+                        seguro = st.number_input("Seguro carga (%)",
                             min_value=0.0, max_value=10.0,
                             value=float(log.get("seguro_pct", 0.0)),
                             step=0.1, key=f"log_seguro_{pieza['id']}",
-                            help="% del valor de la mercancía")
+                            help="% sobre costo de producción. Típico: 0.3% - 1.5% del valor asegurado")
                         st.session_state.piezas[pi]["logistica"]["seguro_pct"] = seguro
                     with ce4:
                         agente = st.number_input("Agente aduanal ($)",
                             min_value=0.0,
                             value=float(log.get("agente_aduanal", 0.0)),
                             step=100.0, key=f"log_agente_{pieza['id']}",
-                            help="Honorarios totales del agente aduanal")
+                            help="Honorarios totales del agente aduanal por el pedimento. Se divide entre la cantidad de piezas.")
                         st.session_state.piezas[pi]["logistica"]["agente_aduanal"] = agente
                     with ce5:
                         embalaje = st.number_input("Embalaje ($)",
                             min_value=0.0,
                             value=float(log.get("embalaje", 0.0)),
                             step=50.0, key=f"log_embalaje_{pieza['id']}",
-                            help="Cajas, tarimas, VCI bags, protección especial")
+                            help="Costo total de embalaje (cajas, tarimas, VCI bags). Se divide entre la cantidad de piezas.")
                         st.session_state.piezas[pi]["logistica"]["embalaje"] = embalaje
+
+                    # Mostrar desglose de comercio exterior
+                    _s = subtotal if True else 0
+                    _base_ce_show = calcular_pieza({**pieza, "logistica": {**log, "aplica": True, "comercio_exterior": True}}, margen_global).get("subtotal", 0)
+                    if arancel > 0 or seguro > 0 or agente > 0 or embalaje > 0:
+                        res_ce = calcular_pieza(pieza, margen_global)
+                        base_ce = res_ce.get("subtotal", 0)
+                        st.markdown(
+                            f"<div style='background:#fff8e8;border-left:3px solid #854F0B;"
+                            f"border-radius:6px;padding:8px 12px;font-size:12px;margin-top:6px'>"
+                            f"Base de cálculo (costo/pza): <b>{fmtc(base_ce)}</b> &nbsp;·&nbsp; "
+                            f"Arancel/pza: <b>{fmtc(base_ce * arancel/100)}</b> &nbsp;·&nbsp; "
+                            f"Seguro/pza: <b>{fmtc(base_ce * seguro/100)}</b> &nbsp;·&nbsp; "
+                            f"Agente/pza: <b>{fmtc(agente / max(pieza['cantidad'],1))}</b> &nbsp;·&nbsp; "
+                            f"Embalaje/pza: <b>{fmtc(embalaje / max(pieza['cantidad'],1))}</b>"
+                            f"</div>", unsafe_allow_html=True)
 
                 # ── Comentarios ────────────────────────────────────────────
                 coment_log = st.text_area("Comentarios de logística",

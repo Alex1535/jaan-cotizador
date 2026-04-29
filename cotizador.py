@@ -1800,14 +1800,29 @@ with tab1:
                     if es_img:
                         st.image(plano_url_saved, use_container_width=True, caption=nombre_plano)
                     else:
-                        st.markdown(f"📄 **{nombre_plano}**")
-                    st.link_button("⬇️ Descargar PDF", plano_url_saved, use_container_width=False)
+                        btn_col1, btn_col2 = st.columns([1, 2])
+                        with btn_col1:
+                            import requests as _req
+                            try:
+                                _r = _req.get(plano_url_saved, timeout=15)
+                                if _r.status_code == 200:
+                                    st.download_button(
+                                        "⬇️ Descargar PDF",
+                                        data=_r.content,
+                                        file_name=nombre_plano,
+                                        mime="application/pdf",
+                                        key=f"dl_cloud_{pieza['id']}",
+                                        use_container_width=True
+                                    )
+                                else:
+                                    st.link_button("⬇️ Descargar PDF", plano_url_saved, use_container_width=True)
+                            except Exception:
+                                st.link_button("⬇️ Descargar PDF", plano_url_saved, use_container_width=True)
+                        with btn_col2:
+                            st.markdown(f"📄 `{nombre_plano}`")
 
-                    # Vista previa: Cloudinary convierte PDF a imagen automáticamente
-                    # Reemplazar /raw/upload/ por /image/upload/ + pg_X + .jpg
                     if "cloudinary.com" in plano_url_saved and "/raw/upload/" in plano_url_saved:
                         base = plano_url_saved.replace("/raw/upload/", "/image/upload/")
-                        # Quitar extensión .pdf y agregar .jpg para renderizar
                         base_noext = base.rsplit(".", 1)[0]
                         preview_url_p1 = base_noext + ".jpg"
                         preview_url_p2 = base.replace("/image/upload/", "/image/upload/pg_2/").rsplit(".", 1)[0] + ".jpg"

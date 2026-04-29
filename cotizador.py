@@ -1801,15 +1801,20 @@ with tab1:
                         st.image(plano_url_saved, use_container_width=True, caption=nombre_plano)
                     else:
                         st.markdown(f"📄 **{nombre_plano}**")
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        st.link_button("⬇️ Descargar PDF", plano_url_saved, use_container_width=True)
-                    with col_b:
-                        # URL de visualización en Cloudinary media viewer
-                        view_url = plano_url_saved.replace("/upload/fl_attachment/", "/upload/").replace("/upload/", "/upload/pg_1/").replace(".pdf", ".jpg")
-                        st.link_button("🔍 Ver en Cloudinary", 
-                            f"https://cloudinary.com/console/media_library/asset/image/upload/{plano_url_saved.split('/upload/')[-1]}",
-                            use_container_width=True)
+                    st.link_button("⬇️ Descargar PDF", plano_url_saved, use_container_width=False)
+
+                    # Vista previa: Cloudinary convierte PDF a imagen automáticamente
+                    # Reemplazar /raw/upload/ por /image/upload/ + pg_X + .jpg
+                    if "cloudinary.com" in plano_url_saved and "/raw/upload/" in plano_url_saved:
+                        base = plano_url_saved.replace("/raw/upload/", "/image/upload/")
+                        # Quitar extensión .pdf y agregar .jpg para renderizar
+                        base_noext = base.rsplit(".", 1)[0]
+                        preview_url_p1 = base_noext + ".jpg"
+                        preview_url_p2 = base.replace("/image/upload/", "/image/upload/pg_2/").rsplit(".", 1)[0] + ".jpg"
+
+                        if st.toggle("🔍 Vista previa del plano", key=f"preview_toggle_{pieza['id']}"):
+                            st.image(preview_url_p1, use_container_width=True, caption=f"Página 1 — {nombre_plano}")
+                            st.image(preview_url_p2, use_container_width=True, caption="Página 2 (si existe)")
                 else:
                     plano_bytes_saved = None
                     if drive_id:

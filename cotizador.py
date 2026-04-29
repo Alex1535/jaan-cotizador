@@ -362,26 +362,26 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
     # DEBUG temporal
     st.info(f"🔍 DEBUG: folder_id={folder_id} | secrets_keys={list(st.secrets.keys())}")
 
-    # ── 2. Subir archivo ───────────────────────────────────────────────────────
-    metadata = _json.dumps({"name": filename, "parents": [folder_id]})
-    boundary = "jaan_boundary_xyz"
-    CRLF = "\r\n"
-    body = (
-        f"--{boundary}{CRLF}Content-Type: application/json; charset=UTF-8{CRLF}{CRLF}"
-        f"{metadata}{CRLF}"
-        f"--{boundary}{CRLF}Content-Type: {mime_type}{CRLF}{CRLF}"
-    ).encode() + file_bytes + f"{CRLF}--{boundary}--".encode()
-
-    resp = requests.post(
-        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name&supportsAllDrives=true",
-        headers={"Authorization": f"Bearer {token}",
-                 "Content-Type": f"multipart/related; boundary={boundary}"},
-        data=body
+    # ── 2. Subir en 2 pasos: crear metadata → subir contenido ────────────────
+    # Paso 2a: crear el archivo con metadata (nombre + carpeta destino)
+    meta_resp = requests.post(
+        "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=_json.dumps({"name": filename, "parents": [folder_id]})
     )
-    if resp.status_code not in (200, 201):
-        return None, None, f"Error Drive {resp.status_code}: {resp.text[:300]}"
+    if meta_resp.status_code not in (200, 201):
+        return None, None, f"Error creando archivo en Drive: {meta_resp.status_code}: {meta_resp.text[:300]}"
 
-    file_id = resp.json().get("id")
+    file_id = meta_resp.json().get("id")
+
+    # Paso 2b: subir el contenido al archivo creado
+    upload_resp = requests.patch(
+        f"https://www.googleapis.com/upload/drive/v3/files/{file_id}?uploadType=media&supportsAllDrives=true",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": mime_type},
+        data=file_bytes
+    )
+    if upload_resp.status_code not in (200, 201):
+        return None, None, f"Error subiendo contenido: {upload_resp.status_code}: {upload_resp.text[:300]}"
 
     # ── 3. Dar permiso reader a cualquiera con el link ─────────────────────────
     requests.post(

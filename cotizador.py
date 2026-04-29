@@ -1703,13 +1703,17 @@ with tab1:
                 _reemplazar = True
             plano_col1, plano_col2 = st.columns([1, 1])
             with plano_col1:
-                plano_file = st.file_uploader(
-                    "Subir plano (PDF o imagen)" if _reemplazar else "Plano ya guardado — activa 'Reemplazar' para cambiar",
-                    type=["pdf", "png", "jpg", "jpeg"],
-                    key=f"plano_{pieza['id']}",
-                    help="El plano se enviará a Claude para análisis",
-                    disabled=not _reemplazar
-                )
+                if _reemplazar:
+                    plano_file = st.file_uploader(
+                        "Subir nuevo plano (PDF o imagen)",
+                        type=["pdf", "png", "jpg", "jpeg"],
+                        key=f"plano_{pieza['id']}",
+                        help="El plano se enviará a Claude para análisis"
+                    )
+                else:
+                    plano_file = None
+                    if _tiene_plano:
+                        st.caption("Plano ya guardado — activa '🔄 Reemplazar' para cambiar")
             with plano_col2:
                 notas_plano = st.text_area(
                     "Notas adicionales para la IA (opcional)",
@@ -1804,47 +1808,27 @@ with tab1:
                 st.markdown(f"**👁️ Plano guardado: {nombre_plano}**")
 
                 if plano_url_saved:
-                    if es_img:
-                        st.image(plano_url_saved, use_container_width=True, caption=nombre_plano)
-                    else:
-                        btn_col1, btn_col2 = st.columns([1, 2])
-                        with btn_col1:
-                            # fl_attachment fuerza descarga directa sin autenticación
-                            dl_url = plano_url_saved.replace("/upload/", "/upload/fl_attachment/")
-                            st.link_button("⬇️ Descargar PDF", dl_url, use_container_width=True)
-                        with btn_col2:
-                            st.markdown(f"📄 `{nombre_plano}`")
+                    # ── Botón de descarga siempre visible ─────────────────────
+                    dl_url = plano_url_saved.replace("/upload/", "/upload/fl_attachment/")
+                    st.link_button("⬇️ Descargar plano", dl_url, use_container_width=False)
 
-                    if "cloudinary.com" in plano_url_saved and "/raw/upload/" in plano_url_saved:
+                    # ── Vista previa ───────────────────────────────────────────
+                    if es_img:
+                        # Imagen directa desde Cloudinary
+                        if st.toggle("🔍 Vista previa del plano", key=f"preview_toggle_{pieza['id']}", value=True):
+                            st.image(plano_url_saved, use_container_width=True, caption=nombre_plano)
+                    elif "cloudinary.com" in plano_url_saved and "/raw/upload/" in plano_url_saved:
+                        # PDF → convertir a imagen via Cloudinary
                         base = plano_url_saved.replace("/raw/upload/", "/image/upload/")
                         base_noext = base.rsplit(".", 1)[0]
                         preview_url_p1 = base_noext + ".jpg"
                         preview_url_p2 = base.replace("/image/upload/", "/image/upload/pg_2/").rsplit(".", 1)[0] + ".jpg"
-
-                        if st.toggle("🔍 Vista previa del plano", key=f"preview_toggle_{pieza['id']}"):
+                        if st.toggle("🔍 Vista previa del plano", key=f"preview_toggle_{pieza['id']}", value=True):
                             st.image(preview_url_p1, use_container_width=True, caption=f"Página 1 — {nombre_plano}")
                             st.image(preview_url_p2, use_container_width=True, caption="Página 2 (si existe)")
                 else:
-                    plano_bytes_saved = None
-                    if drive_id:
-                        cache_key = f"_plano_cache_{drive_id}"
-                        if cache_key not in st.session_state:
-                            with st.spinner("Descargando plano..."):
-                                plano_bytes_saved, _ = descargar_plano_drive(drive_id)
-                                if plano_bytes_saved:
-                                    st.session_state[cache_key] = plano_bytes_saved
-                        else:
-                            plano_bytes_saved = st.session_state[cache_key]
-                    elif b64_local:
-                        import base64 as b64mod
-                        plano_bytes_saved = b64mod.b64decode(b64_local)
-                    if plano_bytes_saved:
-                        st.download_button("Descargar plano", data=plano_bytes_saved,
-                                           file_name=nombre_plano,
-                                           mime="application/pdf" if not es_img else "image/png",
-                                           key=f"dl_plano_saved_{pieza['id']}")
-                    else:
-                        st.info("Vuelve a subir el plano para vincularlo.")
+                    # ── Sin URL de Cloudinary — mostrar info y opción de re-subir ──
+                    st.info("ℹ️ Este plano fue guardado antes de Cloudinary. Activa '🔄 Reemplazar plano actual' y vuelve a subirlo para tener descarga y vista previa.")
                 st.markdown("---")
 
             if plano_file is not None:

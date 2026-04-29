@@ -563,7 +563,8 @@ def nueva_pieza(idx, defaults):
         "peso_pza_trat": 0.0,
         "precio_kg_trat": 0.0,
         "batch_costo": 0.0,
-        "batch_piezas": 100,
+        "batch_piezas": 600,
+        "batch_mias": 100,
         "comentarios_trat": "",
         "plano_nombre": "",
         "plano_b64": "",
@@ -2235,21 +2236,38 @@ with tab1:
                     st.session_state.piezas[pi]["costo_trat"] = costo_trat
 
                 elif modo_trat == "Batch":
-                    tc1, tc2, tc3 = st.columns(3)
+                    tc1, tc2, tc3, tc4 = st.columns(4)
                     with tc1:
                         batch_costo = st.number_input("Costo del batch ($)",
                             min_value=0.0, value=float(pieza.get("batch_costo", 0.0)),
-                            step=10.0, key=f"bcosto_trat_{pieza['id']}")
+                            step=10.0, key=f"bcosto_trat_{pieza['id']}",
+                            help="Costo total que cobra el proveedor por el batch completo")
                         st.session_state.piezas[pi]["batch_costo"] = batch_costo
                     with tc2:
-                        batch_piezas = st.number_input("Piezas en el batch",
+                        batch_piezas = st.number_input("Capacidad max. del batch",
                             min_value=1, max_value=999999,
-                            value=int(pieza.get("batch_piezas", 100)),
-                            key=f"bpzas_trat_{pieza['id']}")
+                            value=int(pieza.get("batch_piezas", 600)),
+                            key=f"bpzas_trat_{pieza['id']}",
+                            help="Número máximo de piezas que caben en un batch")
                         st.session_state.piezas[pi]["batch_piezas"] = batch_piezas
                     with tc3:
-                        costo_trat = batch_costo / batch_piezas if batch_piezas > 0 else 0.0
-                        st.metric("Costo/pza calculado", fmtc(costo_trat))
+                        batch_mias = st.number_input("Piezas que envío",
+                            min_value=1, max_value=999999,
+                            value=int(pieza.get("batch_mias", min(pieza["cantidad"], int(pieza.get("batch_piezas", 600))))),
+                            key=f"bmias_trat_{pieza['id']}",
+                            help="Cuántas piezas tuyas van en este batch — si es menos que la capacidad, pagas el batch completo")
+                        st.session_state.piezas[pi]["batch_mias"] = batch_mias
+                    with tc4:
+                        # Si envío menos del batch, pago el batch completo dividido entre mis piezas
+                        costo_trat = batch_costo / batch_mias if batch_mias > 0 else 0.0
+                        st.metric("Costo/pza (tuyo)", fmtc(costo_trat))
+                        llenado = (batch_mias / batch_piezas * 100) if batch_piezas > 0 else 0
+                        color_ll = "#EAF3DE" if llenado >= 80 else "#FAEEDA" if llenado >= 40 else "#FCEBEB"
+                        st.markdown(
+                            f"<div style='background:{color_ll};border-radius:6px;padding:4px 8px;"
+                            f"font-size:12px;text-align:center'>"
+                            f"Llenado: <b>{llenado:.0f}%</b> ({batch_mias}/{batch_piezas} pzas)</div>",
+                            unsafe_allow_html=True)
                     st.session_state.piezas[pi]["costo_trat"] = costo_trat
             else:
                 costo_trat = 0.0

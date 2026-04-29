@@ -81,7 +81,7 @@ def login_screen():
     /* ── Card blanca unificada — header + form juntos ── */
     .jaan-card {{
         background: white;
-        border-radius: 18px;
+        border-radius: 18px 18px 0 0;
         padding: 30px 32px 0px;
         box-shadow: 0 24px 64px rgba(0,0,0,0.4);
         margin-bottom: 0;
@@ -107,14 +107,19 @@ def login_screen():
         margin: 0 -32px 0px;
     }}
 
-    /* ── El stForm se pega visualmente a la card ── */
+    /* ── El stForm se pega sin gap a la card ── */
     [data-testid="stForm"] {{
         background: white !important;
         border-radius: 0 0 18px 18px !important;
         padding: 20px 32px 28px !important;
         border: none !important;
         box-shadow: 0 24px 64px rgba(0,0,0,0.4) !important;
-        margin-top: -2px !important;
+        margin-top: 0 !important;
+    }}
+    /* Eliminar el gap que Streamlit mete entre elementos */
+    .block-container > div > div > div:has(.jaan-card) + div {{
+        margin-top: 0 !important;
+        padding-top: 0 !important;
     }}
 
     /* ── Labels e inputs visibles ── */

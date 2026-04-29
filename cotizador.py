@@ -1698,7 +1698,7 @@ with tab1:
             # Si ya hay plano guardado en Cloudinary, mostrar opción de reemplazar
             _tiene_plano = bool(pieza.get("plano_url") or pieza.get("plano_drive_id"))
             if _tiene_plano:
-                _reemplazar = st.checkbox("🔄 Reemplazar plano actual", key=f"reemplazar_{pieza['id']}")
+                _reemplazar = st.checkbox("🔄 Reemplazar plano actual", key=f"reemplazar_{pieza['id']}", value=False)
             else:
                 _reemplazar = True
             plano_col1, plano_col2 = st.columns([1, 1])
@@ -1809,22 +1809,9 @@ with tab1:
                     else:
                         btn_col1, btn_col2 = st.columns([1, 2])
                         with btn_col1:
-                            import requests as _req
-                            try:
-                                _r = _req.get(plano_url_saved, timeout=15)
-                                if _r.status_code == 200:
-                                    st.download_button(
-                                        "⬇️ Descargar PDF",
-                                        data=_r.content,
-                                        file_name=nombre_plano,
-                                        mime="application/pdf",
-                                        key=f"dl_cloud_{pieza['id']}",
-                                        use_container_width=True
-                                    )
-                                else:
-                                    st.link_button("⬇️ Descargar PDF", plano_url_saved, use_container_width=True)
-                            except Exception:
-                                st.link_button("⬇️ Descargar PDF", plano_url_saved, use_container_width=True)
+                            # fl_attachment fuerza descarga directa sin autenticación
+                            dl_url = plano_url_saved.replace("/upload/", "/upload/fl_attachment/")
+                            st.link_button("⬇️ Descargar PDF", dl_url, use_container_width=True)
                         with btn_col2:
                             st.markdown(f"📄 `{nombre_plano}`")
 

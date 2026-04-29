@@ -534,6 +534,7 @@ def nueva_materia_prima():
             "cotizacion_mp_nombre": "",
             "cotizacion_mp_b64": "",
             "dims_manual": [0.0, 0.0, 0.0],
+            "comentarios_mp": "",
             # Campos para cálculo por tramo (todo en pulgadas)
             "largo_tramo":   31.5,    # pulgadas
             "largo_pieza":    1.575,  # pulgadas
@@ -2124,6 +2125,16 @@ with tab1:
                     while len(new_dims_man) < 4:
                         new_dims_man.append(0.0)
                     st.session_state.piezas[pi]["materia_prima"]["dims_manual"] = new_dims_man
+
+            # ── Comentarios adicionales ─────────────────────────────────
+            comentarios_mp = st.text_area(
+                "Comentarios adicionales",
+                value=mp.get("comentarios_mp", ""),
+                key=f"coment_mp_{pieza['id']}",
+                placeholder="Ej: Material certificado, colada específica, proveedor preferido...",
+                height=80
+            )
+            st.session_state.piezas[pi]["materia_prima"]["comentarios_mp"] = comentarios_mp
 
             # ── Proveedor de materia prima + cotización adjunta ─────────
             st.markdown("---")

@@ -324,9 +324,9 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
     """Sube plano a Cloudinary y retorna (public_id, url, error)."""
     import requests, hashlib, time
 
-    cloud_name = st.secrets.get("CLOUDINARY_CLOUD_NAME", "dhzywtmp1")
-    api_key    = st.secrets.get("CLOUDINARY_API_KEY", "923179743215412")
-    api_secret = st.secrets.get("CLOUDINARY_API_SECRET", "9vt8nHg1FI307K61gtIwmqTEHgM")
+    cloud_name = "dhzywtmp1"
+    api_key    = "923179743215412"
+    api_secret = "9vt8nHg1FI307K61gtIwmqTEHgM"
 
     resource_type = "raw" if mime_type == "application/pdf" else "image"
     timestamp     = str(int(time.time()))

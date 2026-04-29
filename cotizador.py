@@ -566,6 +566,21 @@ def nueva_pieza(idx, defaults):
         "batch_piezas": 600,
         "batch_mias": 100,
         "comentarios_trat": "",
+        # ── Logística ──
+        "logistica": {
+            "aplica": False,
+            "costo_global": 0.0,
+            "modo_global": "fijo",       # fijo | por_kg | por_pza | pct_valor
+            "peso_pza_log": 0.0,
+            "tramos": [],
+            "comercio_exterior": False,
+            "incoterm": "EXW",
+            "arancel_pct": 0.0,
+            "seguro_pct": 0.0,
+            "agente_aduanal": 0.0,
+            "embalaje": 0.0,
+            "comentarios_log": "",
+        },
         "plano_nombre": "",
         "plano_b64": "",
         "plano_drive_id": "",
@@ -677,9 +692,48 @@ def calcular_pieza(pieza, margen_pct):
         util_mat  = costo_mat  * (pieza.get("margen_mat",  35) / 100)
         util_trat = pieza["costo_trat"] * (pieza.get("margen_trat", 35) / 100)
 
+    # Costo logística por pieza
+    log = pieza.get("logistica", {})
+    costo_log = 0.0
+    if log.get("aplica", False):
+        modo_g = log.get("modo_global", "fijo")
+        val_g  = float(log.get("costo_global", 0.0))
+        if modo_g == "fijo":
+            costo_log = val_g / max(cantidad, 1)
+        elif modo_g == "por_kg":
+            costo_log = val_g * float(log.get("peso_pza_log", 0.0))
+        elif modo_g == "por_pza":
+            costo_log = val_g
+        elif modo_g == "pct_valor":
+            pass  # se calcula post-subtotal abajo
+        # Tramos adicionales
+        for tr in log.get("tramos", []):
+            tr_modo = tr.get("modo", "fijo")
+            tr_val  = float(tr.get("costo", 0.0))
+            if tr_modo == "fijo":
+                costo_log += tr_val / max(cantidad, 1)
+            elif tr_modo == "por_kg":
+                costo_log += tr_val * float(log.get("peso_pza_log", 0.0))
+            elif tr_modo == "por_pza":
+                costo_log += tr_val
+        # Comercio exterior
+        if log.get("comercio_exterior", False):
+            costo_log += float(log.get("agente_aduanal", 0.0)) / max(cantidad, 1)
+            costo_log += float(log.get("embalaje", 0.0)) / max(cantidad, 1)
+
     subtotal   = costo_maq + costo_mat + pieza["costo_trat"]
     utilidad   = util_mo + util_mat + util_trat
     precio_pza = subtotal + utilidad
+
+    # Logística % del valor se aplica sobre precio_pza
+    if log.get("aplica", False) and log.get("modo_global") == "pct_valor":
+        costo_log += precio_pza * (float(log.get("costo_global", 0.0)) / 100)
+    # Seguro y arancel sobre precio_pza
+    if log.get("aplica", False) and log.get("comercio_exterior", False):
+        costo_log += precio_pza * (float(log.get("seguro_pct", 0.0)) / 100)
+        costo_log += precio_pza * (float(log.get("arancel_pct", 0.0)) / 100)
+
+    precio_pza = precio_pza + costo_log
     total      = precio_pza * cantidad
 
     return {
@@ -688,6 +742,7 @@ def calcular_pieza(pieza, margen_pct):
         "costo_maq":     costo_maq,
         "costo_material": costo_mat,
         "costo_trat":    pieza["costo_trat"],
+        "costo_log":     costo_log,
         "subtotal":      subtotal,
         "utilidad":      utilidad,
         "precio_pza":    precio_pza,
@@ -1374,6 +1429,7 @@ components.html("""
         { text: "Materia",     bg: "#EAF3DE", border: "#3B6D11", color: "#27500A" },
         { text: "Tratamiento", bg: "#FAEEDA", border: "#854F0B", color: "#633806" },
         { text: "Operaciones", bg: "#F1EFE8", border: "#5F5E5A", color: "#2C2C2A" },
+        { text: "Logística",   bg: "#EDF7FF", border: "#0369a1", color: "#064E8A" },
     ];
     function paint() {
         var doc = window.parent.document;
@@ -2332,6 +2388,161 @@ with tab1:
             st.session_state.piezas[pi]["demanda_mensual"] = demanda
             cant = pieza["cantidad"]
 
+        # ── Logística ────────────────────────────────────────────────────────
+        with st.expander("▸  Logística", expanded=False):
+            log = pieza.get("logistica", {})
+
+            aplica_log = st.checkbox("Incluir costos de logística en esta pieza",
+                value=log.get("aplica", False),
+                key=f"log_aplica_{pieza['id']}")
+            st.session_state.piezas[pi]["logistica"]["aplica"] = aplica_log
+
+            if aplica_log:
+                st.markdown("##### Costo global de envío")
+                lg1, lg2, lg3 = st.columns([1.5, 1.5, 1])
+                with lg1:
+                    modos_log = ["fijo", "por_kg", "por_pza", "pct_valor"]
+                    labels_log = {"fijo": "Fijo por orden ($)", "por_kg": "Por kg ($/kg × peso)",
+                                  "por_pza": "Por pieza ($/pza)", "pct_valor": "% del valor"}
+                    modo_g_saved = log.get("modo_global", "fijo")
+                    modo_g_idx = modos_log.index(modo_g_saved) if modo_g_saved in modos_log else 0
+                    modo_g = st.selectbox("Modo de costo",
+                        options=modos_log,
+                        index=modo_g_idx,
+                        format_func=lambda x: labels_log[x],
+                        key=f"log_modo_{pieza['id']}")
+                    st.session_state.piezas[pi]["logistica"]["modo_global"] = modo_g
+                with lg2:
+                    lbl_g = {"fijo": "Costo fijo ($)", "por_kg": "Precio ($/kg)",
+                              "por_pza": "Precio ($/pza)", "pct_valor": "Porcentaje (%)"}[modo_g]
+                    costo_g = st.number_input(lbl_g, min_value=0.0,
+                        value=float(log.get("costo_global", 0.0)),
+                        step=10.0, key=f"log_costo_{pieza['id']}")
+                    st.session_state.piezas[pi]["logistica"]["costo_global"] = costo_g
+                with lg3:
+                    if modo_g == "por_kg":
+                        peso_log = st.number_input("Peso/pza (kg)", min_value=0.0,
+                            value=float(log.get("peso_pza_log", 0.0)),
+                            step=0.01, format="%.4f", key=f"log_peso_{pieza['id']}")
+                        st.session_state.piezas[pi]["logistica"]["peso_pza_log"] = peso_log
+                    elif modo_g == "fijo":
+                        cant_log = pieza.get("cantidad", 1)
+                        if cant_log > 0:
+                            st.metric("Costo/pza", fmtc(costo_g / cant_log))
+                    elif modo_g == "pct_valor":
+                        res_preview = calcular_pieza({**pieza, "logistica": {"aplica": False}}, margen_global)
+                        st.metric("Costo/pza estimado", fmtc(res_preview["precio_pza"] * costo_g / 100))
+
+                # ── Tramos ────────────────────────────────────────────────
+                st.markdown("##### Tramos adicionales (opcional)")
+                st.caption("Agrega rutas adicionales: planta → tratamiento → cliente, o importación USA→MX")
+                tramos = log.get("tramos", [])
+
+                for ti, tramo in enumerate(tramos):
+                    tcols = st.columns([2, 1.5, 1.5, 1, 0.5])
+                    with tcols[0]:
+                        origen = st.text_input("Origen → Destino",
+                            value=tramo.get("ruta", ""),
+                            key=f"log_ruta_{pieza['id']}_{ti}",
+                            placeholder="Ej: Planta → Tratamiento")
+                        tramos[ti]["ruta"] = origen
+                    with tcols[1]:
+                        tr_modo = st.selectbox("Modo", modos_log,
+                            index=modos_log.index(tramo.get("modo","fijo")) if tramo.get("modo","fijo") in modos_log else 0,
+                            format_func=lambda x: labels_log[x],
+                            key=f"log_tr_modo_{pieza['id']}_{ti}")
+                        tramos[ti]["modo"] = tr_modo
+                    with tcols[2]:
+                        lbl_tr = {"fijo": "Costo ($)", "por_kg": "$/kg",
+                                  "por_pza": "$/pza", "pct_valor": "%"}[tr_modo]
+                        tr_costo = st.number_input(lbl_tr, min_value=0.0,
+                            value=float(tramo.get("costo", 0.0)),
+                            step=5.0, key=f"log_tr_costo_{pieza['id']}_{ti}")
+                        tramos[ti]["costo"] = tr_costo
+                    with tcols[3]:
+                        tr_tipo = st.selectbox("Tipo",
+                            ["Nacional", "Internacional"],
+                            index=0 if tramo.get("tipo","Nacional")=="Nacional" else 1,
+                            key=f"log_tr_tipo_{pieza['id']}_{ti}")
+                        tramos[ti]["tipo"] = tr_tipo
+                    with tcols[4]:
+                        st.write("")
+                        if st.button("×", key=f"log_del_{pieza['id']}_{ti}"):
+                            tramos.pop(ti)
+                            st.session_state.piezas[pi]["logistica"]["tramos"] = tramos
+                            st.rerun()
+
+                st.session_state.piezas[pi]["logistica"]["tramos"] = tramos
+
+                if st.button("＋ Agregar tramo", key=f"log_add_{pieza['id']}"):
+                    tramos.append({"ruta": "", "modo": "fijo", "costo": 0.0, "tipo": "Nacional"})
+                    st.session_state.piezas[pi]["logistica"]["tramos"] = tramos
+                    st.rerun()
+
+                # ── Comercio exterior ──────────────────────────────────────
+                st.markdown("##### Comercio exterior (opcional)")
+                ce = st.checkbox("Aplica importación / exportación",
+                    value=log.get("comercio_exterior", False),
+                    key=f"log_ce_{pieza['id']}")
+                st.session_state.piezas[pi]["logistica"]["comercio_exterior"] = ce
+
+                if ce:
+                    ce1, ce2, ce3, ce4, ce5 = st.columns(5)
+                    with ce1:
+                        incoterms = ["EXW","FCA","FOB","CFR","CIF","CPT","CIP","DAP","DDP","FAS"]
+                        inc_saved = log.get("incoterm","EXW")
+                        inc_idx = incoterms.index(inc_saved) if inc_saved in incoterms else 0
+                        incoterm = st.selectbox("Incoterm", incoterms,
+                            index=inc_idx, key=f"log_inc_{pieza['id']}",
+                            help="Define quién asume el riesgo y costos del transporte")
+                        st.session_state.piezas[pi]["logistica"]["incoterm"] = incoterm
+                    with ce2:
+                        arancel = st.number_input("Arancel (%)",
+                            min_value=0.0, max_value=100.0,
+                            value=float(log.get("arancel_pct", 0.0)),
+                            step=0.5, key=f"log_arancel_{pieza['id']}",
+                            help="% sobre valor de la mercancía")
+                        st.session_state.piezas[pi]["logistica"]["arancel_pct"] = arancel
+                    with ce3:
+                        seguro = st.number_input("Seguro (%)",
+                            min_value=0.0, max_value=10.0,
+                            value=float(log.get("seguro_pct", 0.0)),
+                            step=0.1, key=f"log_seguro_{pieza['id']}",
+                            help="% del valor de la mercancía")
+                        st.session_state.piezas[pi]["logistica"]["seguro_pct"] = seguro
+                    with ce4:
+                        agente = st.number_input("Agente aduanal ($)",
+                            min_value=0.0,
+                            value=float(log.get("agente_aduanal", 0.0)),
+                            step=100.0, key=f"log_agente_{pieza['id']}",
+                            help="Honorarios totales del agente aduanal")
+                        st.session_state.piezas[pi]["logistica"]["agente_aduanal"] = agente
+                    with ce5:
+                        embalaje = st.number_input("Embalaje ($)",
+                            min_value=0.0,
+                            value=float(log.get("embalaje", 0.0)),
+                            step=50.0, key=f"log_embalaje_{pieza['id']}",
+                            help="Cajas, tarimas, VCI bags, protección especial")
+                        st.session_state.piezas[pi]["logistica"]["embalaje"] = embalaje
+
+                # ── Comentarios ────────────────────────────────────────────
+                coment_log = st.text_area("Comentarios de logística",
+                    value=log.get("comentarios_log", ""),
+                    key=f"log_coment_{pieza['id']}",
+                    placeholder="Ej: Importación vía Laredo TX, naviera preferida, consolidado con otro pedido...",
+                    height=70)
+                st.session_state.piezas[pi]["logistica"]["comentarios_log"] = coment_log
+
+                # ── Resumen logística ──────────────────────────────────────
+                res_log = calcular_pieza(pieza, margen_global)
+                if res_log.get("costo_log", 0) > 0:
+                    st.markdown(
+                        f"<div style='background:#E6F1FB;border-left:3px solid #185FA5;"
+                        f"border-radius:6px;padding:8px 14px;font-size:13px;margin-top:8px'>"
+                        f"<b>Costo logística/pza:</b> {fmtc(res_log['costo_log'])} &nbsp;·&nbsp; "
+                        f"<b>Total logística orden:</b> {fmtc(res_log['costo_log'] * pieza['cantidad'])}"
+                        f"</div>", unsafe_allow_html=True)
+
         # ── Márgenes de utilidad por componente ─────────────────────────────
         usar_global = st.checkbox(
             "Usar margen global para esta pieza",
@@ -2581,9 +2792,10 @@ with tab1:
             r2.metric("Material/pza",     fmtc(res["costo_material"]))
             r3.metric("Tratamiento/pza",  fmtc(res["costo_trat"]))
             with r4:
+                log_label = f" + Log: {fmtc(res.get('costo_log',0))}" if res.get('costo_log',0) > 0 else ""
                 st.markdown(
                     f"<div style='padding:4px 0'>"
-                    f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
+                    f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza{log_label}</div>"
                     f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
                     f"</div>", unsafe_allow_html=True)
             r5.metric(f"Total {cant} pzas", fmtc(res["total"]))

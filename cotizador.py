@@ -321,25 +321,27 @@ def _find_row_number(token, sheet_id, numero_cot):
     return None
 
 def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
-    """Sube un archivo a Google Drive del Service Account y retorna el file_id."""
+    """Sube un archivo a la carpeta compartida de Drive y retorna (file_id, url, error)."""
     import requests, json as _json
+
     token, err = get_gsheet_token()
     if not token:
-        return None, f"Token error: {err}"
+        return None, None, f"Token error: {err}"
 
-    # Obtener folder ID desde Secrets (carpeta compartida con el SA en Drive del usuario)
+    # ── 1. Resolver folder_id ──────────────────────────────────────────────────
     folder_id = st.session_state.get("_drive_folder_id")
     if not folder_id:
-        # Primero intentar desde Secrets (recomendado)
         folder_id = st.secrets.get("DRIVE_FOLDER_ID", "").strip()
         if not folder_id:
-            # Fallback: buscar carpeta accesible por el SA
             r = requests.get(
                 "https://www.googleapis.com/drive/v3/files",
                 headers={"Authorization": f"Bearer {token}"},
                 params={
                     "q": "name='JAAN-Planos' and mimeType='application/vnd.google-apps.folder' and trashed=false",
-                    "fields": "files(id,name)", "spaces": "drive"
+                    "fields": "files(id,name)",
+                    "includeItemsFromAllDrives": "true",
+                    "supportsAllDrives": "true",
+                    "corpora": "allDrives"
                 }
             )
             if r.status_code == 200:
@@ -349,8 +351,16 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
         if folder_id:
             st.session_state["_drive_folder_id"] = folder_id
 
-    # Subir archivo multipart
-    metadata = _json.dumps({"name": filename, "parents": [folder_id] if folder_id else []})
+    if not folder_id:
+        return None, None, (
+            "No se encontro carpeta de Drive. "
+            "Crea una carpeta 'JAAN-Planos' en tu Google Drive, "
+            "compartela con la Service Account como Editor, "
+            "y agrega su ID en Secrets como DRIVE_FOLDER_ID."
+        )
+
+    # ── 2. Subir archivo ───────────────────────────────────────────────────────
+    metadata = _json.dumps({"name": filename, "parents": [folder_id]})
     boundary = "jaan_boundary_xyz"
     CRLF = "\r\n"
     body = (
@@ -360,14 +370,31 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
     ).encode() + file_bytes + f"{CRLF}--{boundary}--".encode()
 
     resp = requests.post(
-        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name",
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name&supportsAllDrives=true",
         headers={"Authorization": f"Bearer {token}",
                  "Content-Type": f"multipart/related; boundary={boundary}"},
         data=body
     )
-    if resp.status_code in (200, 201):
-        return resp.json().get("id"), None
-    return None, f"Error Drive {resp.status_code}: {resp.text[:300]}"
+    if resp.status_code not in (200, 201):
+        return None, None, f"Error Drive {resp.status_code}: {resp.text[:300]}"
+
+    file_id = resp.json().get("id")
+
+    # ── 3. Dar permiso reader a cualquiera con el link ─────────────────────────
+    requests.post(
+        f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions?supportsAllDrives=true",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=_json.dumps({"role": "reader", "type": "anyone"})
+    )
+
+    # ── 4. URL de visualizacion ────────────────────────────────────────────────
+    if mime_type == "application/pdf":
+        url = f"https://drive.google.com/file/d/{file_id}/view"
+    else:
+        url = f"https://drive.google.com/uc?id={file_id}"
+
+    return file_id, url, None
+
 def descargar_plano_drive(file_id):
     """Descarga un archivo de Google Drive por su file_id"""
     import requests
@@ -1330,7 +1357,9 @@ def guardar_cotizacion():
             "cond_generales": {"vigencia": vigencia,
                                "tiempo_entrega": t_entrega,
                                "cond_pago": cond_pago}
-        }, default=str, ensure_ascii=False)
+        }, default=str, ensure_ascii=False),
+        # columna plano_url: primer plano encontrado entre las piezas
+        next((p.get("plano_url","") for p in st.session_state.piezas if p.get("plano_url")), ""),
     ]
 
     # Upsert: actualiza si ya existe, inserta si es nueva
@@ -1382,7 +1411,7 @@ def cargar_cotizaciones():
         CANONICAL = ["numero","fecha","usuario_email","cliente","atencion",
                      "direccion","cp","ciudad","pais","moneda","tipo_cambio",
                      "margen_global","subtotal","iva","total_neto","vigencia",
-                     "tiempo_entrega","cond_pago","datos_json","status"]
+                     "tiempo_entrega","cond_pago","datos_json","plano_url","status"]
 
         # Schemas conocidos — mapeados por número de columnas (sin contar status al final)
         # Schema viejo:  numero,fecha,email,cliente,atencion,ciudad,moneda,tc,margen,sub,iva,total,vig,tent,cpago,json
@@ -1723,20 +1752,20 @@ with tab1:
                 if not st.session_state.piezas[pi].get("plano_drive_id"):
                     with st.spinner("☁️ Subiendo plano a Google Drive..."):
                         mime = "image/png" if is_img_type else "application/pdf"
-                        file_id, drive_err = subir_plano_drive(file_bytes_prev, plano_file.name, mime)
+                        file_id, plano_url, drive_err = subir_plano_drive(file_bytes_prev, plano_file.name, mime)
                     if file_id:
                         st.session_state.piezas[pi]["plano_nombre"]    = plano_file.name
                         st.session_state.piezas[pi]["plano_drive_id"]  = file_id
+                        st.session_state.piezas[pi]["plano_url"]       = plano_url or ""
                         st.session_state.piezas[pi]["plano_b64"]       = ""
                         st.session_state.piezas[pi]["plano_tipo"]      = "img" if is_img_type else "pdf"
-                        st.success(f"☁️ Plano subido a Drive correctamente: {plano_file.name}")
+                        st.success(f"☁️ Plano subido: [{plano_file.name}]({plano_url})")
                     else:
-                        # Drive falló — mostrar error real para diagnóstico
                         st.error(f"❌ Error subiendo a Drive: {drive_err}")
-                        st.info("💡 Verifica que el Service Account tenga la API de Drive habilitada en Google Cloud Console.")
-                        # Guardar solo nombre y tipo (sin b64 para no exceder Sheet)
+                        st.info("💡 Crea carpeta JAAN-Planos en Drive, compartela con la Service Account y agrega el ID en Secrets como DRIVE_FOLDER_ID.")
                         st.session_state.piezas[pi]["plano_nombre"]   = plano_file.name
                         st.session_state.piezas[pi]["plano_drive_id"] = ""
+                        st.session_state.piezas[pi]["plano_url"]      = ""
                         st.session_state.piezas[pi]["plano_b64"]      = ""
                         st.session_state.piezas[pi]["plano_tipo"]     = "img" if is_img_type else "pdf"
                 is_img = plano_file.name.lower().endswith((".png",".jpg",".jpeg"))

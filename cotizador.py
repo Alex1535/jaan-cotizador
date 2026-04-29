@@ -566,6 +566,7 @@ def nueva_pieza(idx, defaults):
         "batch_piezas": 600,
         "batch_mias": 100,
         "comentarios_trat": "",
+        "margen_log": 0,
         # ── Logística ──
         "logistica": {
             "aplica": False,
@@ -743,7 +744,7 @@ def calcular_pieza(pieza, margen_pct):
     utilidad   = util_mo + util_mat + util_trat
     precio_pza = subtotal + utilidad
 
-    # Logística % del valor se aplica sobre precio_pza
+    # Logística % del valor se aplica sobre precio_pza base
     if log.get("aplica", False) and log.get("modo_global") == "pct_valor":
         costo_log += precio_pza * (float(log.get("costo_global", 0.0)) / 100)
     # Seguro y arancel sobre precio_pza
@@ -751,7 +752,12 @@ def calcular_pieza(pieza, margen_pct):
         costo_log += precio_pza * (float(log.get("seguro_pct", 0.0)) / 100)
         costo_log += precio_pza * (float(log.get("arancel_pct", 0.0)) / 100)
 
-    precio_pza = precio_pza + costo_log
+    # Margen de utilidad sobre logística
+    margen_log_pct = pieza.get("margen_log", 0)
+    util_log = costo_log * (margen_log_pct / 100) if costo_log > 0 else 0.0
+    costo_log_con_margen = costo_log + util_log
+
+    precio_pza = precio_pza + costo_log_con_margen
     total      = precio_pza * cantidad
 
     return {
@@ -761,6 +767,8 @@ def calcular_pieza(pieza, margen_pct):
         "costo_material": costo_mat,
         "costo_trat":    pieza["costo_trat"],
         "costo_log":     costo_log,
+        "util_log":      util_log if log.get("aplica", False) else 0.0,
+        "costo_log_total": costo_log_con_margen if log.get("aplica", False) else 0.0,
         "subtotal":      subtotal,
         "utilidad":      utilidad,
         "precio_pza":    precio_pza,
@@ -2547,6 +2555,30 @@ with tab1:
                             help="Cajas, tarimas, VCI bags, protección especial")
                         st.session_state.piezas[pi]["logistica"]["embalaje"] = embalaje
 
+                # ── Margen de utilidad sobre logística ────────────────────
+                st.markdown("---")
+                ml1, ml2 = st.columns([1, 2])
+                with ml1:
+                    margen_log = st.number_input("Utilidad sobre logística (%)",
+                        min_value=0, max_value=100,
+                        value=int(pieza.get("margen_log", 0)),
+                        key=f"margen_log_{pieza['id']}",
+                        help="Margen de utilidad que se aplica sobre el costo de logística")
+                    st.session_state.piezas[pi]["margen_log"] = margen_log
+                with ml2:
+                    _res_log = calcular_pieza(pieza, margen_global)
+                    _cl = _res_log.get("costo_log", 0)
+                    _ul = _res_log.get("util_log", 0)
+                    _cl_total = _res_log.get("costo_log_total", 0)
+                    if _cl > 0:
+                        st.markdown(
+                            f"<div style='background:#f0f4e8;border-left:3px solid #5a9e2f;"
+                            f"border-radius:6px;padding:10px 14px;font-size:13px'>"
+                            f"Costo log. neto: <b>{fmtc(_cl)}</b> &nbsp;·&nbsp; "
+                            f"Utilidad log.: <b>{fmtc(_ul)}</b> &nbsp;·&nbsp; "
+                            f"<span style='font-size:15px'>Logística c/margen: <b>{fmtc(_cl_total)}</b></span>"
+                            f"</div>", unsafe_allow_html=True)
+
                 # ── Comentarios ────────────────────────────────────────────
                 coment_log = st.text_area("Comentarios de logística",
                     value=log.get("comentarios_log", ""),
@@ -2557,12 +2589,13 @@ with tab1:
 
                 # ── Resumen logística ──────────────────────────────────────
                 res_log = calcular_pieza(pieza, margen_global)
-                if res_log.get("costo_log", 0) > 0:
+                _clt = res_log.get("costo_log_total", 0)
+                if _clt > 0:
                     st.markdown(
                         f"<div style='background:#E6F1FB;border-left:3px solid #185FA5;"
                         f"border-radius:6px;padding:8px 14px;font-size:13px;margin-top:8px'>"
-                        f"<b>Costo logística/pza:</b> {fmtc(res_log['costo_log'])} &nbsp;·&nbsp; "
-                        f"<b>Total logística orden:</b> {fmtc(res_log['costo_log'] * pieza['cantidad'])}"
+                        f"<b>Logística/pza (con margen):</b> {fmtc(_clt)} &nbsp;·&nbsp; "
+                        f"<b>Total logística orden:</b> {fmtc(_clt * pieza['cantidad'])}"
                         f"</div>", unsafe_allow_html=True)
 
         # ── Márgenes de utilidad por componente ─────────────────────────────
@@ -2814,7 +2847,7 @@ with tab1:
             r2.metric("Material/pza",     fmtc(res["costo_material"]))
             r3.metric("Tratamiento/pza",  fmtc(res["costo_trat"]))
             with r4:
-                log_label = f" + Log: {fmtc(res.get('costo_log',0))}" if res.get('costo_log',0) > 0 else ""
+                log_label = f" + Log: {fmtc(res.get('costo_log_total',0))}" if res.get('costo_log_total',0) > 0 else ""
                 st.markdown(
                     f"<div style='padding:4px 0'>"
                     f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza{log_label}</div>"

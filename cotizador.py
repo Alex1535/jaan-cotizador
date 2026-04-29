@@ -1789,63 +1789,46 @@ with tab1:
 
             # Mostrar plano guardado si existe y no hay nuevo archivo subido
             if plano_file is None and pieza.get("plano_nombre"):
-                drive_id = pieza.get("plano_drive_id", "")
-                b64_local = pieza.get("plano_b64", "")
-                st.markdown(f"**👁️ Plano guardado: {pieza['plano_nombre']}**")
+                plano_url_saved = pieza.get("plano_url", "")
+                drive_id        = pieza.get("plano_drive_id", "")
+                b64_local       = pieza.get("plano_b64", "")
+                nombre_plano    = pieza["plano_nombre"]
+                es_img          = pieza.get("plano_tipo") == "img"
+                st.markdown(f"**👁️ Plano guardado: {nombre_plano}**")
 
-                # Obtener bytes: desde Drive o desde b64 local
-                plano_bytes_saved = None
-                if drive_id:
-                    cache_key = f"_plano_cache_{drive_id}"
-                    if cache_key not in st.session_state:
-                        with st.spinner("☁️ Descargando plano de Drive..."):
-                            plano_bytes_saved, _ = descargar_plano_drive(drive_id)
-                            if plano_bytes_saved:
-                                st.session_state[cache_key] = plano_bytes_saved
-                    else:
-                        plano_bytes_saved = st.session_state[cache_key]
-                elif b64_local:
-                    import base64 as b64mod
-                    plano_bytes_saved = b64mod.b64decode(b64_local)
-
-                if plano_bytes_saved:
-                    if pieza.get("plano_tipo") == "img":
-                        st.image(plano_bytes_saved, use_container_width=True, caption=pieza["plano_nombre"])
+                if plano_url_saved:
+                    if es_img:
+                        st.image(plano_url_saved, use_container_width=True, caption=nombre_plano)
                     else:
                         sc1, sc2 = st.columns([1, 3])
                         with sc1:
-                            st.markdown(f"📄 **{pieza['plano_nombre']}**")
-                            st.download_button(
-                                "⬇️ Descargar PDF",
-                                data=plano_bytes_saved,
-                                file_name=pieza["plano_nombre"],
-                                mime="application/pdf",
-                                key=f"dl_plano_saved_{pieza['id']}",
-                                use_container_width=True
-                            )
+                            st.markdown(f"📄 **{nombre_plano}**")
+                            st.link_button("🔗 Abrir PDF en Cloudinary", plano_url_saved, use_container_width=True)
                         with sc2:
-                            if st.toggle("🔍 Ver PDF guardado", key=f"toggle_saved_{pieza['id']}"):
-                                try:
-                                    import fitz
-                                    pdf_doc = fitz.open(stream=plano_bytes_saved, filetype="pdf")
-                                    for page_num in range(min(len(pdf_doc), 3)):
-                                        page = pdf_doc[page_num]
-                                        rect = page.rect
-                                        mat = fitz.Matrix(2, 2).prerotate(270) if rect.height > rect.width else fitz.Matrix(2, 2)
-                                        pix = page.get_pixmap(matrix=mat)
-                                        st.image(pix.tobytes("png"), use_container_width=True, caption=f"Página {page_num+1}")
-                                except ImportError:
-                                    import base64 as b64mod
-                                    pdf_b64_disp = b64mod.b64encode(plano_bytes_saved).decode()
-                                    st.markdown(
-                                        f'<object data="data:application/pdf;base64,{pdf_b64_disp}" '
-                                        f'type="application/pdf" width="100%" height="500px"></object>',
-                                        unsafe_allow_html=True)
+                            st.markdown(
+                                f'<iframe src="{plano_url_saved}" width="100%" height="500px" '                                f'style="border:none;border-radius:8px"></iframe>',
+                                unsafe_allow_html=True)
                 else:
+                    plano_bytes_saved = None
                     if drive_id:
-                        st.warning("⚠️ No se pudo descargar el plano de Drive. Verifica la conexión.")
+                        cache_key = f"_plano_cache_{drive_id}"
+                        if cache_key not in st.session_state:
+                            with st.spinner("Descargando plano..."):
+                                plano_bytes_saved, _ = descargar_plano_drive(drive_id)
+                                if plano_bytes_saved:
+                                    st.session_state[cache_key] = plano_bytes_saved
+                        else:
+                            plano_bytes_saved = st.session_state[cache_key]
+                    elif b64_local:
+                        import base64 as b64mod
+                        plano_bytes_saved = b64mod.b64decode(b64_local)
+                    if plano_bytes_saved:
+                        st.download_button("Descargar plano", data=plano_bytes_saved,
+                                           file_name=nombre_plano,
+                                           mime="application/pdf" if not es_img else "image/png",
+                                           key=f"dl_plano_saved_{pieza['id']}")
                     else:
-                        st.info("ℹ️ El plano no está vinculado a Drive. Vuelve a subirlo para guardarlo correctamente.")
+                        st.info("Vuelve a subir el plano para vincularlo.")
                 st.markdown("---")
 
             if plano_file is not None:

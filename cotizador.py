@@ -322,24 +322,21 @@ def _find_row_number(token, sheet_id, numero_cot):
 
 def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
     """Sube plano a Cloudinary y retorna (public_id, url, error)."""
-    import requests, hashlib, time, base64
+    import requests, hashlib, time
 
     cloud_name = st.secrets.get("CLOUDINARY_CLOUD_NAME", "dhzywtmp1")
     api_key    = st.secrets.get("CLOUDINARY_API_KEY", "923179743215412")
     api_secret = st.secrets.get("CLOUDINARY_API_SECRET", "9vt8nHg1FI307K61gtIwmqTEHgM")
 
-    # Determinar resource_type
     resource_type = "raw" if mime_type == "application/pdf" else "image"
+    timestamp     = str(int(time.time()))
+    folder        = "jaan-planos"
 
-    # Construir firma
-    timestamp = str(int(time.time()))
-    folder    = "jaan-planos"
-    public_id = f"{folder}/{filename.rsplit('.',1)[0]}_{timestamp}"
+    # Firma: parámetros en orden alfabético, sin api_key ni resource_type ni file
+    params = {"folder": folder, "timestamp": timestamp}
+    to_sign = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+    signature = hashlib.sha1(f"{to_sign}{api_secret}".encode()).hexdigest()
 
-    params_to_sign = f"folder={folder}&public_id={public_id}&timestamp={timestamp}"
-    signature = hashlib.sha1(f"{params_to_sign}{api_secret}".encode()).hexdigest()
-
-    # Subir a Cloudinary
     resp = requests.post(
         f"https://api.cloudinary.com/v1_1/{cloud_name}/{resource_type}/upload",
         data={
@@ -347,7 +344,6 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
             "timestamp": timestamp,
             "signature": signature,
             "folder":    folder,
-            "public_id": public_id,
         },
         files={"file": (filename, file_bytes, mime_type)},
         timeout=60
@@ -356,11 +352,10 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
     if resp.status_code not in (200, 201):
         return None, None, f"Error Cloudinary {resp.status_code}: {resp.text[:300]}"
 
-    data      = resp.json()
-    public_id = data.get("public_id", "")
-    url       = data.get("secure_url", "")
-
-    return public_id, url, None
+    data = resp.json()
+    url  = data.get("secure_url", "")
+    pid  = data.get("public_id", "")
+    return pid, url, None
 
 def descargar_plano_drive(file_id):
     """Descarga un archivo por su file_id (Drive) o URL (Cloudinary)."""

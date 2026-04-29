@@ -559,6 +559,12 @@ def nueva_pieza(idx, defaults):
         "proveedor_trat": "",
         "cotizacion_trat_nombre": "",
         "cotizacion_trat_b64": "",
+        "modo_trat": "$/pza",
+        "peso_pza_trat": 0.0,
+        "precio_kg_trat": 0.0,
+        "batch_costo": 0.0,
+        "batch_piezas": 100,
+        "comentarios_trat": "",
         "plano_nombre": "",
         "plano_b64": "",
         "plano_drive_id": "",
@@ -2179,22 +2185,85 @@ with tab1:
 
         # ── Tratamiento, cantidad y demanda ──────────────────────────────────
         with st.expander("▸  Tratamiento y recubrimiento", expanded=False):
-            ct1, ct2, ct3 = st.columns([2, 1, 1])
+            ct1, ct2, ct3 = st.columns([2, 1.5, 1])
             with ct1:
                 trat = st.selectbox("Tratamiento / Recubrimiento", TRATAMIENTOS_LISTA,
                     index=TRATAMIENTOS_LISTA.index(pieza["tratamiento"]),
                     key=f"trat_{pieza['id']}")
                 st.session_state.piezas[pi]["tratamiento"] = trat
             with ct2:
-                costo_trat = st.number_input("Costo trat./pza ($)", min_value=0.0,
-                    value=float(pieza["costo_trat"]), step=5.0,
-                    key=f"ctrat_{pieza['id']}", disabled=(trat=="Ninguno"))
-                st.session_state.piezas[pi]["costo_trat"] = 0.0 if trat=="Ninguno" else costo_trat
+                modos_trat = ["$/pza", "$/kg", "Batch"]
+                modo_trat_saved = pieza.get("modo_trat", "$/pza")
+                modo_trat_idx = modos_trat.index(modo_trat_saved) if modo_trat_saved in modos_trat else 0
+                modo_trat = st.radio("Modo de costo",  modos_trat,
+                    index=modo_trat_idx,
+                    key=f"modo_trat_{pieza['id']}",
+                    horizontal=True,
+                    disabled=(trat=="Ninguno"))
+                st.session_state.piezas[pi]["modo_trat"] = modo_trat
             with ct3:
                 dias_trat = st.number_input("Días adicionales", min_value=0, max_value=60,
                     value=int(pieza["dias_trat"]), key=f"dtrat_{pieza['id']}",
                     disabled=(trat=="Ninguno"))
                 st.session_state.piezas[pi]["dias_trat"] = 0 if trat=="Ninguno" else dias_trat
+
+            # ── Cálculo de costo según modo ──────────────────────────────
+            if trat != "Ninguno":
+                if modo_trat == "$/pza":
+                    tc1, = st.columns([1])
+                    with tc1:
+                        costo_trat = st.number_input("Costo por pieza ($)",
+                            min_value=0.0, value=float(pieza["costo_trat"]),
+                            step=5.0, key=f"ctrat_{pieza['id']}")
+                        st.session_state.piezas[pi]["costo_trat"] = costo_trat
+
+                elif modo_trat == "$/kg":
+                    tc1, tc2, tc3 = st.columns(3)
+                    with tc1:
+                        precio_kg_trat = st.number_input("Precio ($/kg)",
+                            min_value=0.0, value=float(pieza.get("precio_kg_trat", 0.0)),
+                            step=1.0, key=f"pkg_trat_{pieza['id']}")
+                        st.session_state.piezas[pi]["precio_kg_trat"] = precio_kg_trat
+                    with tc2:
+                        peso_pza_trat = st.number_input("Peso por pieza (kg)",
+                            min_value=0.0, value=float(pieza.get("peso_pza_trat", 0.0)),
+                            step=0.01, format="%.4f", key=f"peso_trat_{pieza['id']}")
+                        st.session_state.piezas[pi]["peso_pza_trat"] = peso_pza_trat
+                    with tc3:
+                        costo_trat = precio_kg_trat * peso_pza_trat
+                        st.metric("Costo/pza calculado", fmtc(costo_trat))
+                    st.session_state.piezas[pi]["costo_trat"] = costo_trat
+
+                elif modo_trat == "Batch":
+                    tc1, tc2, tc3 = st.columns(3)
+                    with tc1:
+                        batch_costo = st.number_input("Costo del batch ($)",
+                            min_value=0.0, value=float(pieza.get("batch_costo", 0.0)),
+                            step=10.0, key=f"bcosto_trat_{pieza['id']}")
+                        st.session_state.piezas[pi]["batch_costo"] = batch_costo
+                    with tc2:
+                        batch_piezas = st.number_input("Piezas en el batch",
+                            min_value=1, max_value=999999,
+                            value=int(pieza.get("batch_piezas", 100)),
+                            key=f"bpzas_trat_{pieza['id']}")
+                        st.session_state.piezas[pi]["batch_piezas"] = batch_piezas
+                    with tc3:
+                        costo_trat = batch_costo / batch_piezas if batch_piezas > 0 else 0.0
+                        st.metric("Costo/pza calculado", fmtc(costo_trat))
+                    st.session_state.piezas[pi]["costo_trat"] = costo_trat
+            else:
+                costo_trat = 0.0
+                st.session_state.piezas[pi]["costo_trat"] = 0.0
+
+            # ── Comentarios adicionales ──────────────────────────────────
+            comentarios_trat = st.text_area(
+                "Comentarios adicionales",
+                value=pieza.get("comentarios_trat", ""),
+                key=f"coment_trat_{pieza['id']}",
+                placeholder="Ej: Dureza requerida 58-62 HRC, espesor de capa 0.010 pulg, temperatura específica...",
+                height=80
+            )
+            st.session_state.piezas[pi]["comentarios_trat"] = comentarios_trat
 
             # ── Proveedor de tratamiento + cotización adjunta ────────────
             st.markdown("---")

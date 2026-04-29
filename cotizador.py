@@ -321,67 +321,57 @@ def _find_row_number(token, sheet_id, numero_cot):
     return None
 
 def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
-    """Guarda el plano: intenta Drive con multipart, si falla guarda referencia local."""
-    import requests, json as _json, base64
+    """Sube plano a Cloudinary y retorna (public_id, url, error)."""
+    import requests, hashlib, time, base64
 
-    token, err = get_gsheet_token()
-    if not token:
-        return None, None, f"Token error: {err}"
+    cloud_name = st.secrets.get("CLOUDINARY_CLOUD_NAME", "dhzywtmp1")
+    api_key    = st.secrets.get("CLOUDINARY_API_KEY", "923179743215412")
+    api_secret = st.secrets.get("CLOUDINARY_API_SECRET", "9vt8nHg1FI307K61gtIwmqTEHgM")
 
-    folder_id = st.session_state.get("_drive_folder_id")
-    if not folder_id:
-        folder_id = st.secrets.get("DRIVE_FOLDER_ID", "").strip()
-        if folder_id:
-            st.session_state["_drive_folder_id"] = folder_id
+    # Determinar resource_type
+    resource_type = "raw" if mime_type == "application/pdf" else "image"
 
-    if not folder_id:
-        return None, None, "DRIVE_FOLDER_ID no configurado en Secrets."
+    # Construir firma
+    timestamp = str(int(time.time()))
+    folder    = "jaan-planos"
+    public_id = f"{folder}/{filename.rsplit('.',1)[0]}_{timestamp}"
 
-    # ── Subir multipart con delegación explícita ───────────────────────────────
-    metadata = _json.dumps({"name": filename, "parents": [folder_id]})
-    boundary = "jaan_bnd_001"
-    CRLF = "\r\n"
-    body = (
-        f"--{boundary}{CRLF}Content-Type: application/json; charset=UTF-8{CRLF}{CRLF}"
-        f"{metadata}{CRLF}"
-        f"--{boundary}{CRLF}Content-Type: {mime_type}{CRLF}Content-Transfer-Encoding: base64{CRLF}{CRLF}"
-    ).encode() + base64.b64encode(file_bytes) + f"{CRLF}--{boundary}--".encode()
+    params_to_sign = f"folder={folder}&public_id={public_id}&timestamp={timestamp}"
+    signature = hashlib.sha1(f"{params_to_sign}{api_secret}".encode()).hexdigest()
 
+    # Subir a Cloudinary
     resp = requests.post(
-        "https://www.googleapis.com/upload/drive/v3/files"
-        "?uploadType=multipart&fields=id,name&supportsAllDrives=true",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": f"multipart/related; boundary={boundary}",
-            "X-Goog-Drive-Resource-Keys": "",
+        f"https://api.cloudinary.com/v1_1/{cloud_name}/{resource_type}/upload",
+        data={
+            "api_key":   api_key,
+            "timestamp": timestamp,
+            "signature": signature,
+            "folder":    folder,
+            "public_id": public_id,
         },
-        data=body,
-        timeout=30
+        files={"file": (filename, file_bytes, mime_type)},
+        timeout=60
     )
 
     if resp.status_code not in (200, 201):
-        return None, None, f"Error Drive {resp.status_code}: {resp.text[:400]}"
+        return None, None, f"Error Cloudinary {resp.status_code}: {resp.text[:300]}"
 
-    file_id = resp.json().get("id")
+    data      = resp.json()
+    public_id = data.get("public_id", "")
+    url       = data.get("secure_url", "")
 
-    # Dar permiso público de lectura
-    requests.post(
-        f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions"
-        "?supportsAllDrives=true",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        data=_json.dumps({"role": "reader", "type": "anyone"}),
-        timeout=10
-    )
-
-    url = (f"https://drive.google.com/file/d/{file_id}/view"
-           if mime_type == "application/pdf"
-           else f"https://drive.google.com/uc?id={file_id}")
-
-    return file_id, url, None
+    return public_id, url, None
 
 def descargar_plano_drive(file_id):
-    """Descarga un archivo de Google Drive por su file_id"""
+    """Descarga un archivo por su file_id (Drive) o URL (Cloudinary)."""
     import requests
+    # Si es URL de Cloudinary, descargar directo
+    if file_id and (file_id.startswith("http") or "cloudinary" in file_id):
+        resp = requests.get(file_id, timeout=30)
+        if resp.status_code == 200:
+            return resp.content, None
+        return None, f"Error descargando: {resp.status_code}"
+    # Fallback: Google Drive
     token, err = get_gsheet_token()
     if not token:
         return None, err
@@ -1743,10 +1733,10 @@ with tab1:
                         st.session_state.piezas[pi]["plano_url"]       = plano_url or ""
                         st.session_state.piezas[pi]["plano_b64"]       = ""
                         st.session_state.piezas[pi]["plano_tipo"]      = "img" if is_img_type else "pdf"
-                        st.success(f"☁️ Plano subido: [{plano_file.name}]({plano_url})")
+                        st.success(f"☁️ Plano subido correctamente: {plano_file.name}")
                     else:
                         st.error(f"❌ Error subiendo a Drive: {drive_err}")
-                        st.info("💡 Crea carpeta JAAN-Planos en Drive, compartela con la Service Account y agrega el ID en Secrets como DRIVE_FOLDER_ID.")
+                        st.info("💡 Verifica las credenciales de Cloudinary en Secrets: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET")
                         st.session_state.piezas[pi]["plano_nombre"]   = plano_file.name
                         st.session_state.piezas[pi]["plano_drive_id"] = ""
                         st.session_state.piezas[pi]["plano_url"]      = ""

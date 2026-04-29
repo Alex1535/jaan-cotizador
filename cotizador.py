@@ -359,6 +359,9 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
             "y agrega su ID en Secrets como DRIVE_FOLDER_ID."
         )
 
+    # DEBUG temporal
+    st.info(f"🔍 DEBUG: folder_id={folder_id} | secrets_keys={list(st.secrets.keys())}")
+
     # ── 2. Subir archivo ───────────────────────────────────────────────────────
     metadata = _json.dumps({"name": filename, "parents": [folder_id]})
     boundary = "jaan_boundary_xyz"

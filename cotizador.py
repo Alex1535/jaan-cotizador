@@ -35,18 +35,18 @@ LOGIN_LOGO_B64 = "iVBORw0KGgoAAAANSUhEUgAAAMMAAABaCAYAAAAFFuIhAAABCGlDQ1BJQ0MgUH
 def login_screen():
     st.markdown(f"""
     <style>
-    [data-testid="stAppViewContainer"] > .main {
+    [data-testid="stAppViewContainer"] > .main {{
         background: linear-gradient(135deg, #0f1b3d 0%, #1a2f5e 100%) !important;
         min-height: 100vh;
-    }
-    [data-testid="stHeader"] { background: transparent !important; }
-    .login-card {
+    }}
+    [data-testid="stHeader"] {{ background: transparent !important; }}
+    .login-card {{
         max-width:420px;margin:50px auto 0;
         background:white;border-radius:16px;padding:40px;
         box-shadow:0 20px 60px rgba(0,0,0,0.35);
-    }
-    .login-card h3 { color:#0f1b3d;margin:0 0 4px;font-weight:600;font-size:20px }
-    .login-card p { color:#6b7280;font-size:13px;margin:0 0 20px }
+    }}
+    .login-card h3 {{ color:#0f1b3d;margin:0 0 4px;font-weight:600;font-size:20px }}
+    .login-card p {{ color:#6b7280;font-size:13px;margin:0 0 20px }}
     </style>
     <div class="login-card">
         <div style="text-align:center;margin-bottom:28px">

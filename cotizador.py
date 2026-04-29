@@ -321,80 +321,61 @@ def _find_row_number(token, sheet_id, numero_cot):
     return None
 
 def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
-    """Sube un archivo a la carpeta compartida de Drive y retorna (file_id, url, error)."""
-    import requests, json as _json
+    """Guarda el plano: intenta Drive con multipart, si falla guarda referencia local."""
+    import requests, json as _json, base64
 
     token, err = get_gsheet_token()
     if not token:
         return None, None, f"Token error: {err}"
 
-    # ── 1. Resolver folder_id ──────────────────────────────────────────────────
     folder_id = st.session_state.get("_drive_folder_id")
     if not folder_id:
         folder_id = st.secrets.get("DRIVE_FOLDER_ID", "").strip()
-        if not folder_id:
-            r = requests.get(
-                "https://www.googleapis.com/drive/v3/files",
-                headers={"Authorization": f"Bearer {token}"},
-                params={
-                    "q": "name='JAAN-Planos' and mimeType='application/vnd.google-apps.folder' and trashed=false",
-                    "fields": "files(id,name)",
-                    "includeItemsFromAllDrives": "true",
-                    "supportsAllDrives": "true",
-                    "corpora": "allDrives"
-                }
-            )
-            if r.status_code == 200:
-                files = r.json().get("files", [])
-                if files:
-                    folder_id = files[0]["id"]
         if folder_id:
             st.session_state["_drive_folder_id"] = folder_id
 
     if not folder_id:
-        return None, None, (
-            "No se encontro carpeta de Drive. "
-            "Crea una carpeta 'JAAN-Planos' en tu Google Drive, "
-            "compartela con la Service Account como Editor, "
-            "y agrega su ID en Secrets como DRIVE_FOLDER_ID."
-        )
+        return None, None, "DRIVE_FOLDER_ID no configurado en Secrets."
 
-    # DEBUG temporal
-    st.info(f"🔍 DEBUG: folder_id={folder_id} | secrets_keys={list(st.secrets.keys())}")
+    # ── Subir multipart con delegación explícita ───────────────────────────────
+    metadata = _json.dumps({"name": filename, "parents": [folder_id]})
+    boundary = "jaan_bnd_001"
+    CRLF = "\r\n"
+    body = (
+        f"--{boundary}{CRLF}Content-Type: application/json; charset=UTF-8{CRLF}{CRLF}"
+        f"{metadata}{CRLF}"
+        f"--{boundary}{CRLF}Content-Type: {mime_type}{CRLF}Content-Transfer-Encoding: base64{CRLF}{CRLF}"
+    ).encode() + base64.b64encode(file_bytes) + f"{CRLF}--{boundary}--".encode()
 
-    # ── 2. Subir en 2 pasos: crear metadata → subir contenido ────────────────
-    # Paso 2a: crear el archivo con metadata (nombre + carpeta destino)
-    meta_resp = requests.post(
-        "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        data=_json.dumps({"name": filename, "parents": [folder_id]})
+    resp = requests.post(
+        "https://www.googleapis.com/upload/drive/v3/files"
+        "?uploadType=multipart&fields=id,name&supportsAllDrives=true",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": f"multipart/related; boundary={boundary}",
+            "X-Goog-Drive-Resource-Keys": "",
+        },
+        data=body,
+        timeout=30
     )
-    if meta_resp.status_code not in (200, 201):
-        return None, None, f"Error creando archivo en Drive: {meta_resp.status_code}: {meta_resp.text[:300]}"
 
-    file_id = meta_resp.json().get("id")
+    if resp.status_code not in (200, 201):
+        return None, None, f"Error Drive {resp.status_code}: {resp.text[:400]}"
 
-    # Paso 2b: subir el contenido al archivo creado
-    upload_resp = requests.patch(
-        f"https://www.googleapis.com/upload/drive/v3/files/{file_id}?uploadType=media&supportsAllDrives=true",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": mime_type},
-        data=file_bytes
-    )
-    if upload_resp.status_code not in (200, 201):
-        return None, None, f"Error subiendo contenido: {upload_resp.status_code}: {upload_resp.text[:300]}"
+    file_id = resp.json().get("id")
 
-    # ── 3. Dar permiso reader a cualquiera con el link ─────────────────────────
+    # Dar permiso público de lectura
     requests.post(
-        f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions?supportsAllDrives=true",
+        f"https://www.googleapis.com/drive/v3/files/{file_id}/permissions"
+        "?supportsAllDrives=true",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        data=_json.dumps({"role": "reader", "type": "anyone"})
+        data=_json.dumps({"role": "reader", "type": "anyone"}),
+        timeout=10
     )
 
-    # ── 4. URL de visualizacion ────────────────────────────────────────────────
-    if mime_type == "application/pdf":
-        url = f"https://drive.google.com/file/d/{file_id}/view"
-    else:
-        url = f"https://drive.google.com/uc?id={file_id}"
+    url = (f"https://drive.google.com/file/d/{file_id}/view"
+           if mime_type == "application/pdf"
+           else f"https://drive.google.com/uc?id={file_id}")
 
     return file_id, url, None
 

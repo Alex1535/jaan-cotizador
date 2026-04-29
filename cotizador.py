@@ -326,7 +326,7 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
 
     cloud_name = "dhzywtmp1"
     api_key    = "923179743215412"
-    api_secret = "9vt8nHg1FI307K61gtIwmqTEHgM"
+    api_secret = "9vt8nHg1Fl307K61gtlwmqTEHgM"
 
     resource_type = "raw" if mime_type == "application/pdf" else "image"
     timestamp     = str(int(time.time()))

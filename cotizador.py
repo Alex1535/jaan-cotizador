@@ -1695,13 +1695,20 @@ with tab1:
         # ── Plano / Análisis IA ──────────────────────────────────────────────
         with st.expander("▸  Plano de la pieza — Análisis IA", expanded=False):
             st.caption("Sube el plano en PDF o imagen y la IA analizará las operaciones, tiempos y tipo de máquina sugeridos")
+            # Si ya hay plano guardado en Cloudinary, mostrar opción de reemplazar
+            _tiene_plano = bool(pieza.get("plano_url") or pieza.get("plano_drive_id"))
+            if _tiene_plano:
+                _reemplazar = st.checkbox("🔄 Reemplazar plano actual", key=f"reemplazar_{pieza['id']}")
+            else:
+                _reemplazar = True
             plano_col1, plano_col2 = st.columns([1, 1])
             with plano_col1:
                 plano_file = st.file_uploader(
-                    "Subir plano (PDF o imagen)",
+                    "Subir plano (PDF o imagen)" if _reemplazar else "Plano ya guardado — activa 'Reemplazar' para cambiar",
                     type=["pdf", "png", "jpg", "jpeg"],
                     key=f"plano_{pieza['id']}",
-                    help="El plano se enviará a Claude para análisis"
+                    help="El plano se enviará a Claude para análisis",
+                    disabled=not _reemplazar
                 )
             with plano_col2:
                 notas_plano = st.text_area(
@@ -1718,7 +1725,7 @@ with tab1:
                 plano_file.seek(0)
                 is_img_type = plano_file.name.lower().endswith((".png",".jpg",".jpeg"))
                 # Subir a Google Drive si no tiene drive_id aún
-                if not st.session_state.piezas[pi].get("plano_drive_id"):
+                if not st.session_state.piezas[pi].get("plano_drive_id") or _reemplazar:
                     with st.spinner("☁️ Subiendo plano a Google Drive..."):
                         mime = "image/png" if is_img_type else "application/pdf"
                         file_id, plano_url, drive_err = subir_plano_drive(file_bytes_prev, plano_file.name, mime)

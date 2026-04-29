@@ -1800,15 +1800,8 @@ with tab1:
                     if es_img:
                         st.image(plano_url_saved, use_container_width=True, caption=nombre_plano)
                     else:
-                        sc1, sc2 = st.columns([1, 3])
-                        with sc1:
-                            st.markdown(f"📄 **{nombre_plano}**")
-                            st.link_button("🔗 Abrir PDF en Cloudinary", plano_url_saved, use_container_width=True)
-                        with sc2:
-                            viewer_url = f"https://docs.google.com/viewer?url={plano_url_saved}&embedded=true"
-                            st.markdown(
-                                f'<iframe src="{viewer_url}" width="100%" height="500px" '                                f'style="border:none;border-radius:8px"></iframe>',
-                                unsafe_allow_html=True)
+                        st.markdown(f"📄 **{nombre_plano}**")
+                    st.link_button("🔗 Abrir / Descargar PDF", plano_url_saved, use_container_width=False)
                 else:
                     plano_bytes_saved = None
                     if drive_id:

@@ -328,7 +328,7 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
     api_key    = "923179743215412"
     api_secret = "9vt8nHg1Fl307K61gtlwmqTEHgM"
 
-    resource_type = "image"  # Cloudinary puede manejar PDFs como image para acceso público
+    resource_type = "raw" if mime_type == "application/pdf" else "image"
     timestamp     = str(int(time.time()))
     folder        = "jaan-planos"
 
@@ -1801,7 +1801,15 @@ with tab1:
                         st.image(plano_url_saved, use_container_width=True, caption=nombre_plano)
                     else:
                         st.markdown(f"📄 **{nombre_plano}**")
-                    st.link_button("🔗 Abrir / Descargar PDF", plano_url_saved, use_container_width=False)
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.link_button("⬇️ Descargar PDF", plano_url_saved, use_container_width=True)
+                    with col_b:
+                        # URL de visualización en Cloudinary media viewer
+                        view_url = plano_url_saved.replace("/upload/fl_attachment/", "/upload/").replace("/upload/", "/upload/pg_1/").replace(".pdf", ".jpg")
+                        st.link_button("🔍 Ver en Cloudinary", 
+                            f"https://cloudinary.com/console/media_library/asset/image/upload/{plano_url_saved.split('/upload/')[-1]}",
+                            use_container_width=True)
                 else:
                     plano_bytes_saved = None
                     if drive_id:

@@ -2090,18 +2090,39 @@ with tab1:
                     )
                     st.session_state.piezas[pi]["materia_prima"]["costo_manual"] = costo_manual
                 with man2:
-                    st.caption("Dimensiones de la pieza (opcional, para referencia)")
-                    dim_man_cols = st.columns(3)
-                    dim_labels_man = ["Largo (pulg.)", "Ancho/Diám. (pulg.)", "Alto/Espesor (pulg.)"]
-                    dims_man = mp.get("dims_manual", [0.0, 0.0, 0.0])
+                    # Dimensiones según figura seleccionada (en pulgadas, referencia)
+                    IN_TO_MM_M = 25.4
+                    FIGURAS_DIMS_IN = {
+                        "Redondo (barra)":     ["Diám. (pulg.)", "Longitud (pulg.)"],
+                        "Hexagonal":           ["Dist. caras (pulg.)", "Longitud (pulg.)"],
+                        "Cuadrado (barra)":    ["Lado (pulg.)", "Longitud (pulg.)"],
+                        "Rectangular (barra)": ["Ancho (pulg.)", "Alto (pulg.)", "Longitud (pulg.)"],
+                        "Tubo redondo":        ["O.D. (pulg.)", "I.D. (pulg.)", "Longitud (pulg.)"],
+                        "Tubo cuadrado":       ["Lado ext. (pulg.)", "Espesor (pulg.)", "Longitud (pulg.)"],
+                        "PTR (tubo rect.)":    ["Ancho (pulg.)", "Alto (pulg.)", "Espesor (pulg.)", "Longitud (pulg.)"],
+                        "Solera":              ["Ancho (pulg.)", "Espesor (pulg.)", "Longitud (pulg.)"],
+                        "Ángulo (L)":          ["Lado (pulg.)", "Espesor (pulg.)", "Longitud (pulg.)"],
+                        "Placa / Lámina":      ["Ancho (pulg.)", "Largo (pulg.)", "Espesor (pulg.)"],
+                        "Tocho / Bloque":      ["Ancho (pulg.)", "Alto (pulg.)", "Largo (pulg.)"],
+                        "Canal (U / C)":       ["Ancho (pulg.)", "Alto (pulg.)", "Espesor (pulg.)", "Longitud (pulg.)"],
+                        "Otro / Manual":       ["Dim 1 (pulg.)", "Dim 2 (pulg.)", "Dim 3 (pulg.)"],
+                    }
+                    dim_labels_man = FIGURAS_DIMS_IN.get(figura, ["Dim 1 (pulg.)", "Dim 2 (pulg.)", "Dim 3 (pulg.)"])
+                    dims_man = mp.get("dims_manual", [0.0] * len(dim_labels_man))
+                    st.caption(f"Dimensiones — {figura} (referencia, en pulgadas)")
+                    dim_man_cols = st.columns(min(len(dim_labels_man), 4))
                     new_dims_man = []
                     for di2, (col2, lbl2) in enumerate(zip(dim_man_cols, dim_labels_man)):
                         with col2:
                             val2 = float(dims_man[di2]) if di2 < len(dims_man) else 0.0
                             v2 = st.number_input(lbl2, min_value=0.0, value=val2,
-                                step=0.5, format="%.2f",
+                                step=0.01, format="%.4f",
                                 key=f"dman_{pieza['id']}_{di2}")
                             new_dims_man.append(v2)
+                            if v2 > 0:
+                                st.caption(f"= {v2 * IN_TO_MM_M:.2f} mm")
+                    while len(new_dims_man) < 4:
+                        new_dims_man.append(0.0)
                     st.session_state.piezas[pi]["materia_prima"]["dims_manual"] = new_dims_man
 
             # ── Proveedor de materia prima + cotización adjunta ─────────

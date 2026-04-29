@@ -2847,12 +2847,24 @@ with tab1:
             r2.metric("Material/pza",     fmtc(res["costo_material"]))
             r3.metric("Tratamiento/pza",  fmtc(res["costo_trat"]))
             with r4:
-                log_label = f" + Log: {fmtc(res.get('costo_log_total',0))}" if res.get('costo_log_total',0) > 0 else ""
-                st.markdown(
-                    f"<div style='padding:4px 0'>"
-                    f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza{log_label}</div>"
-                    f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
-                    f"</div>", unsafe_allow_html=True)
+                _clt = res.get('costo_log_total', 0)
+                _precio_base = res['precio_pza'] - _clt
+                if _clt > 0:
+                    st.markdown(
+                        f"<div style='padding:4px 0'>"
+                        f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
+                        f"<div style='display:flex;align-items:baseline;gap:10px'>"
+                        f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
+                        f"<div style='font-size:12px;color:#6b7280;line-height:1.4'>"
+                        f"Prod: {fmtc(_precio_base)}<br>Log: +{fmtc(_clt)}</div>"
+                        f"</div>"
+                        f"</div>", unsafe_allow_html=True)
+                else:
+                    st.markdown(
+                        f"<div style='padding:4px 0'>"
+                        f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
+                        f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
+                        f"</div>", unsafe_allow_html=True)
             r5.metric(f"Total {cant} pzas", fmtc(res["total"]))
 
         st.markdown("</div>", unsafe_allow_html=True)

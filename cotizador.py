@@ -1815,7 +1815,7 @@ with tab1:
                     # ── Vista previa ───────────────────────────────────────────
                     if es_img:
                         # Imagen directa desde Cloudinary
-                        if st.toggle("🔍 Vista previa del plano", key=f"preview_toggle_{pieza['id']}", value=True):
+                        if st.toggle("🔍 Vista previa del plano", key=f"preview_toggle_{pieza['id']}", value=False):
                             st.image(plano_url_saved, use_container_width=True, caption=nombre_plano)
                     elif "cloudinary.com" in plano_url_saved and "/raw/upload/" in plano_url_saved:
                         # PDF → convertir a imagen via Cloudinary
@@ -1823,7 +1823,7 @@ with tab1:
                         base_noext = base.rsplit(".", 1)[0]
                         preview_url_p1 = base_noext + ".jpg"
                         preview_url_p2 = base.replace("/image/upload/", "/image/upload/pg_2/").rsplit(".", 1)[0] + ".jpg"
-                        if st.toggle("🔍 Vista previa del plano", key=f"preview_toggle_{pieza['id']}", value=True):
+                        if st.toggle("🔍 Vista previa del plano", key=f"preview_toggle_{pieza['id']}", value=False):
                             st.image(preview_url_p1, use_container_width=True, caption=f"Página 1 — {nombre_plano}")
                             st.image(preview_url_p2, use_container_width=True, caption="Página 2 (si existe)")
                 else:

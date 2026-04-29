@@ -78,17 +78,17 @@ def login_screen():
         margin-bottom: 28px;
     }}
 
-    /* ── Card blanca ── */
+    /* ── Card blanca unificada — header + form juntos ── */
     .jaan-card {{
         background: white;
         border-radius: 18px;
-        padding: 32px 32px 28px;
+        padding: 30px 32px 0px;
         box-shadow: 0 24px 64px rgba(0,0,0,0.4);
-        margin-bottom: 20px;
+        margin-bottom: 0;
     }}
     .jaan-card-header {{
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 16px;
     }}
     .jaan-card-header h2 {{
         color: #0f1b3d;
@@ -104,7 +104,17 @@ def login_screen():
     .jaan-sep {{
         border: none;
         border-top: 1px solid #e5e7eb;
-        margin: 0 0 20px;
+        margin: 0 -32px 0px;
+    }}
+
+    /* ── El stForm se pega visualmente a la card ── */
+    [data-testid="stForm"] {{
+        background: white !important;
+        border-radius: 0 0 18px 18px !important;
+        padding: 20px 32px 28px !important;
+        border: none !important;
+        box-shadow: 0 24px 64px rgba(0,0,0,0.4) !important;
+        margin-top: -2px !important;
     }}
 
     /* ── Labels e inputs visibles ── */
@@ -141,11 +151,10 @@ def login_screen():
     }}
     .stFormSubmitButton > button:hover {{
         background: #162447 !important;
-        transform: translateY(-1px);
     }}
 
     /* ── Mensajes de error ── */
-    .stAlert {{ border-radius: 9px !important; }}
+    .stAlert {{ border-radius: 9px !important; margin-top: 8px !important; }}
 
     /* ── Footer ── */
     .jaan-footer {{
@@ -153,6 +162,7 @@ def login_screen():
         color: rgba(255,255,255,0.25);
         font-size: 11px;
         letter-spacing: 0.5px;
+        margin-top: 18px;
     }}
     </style>
 
@@ -169,7 +179,7 @@ def login_screen():
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Form de Streamlit centrado en la misma columna ──
+    # ── Form de Streamlit — visualmente pegado a la card ──
     with st.form("login_form"):
         email    = st.text_input("Correo electrónico", placeholder="usuario@jaan.com")
         password = st.text_input("Contraseña", type="password")

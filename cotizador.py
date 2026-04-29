@@ -36,163 +36,158 @@ LOGO_B64 = "iVBORw0KGgoAAAANSUhEUgAAANYAAABGCAYAAACwhWptAABH7UlEQVR4nO29eZgVxdU/
 def login_screen():
     st.markdown(f"""
     <style>
-    /* ── Fondo completo navy con patrón sutil ── */
-    [data-testid="stAppViewContainer"] {{
-        background: linear-gradient(145deg, #0a1628 0%, #0f1b3d 50%, #162447 100%) !important;
-        min-height: 100vh;
+    /* ── Fondo navy completo ── */
+    [data-testid="stAppViewContainer"],
+    [data-testid="stAppViewContainer"] > .main,
+    [data-testid="stAppViewContainer"] > .main > div {{
+        background: linear-gradient(145deg, #0a1628 0%, #0f1b3d 55%, #162447 100%) !important;
     }}
-    [data-testid="stAppViewContainer"] > .main {{
-        background: transparent !important;
-        padding-top: 0 !important;
-    }}
-    [data-testid="stHeader"] {{ background: transparent !important; border-bottom: none !important; }}
-    [data-testid="stToolbar"] {{ display: none; }}
-    .block-container {{ padding-top: 0 !important; max-width: 100% !important; }}
+    [data-testid="stHeader"] {{ background: transparent !important; border: none !important; }}
+    [data-testid="stToolbar"] {{ display: none !important; }}
+    footer {{ display: none !important; }}
 
-    /* ── Wrapper centrado ── */
-    .login-wrapper {{
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        padding: 20px;
-        box-sizing: border-box;
+    /* ── Centrar todo el contenido ── */
+    .block-container {{
+        max-width: 460px !important;
+        margin: 0 auto !important;
+        padding-top: 60px !important;
+        padding-bottom: 40px !important;
     }}
 
-    /* ── Logo hero encima de la card ── */
-    .login-logo-hero {{
+    /* ── Logo con fondo blanco redondeado ── */
+    .jaan-logo-box {{
+        background: white;
+        border-radius: 16px;
+        padding: 18px 32px;
         text-align: center;
-        margin-bottom: 24px;
+        margin-bottom: 10px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     }}
-    .login-logo-hero img {{
-        height: 90px;
+    .jaan-logo-box img {{
+        height: 72px;
         width: auto;
-        filter: drop-shadow(0 4px 16px rgba(0,0,0,0.5));
+        display: block;
+        margin: 0 auto;
     }}
-    .login-logo-hero .brand-name {{
-        color: rgba(255,255,255,0.85);
-        font-size: 13px;
-        letter-spacing: 3px;
+    .jaan-subtitle {{
+        color: rgba(255,255,255,0.55);
+        font-size: 11px;
+        letter-spacing: 4px;
         text-transform: uppercase;
-        margin-top: 10px;
-        font-weight: 400;
-    }}
-
-    /* ── Card ── */
-    .login-card {{
-        width: 100%;
-        max-width: 400px;
-        background: rgba(255,255,255,0.97);
-        border-radius: 20px;
-        padding: 40px 36px 36px;
-        box-shadow: 0 32px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.08);
-    }}
-    .login-card-title {{
         text-align: center;
         margin-bottom: 28px;
     }}
-    .login-card-title h2 {{
+
+    /* ── Card blanca ── */
+    .jaan-card {{
+        background: white;
+        border-radius: 18px;
+        padding: 32px 32px 28px;
+        box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+        margin-bottom: 20px;
+    }}
+    .jaan-card-header {{
+        text-align: center;
+        margin-bottom: 20px;
+    }}
+    .jaan-card-header h2 {{
         color: #0f1b3d;
-        font-size: 22px;
+        font-size: 21px;
         font-weight: 700;
         margin: 0 0 4px;
     }}
-    .login-card-title p {{
-        color: #6b7280;
-        font-size: 13px;
+    .jaan-card-header p {{
+        color: #9ca3af;
+        font-size: 12.5px;
         margin: 0;
     }}
-    .login-divider {{
+    .jaan-sep {{
         border: none;
         border-top: 1px solid #e5e7eb;
-        margin: 0 0 24px;
+        margin: 0 0 20px;
     }}
 
-    /* ── Inputs de Streamlit dentro del form ── */
+    /* ── Labels e inputs visibles ── */
     .stTextInput > label {{
-        color: #374151 !important;
+        color: #1f2937 !important;
         font-size: 13px !important;
         font-weight: 600 !important;
-        letter-spacing: 0.3px;
     }}
     .stTextInput > div > div > input {{
+        background: #f9fafb !important;
         border: 1.5px solid #d1d5db !important;
-        border-radius: 10px !important;
-        padding: 10px 14px !important;
+        border-radius: 9px !important;
+        color: #111827 !important;
         font-size: 14px !important;
-        transition: border-color .2s;
     }}
     .stTextInput > div > div > input:focus {{
         border-color: #0f1b3d !important;
-        box-shadow: 0 0 0 3px rgba(15,27,61,0.12) !important;
+        box-shadow: 0 0 0 3px rgba(15,27,61,0.1) !important;
+        background: white !important;
     }}
 
-    /* ── Botón Entrar ── */
+    /* ── Botón navy ── */
     .stFormSubmitButton > button {{
-        background: linear-gradient(135deg, #0f1b3d 0%, #1a3a6b 100%) !important;
+        background: #0f1b3d !important;
         color: white !important;
         border: none !important;
-        border-radius: 10px !important;
-        padding: 12px !important;
+        border-radius: 9px !important;
         font-size: 15px !important;
         font-weight: 600 !important;
-        letter-spacing: 0.5px;
-        width: 100%;
-        margin-top: 8px;
-        transition: opacity .2s, transform .1s;
-        cursor: pointer;
+        padding: 11px 0 !important;
+        width: 100% !important;
+        margin-top: 6px !important;
+        letter-spacing: 0.4px;
     }}
     .stFormSubmitButton > button:hover {{
-        opacity: 0.9 !important;
+        background: #162447 !important;
         transform: translateY(-1px);
     }}
 
+    /* ── Mensajes de error ── */
+    .stAlert {{ border-radius: 9px !important; }}
+
     /* ── Footer ── */
-    .login-footer {{
+    .jaan-footer {{
         text-align: center;
-        margin-top: 20px;
-        color: rgba(255,255,255,0.35);
+        color: rgba(255,255,255,0.25);
         font-size: 11px;
         letter-spacing: 0.5px;
     }}
     </style>
 
-    <div class="login-wrapper">
-        <div class="login-logo-hero">
-            <img src="data:image/png;base64,{LOGO_B64}" alt="JAAN Logo">
-            <div class="brand-name">Manufacturing</div>
-        </div>
-        <div class="login-card">
-            <div class="login-card-title">
-                <h2>Bienvenido</h2>
-                <p>Cotizador Profesional · Ingresa tus credenciales</p>
-            </div>
-            <hr class="login-divider">
+    <div class="jaan-logo-box">
+        <img src="data:image/png;base64,{LOGO_B64}" alt="JAAN Manufacturing">
     </div>
-    <div class="login-footer">© 2025 JAAN Manufacturing · Uso interno</div>
+    <div class="jaan-subtitle">Manufacturing · Cotizador Profesional</div>
+    <div class="jaan-card">
+        <div class="jaan-card-header">
+            <h2>Bienvenido</h2>
+            <p>Ingresa tus credenciales para continuar</p>
+        </div>
+        <hr class="jaan-sep">
     </div>
     """, unsafe_allow_html=True)
 
-    # Form de Streamlit superpuesto sobre la card (limitado por col centrada)
-    col_l, col_c, col_r = st.columns([1, 1.6, 1])
-    with col_c:
-        with st.form("login_form"):
-            email    = st.text_input("Correo electrónico", placeholder="usuario@jaan.com")
-            password = st.text_input("Contraseña", type="password")
-            submit   = st.form_submit_button("→  Entrar", use_container_width=True)
-            if submit:
-                if not email or not password:
-                    st.error("Ingresa tu correo y contraseña")
-                    return
-                usuarios  = cargar_usuarios()
-                email_key = email.strip().lower()
-                if email_key in usuarios and usuarios[email_key]["password"] == password:
-                    st.session_state.usuario     = {"email": email_key, "nombre": usuarios[email_key]["nombre"], "rol": usuarios[email_key]["rol"], "smtp_password": usuarios[email_key].get("smtp_password","")}
-                    st.session_state.autenticado = True
-                    st.rerun()
-                else:
-                    st.error("❌ Credenciales incorrectas")
+    # ── Form de Streamlit centrado en la misma columna ──
+    with st.form("login_form"):
+        email    = st.text_input("Correo electrónico", placeholder="usuario@jaan.com")
+        password = st.text_input("Contraseña", type="password")
+        submit   = st.form_submit_button("Entrar →", use_container_width=True)
+        if submit:
+            if not email or not password:
+                st.error("Ingresa tu correo y contraseña")
+                return
+            usuarios  = cargar_usuarios()
+            email_key = email.strip().lower()
+            if email_key in usuarios and usuarios[email_key]["password"] == password:
+                st.session_state.usuario     = {"email": email_key, "nombre": usuarios[email_key]["nombre"], "rol": usuarios[email_key]["rol"], "smtp_password": usuarios[email_key].get("smtp_password","")}
+                st.session_state.autenticado = True
+                st.rerun()
+            else:
+                st.error("❌ Credenciales incorrectas")
+
+    st.markdown('<div class="jaan-footer">© 2025 JAAN Manufacturing · Uso interno</div>', unsafe_allow_html=True)
 
 
 if not st.session_state.get("autenticado", False):

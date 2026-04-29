@@ -533,6 +533,7 @@ def nueva_materia_prima():
             "proveedor": "",
             "cotizacion_mp_nombre": "",
             "cotizacion_mp_b64": "",
+            "dims_manual": [0.0, 0.0, 0.0],
             # Campos para cálculo por tramo (todo en pulgadas)
             "largo_tramo":   31.5,    # pulgadas
             "largo_pieza":    1.575,  # pulgadas
@@ -1901,10 +1902,24 @@ with tab1:
                     format_func=lambda x: f"{FIGURAS[x]['icono']} {x}")
                 st.session_state.piezas[pi]["materia_prima"]["figura"] = figura
             with mpb:
-                material = st.selectbox("Material", list(MATERIALES_DENSIDAD.keys()),
-                    index=list(MATERIALES_DENSIDAD.keys()).index(mp["material"])
-                          if mp["material"] in MATERIALES_DENSIDAD else 0,
+                # Si el material guardado no está en la lista, mostrar "Otro" seleccionado
+                mat_lista = list(MATERIALES_DENSIDAD.keys())
+                mat_saved = mp.get("material", "Inox 303")
+                mat_idx = mat_lista.index(mat_saved) if mat_saved in mat_lista else mat_lista.index("Otro")
+                material_sel = st.selectbox("Material", mat_lista,
+                    index=mat_idx,
                     key=f"mpmat_{pieza['id']}")
+                if material_sel == "Otro":
+                    mat_custom_key = f"mpmat_custom_{pieza['id']}"
+                    mat_custom_default = mat_saved if mat_saved not in mat_lista or mat_saved == "Otro" else ""
+                    if mat_custom_key not in st.session_state:
+                        st.session_state[mat_custom_key] = mat_custom_default
+                    material_custom = st.text_input("Nombre del material",
+                        key=mat_custom_key,
+                        placeholder="Ej: Inconel 718, Titanio CP, PVC...")
+                    material = material_custom if material_custom.strip() else "Otro"
+                else:
+                    material = material_sel
                 st.session_state.piezas[pi]["materia_prima"]["material"] = material
             with mpc:
                 modos = ["Por kg", "Por tramo", "Manual"]
@@ -2062,16 +2077,32 @@ with tab1:
                     f"<span style='font-size:18px;font-weight:700;color:#185FA5'>Costo material/pza: {fmtc(costo_pza_t)}</span></div>",
                     unsafe_allow_html=True)
             else:
-                # Modo Manual
-                costo_manual = st.number_input(
-                    "Costo de materia prima por pieza ($MXN)",
-                    min_value=0.0,
-                    value=float(mp["costo_manual"]),
-                    step=10.0,
-                    key=f"cman_{pieza['id']}",
-                    help="Ingresa el precio de la materia prima por pieza ya cortada"
-                )
-                st.session_state.piezas[pi]["materia_prima"]["costo_manual"] = costo_manual
+                # Modo Manual — costo + dimensiones opcionales
+                man1, man2 = st.columns([1, 2])
+                with man1:
+                    costo_manual = st.number_input(
+                        "Costo de materia prima por pieza ($MXN)",
+                        min_value=0.0,
+                        value=float(mp["costo_manual"]),
+                        step=10.0,
+                        key=f"cman_{pieza['id']}",
+                        help="Ingresa el precio de la materia prima por pieza ya cortada"
+                    )
+                    st.session_state.piezas[pi]["materia_prima"]["costo_manual"] = costo_manual
+                with man2:
+                    st.caption("Dimensiones de la pieza (opcional, para referencia)")
+                    dim_man_cols = st.columns(3)
+                    dim_labels_man = ["Largo (pulg.)", "Ancho/Diám. (pulg.)", "Alto/Espesor (pulg.)"]
+                    dims_man = mp.get("dims_manual", [0.0, 0.0, 0.0])
+                    new_dims_man = []
+                    for di2, (col2, lbl2) in enumerate(zip(dim_man_cols, dim_labels_man)):
+                        with col2:
+                            val2 = float(dims_man[di2]) if di2 < len(dims_man) else 0.0
+                            v2 = st.number_input(lbl2, min_value=0.0, value=val2,
+                                step=0.5, format="%.2f",
+                                key=f"dman_{pieza['id']}_{di2}")
+                            new_dims_man.append(v2)
+                    st.session_state.piezas[pi]["materia_prima"]["dims_manual"] = new_dims_man
 
             # ── Proveedor de materia prima + cotización adjunta ─────────
             st.markdown("---")

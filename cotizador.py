@@ -2555,30 +2555,6 @@ with tab1:
                             help="Cajas, tarimas, VCI bags, protección especial")
                         st.session_state.piezas[pi]["logistica"]["embalaje"] = embalaje
 
-                # ── Margen de utilidad sobre logística ────────────────────
-                st.markdown("---")
-                ml1, ml2 = st.columns([1, 2])
-                with ml1:
-                    margen_log = st.number_input("Utilidad sobre logística (%)",
-                        min_value=0, max_value=100,
-                        value=int(pieza.get("margen_log", 0)),
-                        key=f"margen_log_{pieza['id']}",
-                        help="Margen de utilidad que se aplica sobre el costo de logística")
-                    st.session_state.piezas[pi]["margen_log"] = margen_log
-                with ml2:
-                    _res_log = calcular_pieza(pieza, margen_global)
-                    _cl = _res_log.get("costo_log", 0)
-                    _ul = _res_log.get("util_log", 0)
-                    _cl_total = _res_log.get("costo_log_total", 0)
-                    if _cl > 0:
-                        st.markdown(
-                            f"<div style='background:#f0f4e8;border-left:3px solid #5a9e2f;"
-                            f"border-radius:6px;padding:10px 14px;font-size:13px'>"
-                            f"Costo log. neto: <b>{fmtc(_cl)}</b> &nbsp;·&nbsp; "
-                            f"Utilidad log.: <b>{fmtc(_ul)}</b> &nbsp;·&nbsp; "
-                            f"<span style='font-size:15px'>Logística c/margen: <b>{fmtc(_cl_total)}</b></span>"
-                            f"</div>", unsafe_allow_html=True)
-
                 # ── Comentarios ────────────────────────────────────────────
                 coment_log = st.text_area("Comentarios de logística",
                     value=log.get("comentarios_log", ""),
@@ -2614,26 +2590,34 @@ with tab1:
                     disabled=True,
                     help="Se usa el margen global del sidebar")
         else:
-            mg1, mg2, mg3 = st.columns(3)
+            mg1, mg2, mg3, mg4 = st.columns(4)
             with mg1:
-                m_mo = st.number_input("💰 Utilidad mano de obra (%)",
+                m_mo = st.number_input("⚙ Utilidad mano de obra (%)",
                     min_value=0, max_value=200,
                     value=int(pieza.get("margen_mo", 35)),
                     key=f"mmo_{pieza['id']}")
                 st.session_state.piezas[pi]["margen_mo"] = m_mo
             with mg2:
-                m_mat = st.number_input("🧱 Utilidad material (%)",
+                m_mat = st.number_input("◈ Utilidad material (%)",
                     min_value=0, max_value=200,
                     value=int(pieza.get("margen_mat", 35)),
                     key=f"mmat_{pieza['id']}")
                 st.session_state.piezas[pi]["margen_mat"] = m_mat
             with mg3:
-                m_trat = st.number_input("🔬 Utilidad tratamiento (%)",
+                m_trat = st.number_input("◎ Utilidad tratamiento (%)",
                     min_value=0, max_value=200,
                     value=int(pieza.get("margen_trat", 35)),
                     key=f"mtrat_{pieza['id']}",
                     disabled=(trat == "Ninguno"))
                 st.session_state.piezas[pi]["margen_trat"] = m_trat
+            with mg4:
+                aplica_log = pieza.get("logistica", {}).get("aplica", False)
+                m_log = st.number_input("⇢ Utilidad logística (%)",
+                    min_value=0, max_value=200,
+                    value=int(pieza.get("margen_log", 0)),
+                    key=f"margen_log_{pieza['id']}",
+                    disabled=not aplica_log)
+                st.session_state.piezas[pi]["margen_log"] = m_log
 
         # Semáforo de viabilidad
         if demanda > 0:

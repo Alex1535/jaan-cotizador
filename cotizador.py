@@ -3161,11 +3161,14 @@ with tab2:
     usuario_actual   = st.session_state.get("usuario", {})
     smtp_user_actual = usuario_actual.get("email", "")
     nombre_user      = usuario_actual.get("nombre", "JAAN Manufacturing")
-    smtp_pass_actual = st.secrets.get(f"SMTP_{smtp_user_actual}", "")
+    # Normalizar email a clave TOML válida: a.islas@jaan.com → SMTP_a_islas_jaan
+    smtp_key = "SMTP_" + smtp_user_actual.replace(".", "_").replace("@", "_").replace("-", "_")
+    # Intentar clave normalizada primero, luego clave literal por compatibilidad
+    smtp_pass_actual = st.secrets.get(smtp_key, "") or st.secrets.get(f"SMTP_{smtp_user_actual}", "")
 
     if not smtp_pass_actual:
         st.warning("No se encontró contraseña SMTP para " + smtp_user_actual +
-                   ". Verifica que en Secrets exista: SMTP_" + smtp_user_actual)
+                   f". Agrega en Secrets: {smtp_key} = \"tu_contraseña\"")
     else:
         st.success("SMTP configurado para " + smtp_user_actual)
 

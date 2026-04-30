@@ -111,10 +111,11 @@ def login_screen():
     [data-testid="stForm"] {{
         background: white !important;
         border-radius: 0 0 18px 18px !important;
-        padding: 20px 32px 28px !important;
+        padding: 24px 32px 28px !important;
         border: none !important;
         box-shadow: 0 24px 64px rgba(0,0,0,0.4) !important;
         margin-top: -24px !important;
+        border-top: 1px solid #e5e7eb !important;
     }}
     /* Eliminar gaps de Streamlit entre elementos */
     .block-container > div > div > div {{
@@ -127,6 +128,7 @@ def login_screen():
     /* Forzar pegado del form */
     div[data-testid="stVerticalBlock"] > div:has([data-testid="stForm"]) {{
         margin-top: -24px !important;
+        background: transparent !important;
     }}
 
     /* ── Labels e inputs visibles ── */

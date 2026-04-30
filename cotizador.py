@@ -116,6 +116,7 @@ def login_screen():
         box-shadow: 0 24px 64px rgba(0,0,0,0.4) !important;
         margin-top: -24px !important;
         border-top: 1px solid #e5e7eb !important;
+        padding-top: 20px !important;
     }}
     /* Eliminar gaps de Streamlit entre elementos */
     .block-container > div > div > div {{
@@ -190,7 +191,6 @@ def login_screen():
             <h2>Bienvenido</h2>
             <p>Ingresa tus credenciales para continuar</p>
         </div>
-        <hr class="jaan-sep">
     </div>
     """, unsafe_allow_html=True)
 

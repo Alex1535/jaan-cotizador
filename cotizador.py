@@ -114,12 +114,19 @@ def login_screen():
         padding: 20px 32px 28px !important;
         border: none !important;
         box-shadow: 0 24px 64px rgba(0,0,0,0.4) !important;
-        margin-top: 0 !important;
+        margin-top: -8px !important;
     }}
     /* Eliminar el gap que Streamlit mete entre elementos */
     .block-container > div > div > div:has(.jaan-card) + div {{
-        margin-top: 0 !important;
+        margin-top: -8px !important;
         padding-top: 0 !important;
+    }}
+    /* Gap entre elementos del block-container */
+    .block-container > div > div > div {{
+        gap: 0 !important;
+    }}
+    [data-testid="stVerticalBlock"] > div {{
+        gap: 0 !important;
     }}
 
     /* ── Labels e inputs visibles ── */

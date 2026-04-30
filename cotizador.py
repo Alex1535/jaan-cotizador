@@ -82,7 +82,7 @@ def login_screen():
     .jaan-card {{
         background: white;
         border-radius: 18px 18px 0 0;
-        padding: 30px 32px 0px;
+        padding: 30px 32px 16px;
         box-shadow: 0 24px 64px rgba(0,0,0,0.4);
         margin-bottom: 0;
     }}
@@ -128,7 +128,8 @@ def login_screen():
     /* Forzar pegado del form */
     div[data-testid="stVerticalBlock"] > div:has([data-testid="stForm"]) {{
         margin-top: -24px !important;
-        background: transparent !important;
+        background: white !important;
+        border-radius: 0 0 18px 18px !important;
     }}
 
     /* ── Labels e inputs visibles ── */

@@ -1183,7 +1183,7 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
 
     story = []
 
-    # ── Header: Logo JAAN (izq) + BV logo rojo (der) + datos cotización ────
+    # ── Header: navy con logo JAAN + BV + cotización ────────────────────────
     def b64_to_rl_image(b64str, height):
         img_data = _b64.b64decode(b64str)
         from PIL import Image as PILImage
@@ -1193,33 +1193,32 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
         return RLImage(_io.BytesIO(img_data), width=height*aspect, height=height)
 
     try:
-        jaan_img = b64_to_rl_image(LOGO_B64, 0.6*inch)
+        jaan_img = b64_to_rl_image(LOGO_B64, 0.55*inch)
     except Exception:
-        jaan_img = Paragraph("JAAN Manufacturing", ps("hfb",12,NAVY,True))
+        jaan_img = Paragraph("JAAN Manufacturing", ps("hfb",14,WHITE,True))
 
     try:
-        bv_img = b64_to_rl_image(BV_LOGO_B64, 0.55*inch)
+        bv_img = b64_to_rl_image(BV_LOGO_B64, 0.45*inch)
     except Exception:
-        bv_img = Paragraph("ISO 9001:2015", ps("hfbv",8,BLACK))
+        bv_img = Paragraph("ISO 9001:2015", ps("hfbv",8,WHITE))
 
     hdr = Table([[
         jaan_img,
-        Paragraph(
-            f"<b>Cotización: {num_cot}</b><br/>{datetime.now().strftime('%d/%m/%Y')}",
-            ps("hr",11,NAVY,True,TA_CENTER)),
-        bv_img,
-    ]], colWidths=[2.8*inch, 2.0*inch, 2.2*inch])
+        Paragraph("", ps("hsp",9,WHITE)),
+        Table([[
+            bv_img,
+            Paragraph(
+                f"<b>Cotización: {num_cot}</b><br/>{datetime.now().strftime('%d/%m/%Y')}",
+                ps("hdt",9,WHITE,True,TA_RIGHT))
+        ]], colWidths=[1.1*inch, 1.4*inch])
+    ]], colWidths=[2.0*inch, 2.5*inch, 2.5*inch])
+
     hdr.setStyle(TableStyle([
-        ("BACKGROUND",(0,0),(-1,-1),WHITE),
+        ("BACKGROUND",(0,0),(-1,-1),NAVY),
         ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-        ("ALIGN",(0,0),(0,-1),"LEFT"),
-        ("ALIGN",(2,0),(2,-1),"RIGHT"),
-        ("TOPPADDING",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,-1),10),
-        ("LEFTPADDING",(0,0),(0,-1),12),("RIGHTPADDING",(2,0),(2,-1),12),
-        ("LINEBELOW",(0,0),(-1,-1),2.5,NAVY),
-        ("LINEABOVE",(0,0),(-1,0),2.5,NAVY),
-        ("LINEBEFORE",(0,0),(0,-1),2.5,NAVY),
-        ("LINEAFTER",(2,0),(2,-1),2.5,NAVY),
+        ("TOPPADDING",(0,0),(-1,-1),12),("BOTTOMPADDING",(0,0),(-1,-1),12),
+        ("LEFTPADDING",(0,0),(0,-1),14),("RIGHTPADDING",(-1,0),(-1,-1),14),
+        ("LINEBELOW",(0,0),(-1,-1),3,BLUE),
     ]))
 
     story.append(hdr)

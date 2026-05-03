@@ -767,6 +767,9 @@ def _ensure_logistica(pieza):
         for k, v in default.items():
             if k not in pieza["logistica"]:
                 pieza["logistica"][k] = v
+    # Garantizar custom_tooling existe
+    if "custom_tooling" not in pieza or not isinstance(pieza["custom_tooling"], list):
+        pieza["custom_tooling"] = []
     return pieza
 
 

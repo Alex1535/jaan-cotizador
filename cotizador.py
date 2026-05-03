@@ -760,11 +760,11 @@ def _emb_default():
             "peso_bruto_kg":0.0,"pzas_por_bulto":1,"notas_embalaje":""}
 
 TRAMOS_PRE_DEFAULT = [
-    {"id":"mp_frontera",    "label":"MP → Frontera USA",               "aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
-    {"id":"aduana",         "label":"Aduana / Importación",            "aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
-    {"id":"frontera_planta","label":"Frontera → Planta JAAN",          "aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
-    {"id":"planta_trat",    "label":"Planta → Tratamiento (ida+vuelta)","aplica":False,"origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
-    {"id":"planta_cliente", "label":"Planta → Cliente final",          "aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
+    {"id":"mp_frontera",    "label":"MP → Frontera USA",               "label_custom":"", "aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
+    {"id":"aduana",         "label":"Aduana / Importación",            "label_custom":"", "aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
+    {"id":"frontera_planta","label":"Frontera → Planta JAAN",          "label_custom":"", "aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
+    {"id":"planta_trat",    "label":"Planta → Tratamiento (ida+vuelta)","label_custom":"","aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
+    {"id":"planta_cliente", "label":"Planta → Cliente final",          "label_custom":"", "aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
 ]
 
 def _init_tramos_pre():
@@ -792,12 +792,13 @@ def _ensure_logistica(pieza):
             log["tramos_pre"] = _init_tramos_pre()
             log["tramos_extra"] = log.pop("tramos", [])
         else:
-            # Asegurar que cada tramo tenga embalaje
+            # Asegurar que cada tramo tenga todos los campos
             for t in log["tramos_pre"]:
                 if "embalaje" not in t or not isinstance(t.get("embalaje"), dict):
                     t["embalaje"] = _emb_default()
                 if "origen" not in t: t["origen"] = ""
                 if "destino" not in t: t["destino"] = ""
+                if "label_custom" not in t: t["label_custom"] = ""
         if "tramos_extra" not in log:
             log["tramos_extra"] = []
         if "destino_final" not in log:
@@ -1488,7 +1489,7 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                             else float(t.get("costo",0)) * p.get("cantidad",1)
                         )
                         tr_rows.append([
-                            Paragraph(t["label"],ps(f"trv0{i}{tridx}",8)),
+                            Paragraph(t.get("label_custom","").strip() or t["label"],ps(f"trv0{i}{tridx}",8)),
                             Paragraph(t.get("origen","—"),ps(f"trv1{i}{tridx}",8,GRAY)),
                             Paragraph(t.get("destino","—"),ps(f"trv2{i}{tridx}",8,GRAY)),
                             Paragraph(fmtc(tr_costo_orden),ps(f"trv3{i}{tridx}",8,align=TA_RIGHT)),
@@ -3024,16 +3025,17 @@ with tab1:
                     emb       = tr.get("embalaje") or _emb_default()
                     tr_aplica = tr.get("aplica", False)
 
-                    # Resumen inline para el encabezado del expander
+                    # Nombre visible: custom si existe, si no el default
+                    nombre_tr  = tr.get("label_custom","").strip() or tr["label"]
                     resumen_tr = ""
                     if tr_aplica:
                         partes = []
-                        if tr.get("origen"): partes.append(tr["origen"])
+                        if tr.get("origen"):  partes.append(tr["origen"])
                         if tr.get("destino"): partes.append(tr["destino"])
                         if tr.get("costo",0) > 0: partes.append(f"${tr['costo']:,.0f}")
                         if partes: resumen_tr = "  —  " + "  ·  ".join(partes)
 
-                    # Checkbox fuera del expander para activar/desactivar
+                    # Checkbox fuera del expander
                     chk_col, lbl_col = st.columns([0.25, 5.5])
                     with chk_col:
                         new_aplica = st.checkbox("", value=tr_aplica,
@@ -3041,8 +3043,17 @@ with tab1:
                         tramos_pre[ti]["aplica"] = new_aplica
                         tr_aplica = new_aplica
                     with lbl_col:
-                        label_exp = f"**{tr['label']}**{resumen_tr}"
+                        label_exp = f"**{nombre_tr}**{resumen_tr}"
                         with st.expander(label_exp, expanded=tr_aplica):
+                            # Nombre del tramo editable
+                            st.caption("Nombre del tramo")
+                            lc = st.text_input("Nombre del tramo",
+                                value=tr.get("label_custom",""),
+                                key=f"lplc_{pieza['id']}_{tr_key}",
+                                placeholder=f"Predeterminado: {tr['label']}",
+                                label_visibility="collapsed")
+                            tramos_pre[ti]["label_custom"] = lc
+
                             # Fila 1: Ruta y costo
                             st.caption("Ruta y costo")
                             r1, r2, r3, r4 = st.columns([1.4, 1.4, 1.1, 1.1])

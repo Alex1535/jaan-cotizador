@@ -1260,44 +1260,44 @@ def enviar_cotizacion_email(pdf_bytes, email_destino, num_cot, cliente,
                             total_neto, moneda_cot,
                             asunto=None, cuerpo=None,
                             smtp_user=None, smtp_pass=None, from_name=None):
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    from email.mime.application import MIMEApplication
+    import requests as _req, base64 as _b64, json as _json
 
-    smtp_server = st.secrets.get("SMTP_SERVER", "smtp.office365.com")
-    smtp_port   = int(st.secrets.get("SMTP_PORT", 587))
-    _from_name  = from_name or st.secrets.get("SMTP_FROM_NAME", "JAAN Manufacturing")
-    _user       = smtp_user or st.secrets.get("SMTP_USER", "")
-    _pass       = smtp_pass or st.secrets.get("SMTP_PASSWORD", "")
-    _asunto     = asunto or f"Cotización {num_cot} — JAAN Manufacturing"
-    _cuerpo     = (cuerpo or "").strip() or (
+    SENDGRID_KEY = st.secrets.get("SENDGRID_API_KEY", "")
+    _from_name   = from_name or st.secrets.get("SMTP_FROM_NAME", "JAAN Manufacturing")
+    _user        = smtp_user or "a.islas@jaanmanufacturing.com"
+    _asunto      = asunto or f"Cotización {num_cot} — JAAN Manufacturing"
+    _cuerpo_txt  = (cuerpo or "").strip() or (
         f"Estimado/a {cliente},\n\n"
-        f"Adjunto la cotización {num_cot} por {fmtc(total_neto)} {moneda_cot}.\n\n"
-        f"Quedamos a sus órdenes para cualquier aclaración.\n\n"
+        f"Nos complace hacerle llegar la cotización {num_cot} correspondiente a su solicitud.\n"
+        f"Adjunto encontrará el detalle completo con un total de {fmtc(total_neto)} {moneda_cot}.\n\n"
+        f"Quedamos a sus órdenes para cualquier aclaración o ajuste que requiera.\n\n"
         f"Atentamente,\n{_from_name}"
     )
 
-    if not _user or not _pass:
-        return False, "No hay credenciales SMTP configuradas para este usuario"
-
-    msg = MIMEMultipart()
-    msg["From"]    = f"{_from_name} <{_user}>"
-    msg["To"]      = email_destino
-    msg["Subject"] = _asunto
-    msg.attach(MIMEText(_cuerpo, "plain", "utf-8"))
-    pdf_part = MIMEApplication(pdf_bytes, _subtype="pdf")
-    pdf_part.add_header("Content-Disposition", "attachment",
-                        filename=f"Cotizacion_{num_cot}.pdf")
-    msg.attach(pdf_part)
+    payload = {
+        "personalizations": [{"to": [{"email": email_destino}]}],
+        "from": {"email": _user, "name": _from_name},
+        "subject": _asunto,
+        "content": [{"type": "text/plain", "value": _cuerpo_txt}],
+        "attachments": [{
+            "content": _b64.b64encode(pdf_bytes).decode(),
+            "type": "application/pdf",
+            "filename": f"Cotizacion_{num_cot}.pdf",
+            "disposition": "attachment"
+        }]
+    }
 
     try:
-        with smtplib.SMTP(smtp_server, smtp_port, timeout=15) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(_user, _pass)
-            server.sendmail(_user, email_destino, msg.as_string())
-        return True, None
+        resp = _req.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={"Authorization": f"Bearer {SENDGRID_KEY}",
+                     "Content-Type": "application/json"},
+            data=_json.dumps(payload),
+            timeout=20
+        )
+        if resp.status_code == 202:
+            return True, None
+        return False, f"SendGrid error {resp.status_code}: {resp.text[:200]}"
     except Exception as e:
         return False, str(e)
 
@@ -3128,11 +3128,7 @@ with tab2:
     # Intentar clave normalizada primero, luego clave literal por compatibilidad
     smtp_pass_actual = st.secrets.get(smtp_key, "") or st.secrets.get(f"SMTP_{smtp_user_actual}", "")
 
-    if not smtp_pass_actual:
-        st.warning("No se encontró contraseña SMTP para " + smtp_user_actual +
-                   f". Agrega en Secrets: {smtp_key} = \"tu_contraseña\"")
-    else:
-        st.success("SMTP configurado para " + smtp_user_actual)
+    st.success(f"✉️ Listo para enviar desde **{smtp_user_actual}** vía SendGrid")
 
     ecol1, ecol2 = st.columns([2, 1])
     with ecol1:

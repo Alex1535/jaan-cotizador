@@ -1394,16 +1394,21 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
     story.append(Spacer(1,0.1*inch))
 
     # Totales (incluyendo tooling si aplica)
-    total_con_tooling = total_neto + total_tooling_cot
+    total_con_tooling = total_neto + total_tooling_cot  # se recalcula abajo si exportación
     filas_totales = [
         ["", Paragraph("Subtotal piezas:", ps("ts1",9,align=TA_RIGHT)), Paragraph(fmtc(total_general), ps("tv1",9,bold=True,align=TA_RIGHT))],
         ["", Paragraph("IVA (16%):", ps("ts2",9,GRAY,align=TA_RIGHT)), Paragraph(fmtc(iva), ps("tv2",9,GRAY,align=TA_RIGHT))],
     ]
+    iva_display = iva if aplica_iva_pdf else 0.0
+    iva_label   = "IVA (16%):" if aplica_iva_pdf else "IVA (0% — Exportación):"
+    total_con_tooling = total_general + iva_display + total_tooling_cot
+
+    filas_totales[1] = ["", Paragraph(iva_label, ps("ts2",9,GRAY,align=TA_RIGHT)), Paragraph(fmtc(iva_display), ps("tv2",9,GRAY,align=TA_RIGHT))]
     if total_tooling_cot > 0:
         filas_totales.append(["", Paragraph("Custom Tooling:", ps("tst",9,BLUE,align=TA_RIGHT)), Paragraph(fmtc(total_tooling_cot), ps("tvt",9,BLUE,True,align=TA_RIGHT))])
-    filas_totales.append(["", Paragraph("TOTAL NETO:", ps("ts3",11,NAVY,True,TA_RIGHT)), Paragraph(fmtc(total_con_tooling), ps("tv3",13,GREEN,True,TA_RIGHT))])
+    filas_totales.append(["", Paragraph("TOTAL NETO:", ps("ts3",10,NAVY,True,TA_RIGHT)), Paragraph(fmtc(total_con_tooling), ps("tv3",10,GREEN,True,TA_RIGHT))])
 
-    tt = Table(filas_totales, colWidths=[4.7*inch,1.3*inch,1.0*inch])
+    tt = Table(filas_totales, colWidths=[4.0*inch,1.5*inch,1.5*inch])
     tt.setStyle(TableStyle([
         ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
         ("LINEABOVE",(1,-1),(-1,-1),1,NAVY),

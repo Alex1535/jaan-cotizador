@@ -3016,120 +3016,110 @@ with tab1:
 
                 # ── Tramos predefinidos ────────────────────────────────────
                 st.markdown("##### Cadena logística")
-                st.caption("Activa (✓) los tramos que apliquen · Llena los datos de cada etapa")
-
+                st.caption("Activa (✓) los tramos que apliquen y llena los datos de cada etapa")
                 tramos_pre = log.get("tramos_pre", [])
 
-                # Cabecera columnas fila principal
-                hh0,hh1,hh2,hh3,hh4,hh5 = st.columns([0.25,1.4,1.2,1.2,0.95,1.5])
-                with hh0: st.caption("✓")
-                with hh1: st.caption("Tramo")
-                with hh2: st.caption("Origen")
-                with hh3: st.caption("Destino")
-                with hh4: st.caption("Modo cobro")
-                with hh5: st.caption("Costo ($)")
-                # Cabecera fila embalaje
-                he0,he1,he2,he3,he4,he5,he6,he7 = st.columns([0.25,1.4,1.0,0.7,0.7,0.7,0.7,1.1])
-                with he1: st.caption("Tipo embalaje")
-                with he2: st.caption("Carrier / agente")
-                with he3: st.caption("L(cm)")
-                with he4: st.caption("A(cm)")
-                with he5: st.caption("H(cm)")
-                with he6: st.caption("Kg bruto")
-                with he7: st.caption("Pzas/bulto")
-
                 for ti, tr in enumerate(tramos_pre):
-                    tr_key = tr["id"]
-                    emb    = tr.get("embalaje") or _emb_default()
+                    tr_key   = tr["id"]
+                    emb      = tr.get("embalaje") or _emb_default()
+                    tr_aplica = tr.get("aplica", False)
 
-                    # Fila principal
-                    c0,c1,c2,c3,c4,c5 = st.columns([0.25,1.4,1.2,1.2,0.95,1.5])
-                    with c0:
-                        tr_aplica = st.checkbox("", value=tr.get("aplica",False),
+                    # Color de fondo según activo
+                    bg  = "#f0f4ff" if tr_aplica else "#f9fafb"
+                    brd = "#185FA5" if tr_aplica else "#e5e7eb"
+                    st.markdown(
+                        f"<div style='background:{bg};border:1px solid {brd};"
+                        f"border-radius:8px;padding:10px 14px 6px 14px;margin-bottom:8px'>",
+                        unsafe_allow_html=True)
+
+                    # ── Fila 1: checkbox + ruta + costo ──────────────────
+                    f1a, f1b, f1c, f1d, f1e, f1f = st.columns([0.3, 1.6, 1.3, 1.3, 1.1, 1.1])
+                    with f1a:
+                        new_aplica = st.checkbox("", value=tr_aplica,
                             key=f"lp_{pieza['id']}_{tr_key}")
-                        tramos_pre[ti]["aplica"] = tr_aplica
-                    with c1:
-                        color = "#0f1b3d" if tr_aplica else "#9ca3af"
+                        tramos_pre[ti]["aplica"] = new_aplica
+                        tr_aplica = new_aplica
+                    with f1b:
+                        color = "#0f1b3d" if tr_aplica else "#6b7280"
                         fw    = "600" if tr_aplica else "400"
-                        st.markdown(f"<div style='padding-top:8px;font-size:13px;font-weight:{fw};color:{color}'>"
-                                    f"{tr['label']}</div>", unsafe_allow_html=True)
-                    with c2:
-                        tr_origen = st.text_input("Origen", value=tr.get("origen",""),
+                        st.markdown(
+                            f"<div style='font-size:13px;font-weight:{fw};color:{color};"
+                            f"padding-top:6px'>🚚 {tr['label']}</div>",
+                            unsafe_allow_html=True)
+                    with f1c:
+                        tr_origen = st.text_input("📍 Origen", value=tr.get("origen",""),
                             key=f"lpo_{pieza['id']}_{tr_key}",
-                            placeholder="Lugar origen",
-                            label_visibility="collapsed")
+                            placeholder="Lugar origen")
                         tramos_pre[ti]["origen"] = tr_origen
-                    with c3:
-                        tr_destino = st.text_input("Destino", value=tr.get("destino",""),
+                    with f1d:
+                        tr_destino = st.text_input("🏁 Destino", value=tr.get("destino",""),
                             key=f"lpd_{pieza['id']}_{tr_key}",
-                            placeholder="Lugar destino",
-                            label_visibility="collapsed")
+                            placeholder="Lugar destino")
                         tramos_pre[ti]["destino"] = tr_destino
-                    with c4:
-                        tr_modo = st.selectbox("Modo", MODOS,
+                    with f1e:
+                        tr_modo = st.selectbox("Modo cobro", MODOS,
                             index=MODOS.index(tr.get("modo","fijo")) if tr.get("modo","fijo") in MODOS else 0,
                             format_func=lambda x: MODOS_LBL[x],
-                            key=f"lpm_{pieza['id']}_{tr_key}",
-                            label_visibility="collapsed")
+                            key=f"lpm_{pieza['id']}_{tr_key}")
                         tramos_pre[ti]["modo"] = tr_modo
-                    with c5:
-                        tr_costo = st.number_input("Costo", min_value=0.0,
+                    with f1f:
+                        tr_costo = st.number_input("Costo ($)", min_value=0.0,
                             value=float(tr.get("costo",0.0)), step=50.0,
-                            key=f"lpc_{pieza['id']}_{tr_key}",
-                            label_visibility="collapsed")
+                            key=f"lpc_{pieza['id']}_{tr_key}")
                         tramos_pre[ti]["costo"] = tr_costo
 
-                    # Fila embalaje — siempre visible
-                    e0,e1,e2,e3,e4,e5,e6,e7 = st.columns([0.25,1.4,1.0,0.7,0.7,0.7,0.7,1.1])
-                    with e0: st.empty()
-                    with e1:
-                        emb_tipo = st.selectbox("Tipo embalaje",
-                            TIPOS_EMBALAJE,
+                    # ── Fila 2: embalaje ──────────────────────────────────
+                    f2a, f2b, f2c, f2d, f2e, f2f, f2g = st.columns([1.6, 1.6, 0.7, 0.7, 0.7, 0.8, 0.7])
+                    with f2a:
+                        emb_tipo = st.selectbox("📦 Tipo embalaje", TIPOS_EMBALAJE,
                             index=TIPOS_EMBALAJE.index(emb.get("tipo","—")) if emb.get("tipo","—") in TIPOS_EMBALAJE else 0,
-                            key=f"embt_{pieza['id']}_{tr_key}",
-                            label_visibility="collapsed")
+                            key=f"embt_{pieza['id']}_{tr_key}")
                         emb["tipo"] = emb_tipo
-                    with e2:
-                        emb_notas = st.text_input("Notas embalaje/carrier",
+                    with f2b:
+                        emb_notas = st.text_input("🚛 Carrier / agente / condiciones",
                             value=emb.get("notas_embalaje",""),
                             key=f"embn_{pieza['id']}_{tr_key}",
-                            placeholder="Carrier / agente / condiciones",
-                            label_visibility="collapsed")
+                            placeholder="Ej: XPO · Agente Ramírez · ISPM-15")
                         emb["notas_embalaje"] = emb_notas
-                    with e3:
-                        emb_l = st.number_input("L(cm)", min_value=0.0,
+                    with f2c:
+                        emb_l = st.number_input("Largo cm", min_value=0.0,
                             value=float(emb.get("largo_cm",0.0)), step=1.0, format="%.0f",
-                            key=f"embl_{pieza['id']}_{tr_key}",
-                            label_visibility="collapsed")
+                            key=f"embl_{pieza['id']}_{tr_key}")
                         emb["largo_cm"] = emb_l
-                    with e4:
-                        emb_a = st.number_input("A(cm)", min_value=0.0,
+                    with f2d:
+                        emb_a = st.number_input("Ancho cm", min_value=0.0,
                             value=float(emb.get("ancho_cm",0.0)), step=1.0, format="%.0f",
-                            key=f"emba_{pieza['id']}_{tr_key}",
-                            label_visibility="collapsed")
+                            key=f"emba_{pieza['id']}_{tr_key}")
                         emb["ancho_cm"] = emb_a
-                    with e5:
-                        emb_h = st.number_input("H(cm)", min_value=0.0,
+                    with f2e:
+                        emb_h = st.number_input("Alto cm", min_value=0.0,
                             value=float(emb.get("alto_cm",0.0)), step=1.0, format="%.0f",
-                            key=f"embh_{pieza['id']}_{tr_key}",
-                            label_visibility="collapsed")
+                            key=f"embh_{pieza['id']}_{tr_key}")
                         emb["alto_cm"] = emb_h
-                    with e6:
+                    with f2f:
                         emb_p = st.number_input("Kg bruto", min_value=0.0,
                             value=float(emb.get("peso_bruto_kg",0.0)), step=0.5, format="%.1f",
-                            key=f"embp_{pieza['id']}_{tr_key}",
-                            label_visibility="collapsed")
+                            key=f"embp_{pieza['id']}_{tr_key}")
                         emb["peso_bruto_kg"] = emb_p
-                    with e7:
+                    with f2g:
                         emb_pzas = st.number_input("Pzas/bulto", min_value=1,
                             value=int(emb.get("pzas_por_bulto",1)), step=1,
-                            key=f"embpz_{pieza['id']}_{tr_key}",
-                            label_visibility="collapsed")
+                            key=f"embpz_{pieza['id']}_{tr_key}")
                         emb["pzas_por_bulto"] = emb_pzas
 
+                    # Resumen rápido si tiene dimensiones o peso
+                    cant_pieza = pieza.get("cantidad",1)
+                    n_bultos   = math.ceil(cant_pieza / max(emb_pzas,1))
+                    vol_m3     = (emb_l * emb_a * emb_h) / 1_000_000
+                    if emb_l > 0 or emb_p > 0:
+                        st.markdown(
+                            f"<div style='font-size:11px;color:#6b7280;margin-top:2px'>"
+                            f"📊 {n_bultos} bulto(s) · {emb_l:.0f}×{emb_a:.0f}×{emb_h:.0f} cm · "
+                            f"{vol_m3:.4f} m³/bulto · {emb_p * n_bultos:.1f} kg total</div>",
+                            unsafe_allow_html=True)
+
                     tramos_pre[ti]["embalaje"] = emb
-                    st.markdown("<hr style='margin:2px 0 6px;border:none;border-top:0.5px solid #e5e7eb'>",
-                                unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
 
                 st.session_state.piezas[pi]["logistica"]["tramos_pre"] = tramos_pre
 

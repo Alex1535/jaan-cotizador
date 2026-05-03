@@ -1198,7 +1198,7 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
         jaan_img = Paragraph("JAAN Manufacturing", ps("hfb",14,NAVY,True))
 
     try:
-        bv_img = b64_to_rl_image(BV_LOGO_B64, 0.9*inch)
+        bv_img = b64_to_rl_image(BV_LOGO_B64, 1.2*inch)
     except Exception:
         bv_img = Paragraph("ISO 9001:2015", ps("hfbv",8,BLACK))
 
@@ -1210,8 +1210,8 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
             Paragraph(
                 f"<b>Cotización: {num_cot}</b><br/>{datetime.now().strftime('%d/%m/%Y')}",
                 ps("hdt",10,BLACK,True,TA_RIGHT))
-        ]], colWidths=[1.6*inch, 1.7*inch])
-    ]], colWidths=[2.2*inch, 1.5*inch, 3.3*inch])
+        ]], colWidths=[2.0*inch, 2.0*inch])
+    ]], colWidths=[2.2*inch, 0.8*inch, 4.0*inch])
 
     hdr.setStyle(TableStyle([
         ("BACKGROUND",(0,0),(-1,-1),WHITE),

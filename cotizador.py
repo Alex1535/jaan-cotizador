@@ -3598,24 +3598,35 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                 unsafe_allow_html=True)
         else:
             _clt = res.get('costo_log_total', 0)
-            _precio_base = res['precio_pza'] - _clt
+            _clo = res.get('costo_log_orden', 0)
+            _total_con_log = res["total"] + _clo
             if _clt > 0:
-                r1, r2, r3, r4, r5, r6 = st.columns(6)
+                r1, r2, r3, r4, r5, r6, r7 = st.columns(7)
             else:
                 r1, r2, r3, r4, r5 = st.columns(5)
-                r6 = None
-            r1.metric("Maquinado/pza",    fmtc(res["costo_maq"]))
-            r2.metric("Material/pza",     fmtc(res["costo_material"]))
-            r3.metric("Tratamiento/pza",  fmtc(res["costo_trat"]))
+                r6 = r7 = None
+            r1.metric("Maquinado/pza",   fmtc(res["costo_maq"]))
+            r2.metric("Material/pza",    fmtc(res["costo_material"]))
+            r3.metric("Tratamiento/pza", fmtc(res["costo_trat"]))
             if r6 is not None:
                 r4.metric("Logística/pza", fmtc(_clt))
-            with r5 if r6 is not None else r4:
-                st.markdown(
-                    f"<div style='padding:4px 0'>"
-                    f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
-                    f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
-                    f"</div>", unsafe_allow_html=True)
-            (r6 if r6 is not None else r5).metric(f"Total {cant} pzas", fmtc(res["total"]))
+                with r5:
+                    st.markdown(
+                        f"<div style='padding:4px 0'>"
+                        f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
+                        f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
+                        f"</div>", unsafe_allow_html=True)
+                r6.metric(f"Total {cant} pzas", fmtc(res["total"]))
+                r7.metric("+ Logística orden", fmtc(_clo),
+                    help="Cargo de logística separado del precio/pza")
+            else:
+                with r4:
+                    st.markdown(
+                        f"<div style='padding:4px 0'>"
+                        f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
+                        f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
+                        f"</div>", unsafe_allow_html=True)
+                r5.metric(f"Total {cant} pzas", fmtc(res["total"]))
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -3645,10 +3656,12 @@ with tab2:
 
     st.markdown("#### Resumen de piezas")
     filas         = []
-    total_general = 0
+    total_general   = 0
+    total_log_orden = 0
     for i, pieza in enumerate(st.session_state.piezas):
         res = calcular_pieza(pieza, margen_global)
-        total_general += res["total"]
+        total_general   += res["total"]
+        total_log_orden += res.get("costo_log_orden", 0.0)
         mp = pieza["materia_prima"]
         sem = res["semaforo"]
         tipo_ped_i = pieza.get("tipo_pedido", "Pedido único")
@@ -3680,6 +3693,8 @@ with tab2:
 
     st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
 
+    total_piezas = total_general
+    total_general = total_general + total_log_orden   # incluye logística para IVA y totales
     iva        = total_general * 0.16
     total_neto = total_general + iva
 

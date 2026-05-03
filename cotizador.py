@@ -1303,8 +1303,22 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                     Paragraph(fmtc(pv_tr),ps("dr7",8,align=TA_RIGHT)),
                     Paragraph(fmtc(pv_tr*cant),ps("dr8",8,align=TA_RIGHT))])
             if pv_log > 0:
+                log_d    = p.get("logistica",{})
+                incoterm_d = log_d.get("incoterm","EXW")
+                MODO_LBL = {"fijo":"Fijo por orden","por_kg":"Por kg","por_pza":"Por pieza","pct_valor":"% del valor"}
+                modo_d   = MODO_LBL.get(log_d.get("modo_global","fijo"), log_d.get("modo_global","—"))
+                ce_d     = log_d.get("comercio_exterior", False)
+                dest_d   = ", ".join(filter(None,[ciudad, pais]))
+                coment_d = log_d.get("comentarios_log","").strip()
+                cond_d   = f"{incoterm_d} · {modo_d}"
+                if ce_d:
+                    cond_d += f" · Comercio exterior (arancel {log_d.get('arancel_pct',0):.1f}%, seguro {log_d.get('seguro_pct',0):.1f}%)"
+                if dest_d:
+                    cond_d += f" · Destino: {dest_d}"
+                if coment_d:
+                    cond_d += f" · {coment_d}"
                 det_rows.append([
-                    Paragraph("Logística",ps("dr9",8)),
+                    Paragraph(f"Logística<br/><font size='7' color='grey'>{cond_d}</font>",ps("dr9",8)),
                     Paragraph(fmtc(pv_log),ps("dr10",8,align=TA_RIGHT)),
                     Paragraph(fmtc(pv_log*cant),ps("dr11",8,align=TA_RIGHT))])
 
@@ -1374,6 +1388,85 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
         ]))
         story.append(pt)
         story.append(Spacer(1,0.15*inch))
+
+        # ── Sección Logística (simplificado) — una fila por pieza que aplique ──
+        piezas_con_log = [(i,p) for i,p in enumerate(piezas)
+                          if p.get("logistica",{}).get("aplica", False)]
+        if piezas_con_log:
+            story.append(Paragraph("Condiciones de logística", ps("h2log",11,NAVY,True)))
+            story.append(Spacer(1,0.06*inch))
+            MODO_LABEL = {"fijo":"Fijo por orden","por_kg":"Por kg","por_pza":"Por pieza","pct_valor":"% del valor"}
+            for i,p in piezas_con_log:
+                res = calcular_pieza(p, margen_global)
+                log = p.get("logistica",{})
+                incoterm    = log.get("incoterm","EXW")
+                modo_label  = MODO_LABEL.get(log.get("modo_global","fijo"), log.get("modo_global","—"))
+                destino     = ", ".join(filter(None,[
+                    p.get("logistica",{}).get("destino_ciudad",""),
+                    ciudad, pais]))
+                comentarios = log.get("comentarios_log","").strip()
+                ce          = log.get("comercio_exterior", False)
+                arancel     = float(log.get("arancel_pct",0))
+                seguro      = float(log.get("seguro_pct",0))
+                costo_log_pza = res.get("costo_log_total", 0.0)
+
+                # Encabezado de pieza
+                ph_log = Table([[
+                    Paragraph(f"#{i+1}  {p.get('num_dibujo','—')} — {p.get('descripcion','—')}",
+                              ps(f"lph{i}",9,WHITE,True)),
+                    Paragraph(fmtc(costo_log_pza) + "/pza",
+                              ps(f"lphv{i}",9,WHITE,True,TA_RIGHT))
+                ]], colWidths=[5.5*inch,1.5*inch])
+                ph_log.setStyle(TableStyle([
+                    ("BACKGROUND",(0,0),(-1,-1),BLUE),
+                    ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+                    ("LEFTPADDING",(0,0),(0,-1),10),("RIGHTPADDING",(-1,0),(-1,-1),10),
+                ]))
+                story.append(ph_log)
+
+                # Detalle condiciones
+                log_detail_rows = [
+                    [Paragraph("Incoterm",ps(f"llh1{i}",8,GRAY)),
+                     Paragraph("Modo de costo",ps(f"llh2{i}",8,GRAY)),
+                     Paragraph("Destino de entrega",ps(f"llh3{i}",8,GRAY)),
+                     Paragraph("Costo logística/pza",ps(f"llh4{i}",8,GRAY))],
+                    [Paragraph(f"<b>{incoterm}</b>",ps(f"llv1{i}",9)),
+                     Paragraph(modo_label,ps(f"llv2{i}",9)),
+                     Paragraph(destino or ciudad or pais or "—",ps(f"llv3{i}",9)),
+                     Paragraph(fmtc(costo_log_pza),ps(f"llv4{i}",9,align=TA_RIGHT))],
+                ]
+                # Comercio exterior — si aplica
+                if ce:
+                    log_detail_rows.append([
+                        Paragraph("Comercio exterior",ps(f"llh5{i}",8,GRAY)),
+                        Paragraph("Arancel",ps(f"llh6{i}",8,GRAY)),
+                        Paragraph("Seguro",ps(f"llh7{i}",8,GRAY)),
+                        Paragraph("",ps(f"llh8{i}",8,GRAY))])
+                    log_detail_rows.append([
+                        Paragraph("✓ Importación/Exportación",ps(f"llv5{i}",9,GREEN)),
+                        Paragraph(f"{arancel:.1f}%",ps(f"llv6{i}",9)),
+                        Paragraph(f"{seguro:.1f}%",ps(f"llv7{i}",9)),
+                        Paragraph("",ps(f"llv8{i}",9))])
+                # Comentarios — si hay
+                if comentarios:
+                    log_detail_rows.append([
+                        Paragraph("Observaciones",ps(f"llhc{i}",8,GRAY)),
+                        Paragraph("",""),Paragraph("",""),Paragraph("","")])
+                    log_detail_rows.append([
+                        Paragraph(comentarios,ps(f"llvc{i}",8,GRAY)),
+                        Paragraph("",""),Paragraph("",""),Paragraph("","")])
+
+                ld = Table(log_detail_rows, colWidths=[1.75*inch,1.75*inch,2.5*inch,1.0*inch])
+                ld.setStyle(TableStyle([
+                    ("BACKGROUND",(0,0),(-1,0),LGRAY),
+                    ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+                    ("LEFTPADDING",(0,0),(-1,-1),8),("RIGHTPADDING",(0,0),(-1,-1),8),
+                    ("LINEBELOW",(0,0),(-1,0),0.5,colors.HexColor("#dde1ea")),
+                    ("SPAN",(0,-1),(3,-1)) if comentarios else ("TOPPADDING",(0,0),(0,0),4),
+                ]))
+                story.append(ld)
+                story.append(Spacer(1,0.1*inch))
+            story.append(Spacer(1,0.05*inch))
 
     # ── Sección Custom Tooling (Opciones A y C) ──────────────────────────────
     all_tools_ac = [(p, t) for p in piezas

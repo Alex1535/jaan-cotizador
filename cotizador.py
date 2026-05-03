@@ -1183,43 +1183,50 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
 
     story = []
 
-    # ── Header con logos + datos cotización ─────────────────────────────────
+    # ── Header: Logo JAAN + Certificación ISO ───────────────────────────────
     def b64_to_rl_image(b64str, height):
         img_data = _b64.b64decode(b64str)
-        img_buf  = _io.BytesIO(img_data)
-        pil_img  = __import__("PIL.Image", fromlist=["Image"]).open(img_buf)
+        from PIL import Image as PILImage
+        pil_img  = PILImage.open(_io.BytesIO(img_data))
         w_px, h_px = pil_img.size
-        aspect   = w_px / h_px
-        rl_img   = RLImage(_io.BytesIO(img_data), width=height*aspect, height=height)
-        return rl_img
+        aspect = w_px / h_px
+        return RLImage(_io.BytesIO(img_data), width=height*aspect, height=height)
 
     try:
-        jaan_img = b64_to_rl_image(LOGO_B64, 0.55*inch)
+        jaan_img = b64_to_rl_image(LOGO_B64, 0.6*inch)
     except Exception:
         jaan_img = Paragraph("JAAN Manufacturing", ps("hfb",14,WHITE,True))
 
-    try:
-        bv_img = b64_to_rl_image(BV_LOGO_B64, 0.45*inch)
-    except Exception:
-        bv_img = Paragraph("ISO 9001:2015", ps("hfbv",8,WHITE))
-
-    hdr = Table([[
+    # Fila 1: Logo JAAN | número y fecha
+    hdr1 = Table([[
         jaan_img,
-        bv_img,
         Paragraph(
-            f"Cotización: <b>{num_cot}</b><br/>"
-            f"{datetime.now().strftime('%d/%m/%Y')}",
-            ps("hr",10,WHITE,True,TA_RIGHT))
-    ]], colWidths=[2.5*inch, 2.5*inch, 2.0*inch])
-    hdr.setStyle(TableStyle([
+            f"Cotización: <b>{num_cot}</b><br/>{datetime.now().strftime('%d/%m/%Y')}",
+            ps("hr",11,WHITE,True,TA_RIGHT))
+    ]], colWidths=[4.5*inch, 2.5*inch])
+    hdr1.setStyle(TableStyle([
         ("BACKGROUND",(0,0),(-1,-1),NAVY),
         ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-        ("TOPPADDING",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,-1),10),
-        ("LEFTPADDING",(0,0),(0,-1),14),("RIGHTPADDING",(-1,0),(-1,-1),14),
+        ("TOPPADDING",(0,0),(-1,-1),12),("BOTTOMPADDING",(0,0),(-1,-1),6),
+        ("LEFTPADDING",(0,0),(0,-1),16),("RIGHTPADDING",(-1,0),(-1,-1),16),
+    ]))
+
+    # Fila 2: certificación ISO como banda delgada
+    hdr2 = Table([[
+        Paragraph(
+            "  ISO 9001:2015 Certified  ·  Bureau Veritas Certification",
+            ps("iso",8,colors.HexColor("#93B8E0"),align=TA_CENTER))
+    ]], colWidths=[7.0*inch])
+    hdr2.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,-1),NAVY),
+        ("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),7),
         ("LINEBELOW",(0,0),(-1,-1),3,BLUE),
     ]))
-    story.append(hdr)
+
+    story.append(hdr1)
+    story.append(hdr2)
     story.append(Spacer(1,0.2*inch))
+
 
     # Cliente
     dir_c = ", ".join(filter(None,[direccion,cp,ciudad,pais]))

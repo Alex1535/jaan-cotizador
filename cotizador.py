@@ -3084,74 +3084,99 @@ with tab1:
                                     key=f"lpc_{pieza['id']}_{tr_key}")
                                 tramos_pre[ti]["costo"] = tr_costo
 
-                            # Fila 2: Embalaje
+                            # Embalaje — usa global si aplica, sino personalizado por tramo
+                            _emb_global_key = f"emb_global_activo_{pieza['id']}"
+                            _emb_global_data_key = f"emb_global_data_{pieza['id']}"
+                            _usa_global = st.session_state.get(_emb_global_key, False)
+
+                            # Solo mostrar el toggle en el primer tramo activo
+                            _tramos_activos = [t for t in tramos_pre if t.get("aplica")]
+                            _es_primero_activo = _tramos_activos and _tramos_activos[0]["id"] == tr_key
+
+                            if _es_primero_activo:
+                                _usa_global = st.toggle(
+                                    "Mismo embalaje para todos los tramos",
+                                    value=_usa_global,
+                                    key=_emb_global_key)
+
                             st.caption("Embalaje y transporte")
-                            e1, e2, e3, e4, e5, e6, e7 = st.columns([1.3, 1.5, 0.6, 0.6, 0.6, 0.7, 0.7])
-                            with e1:
-                                emb_tipo = st.selectbox("Tipo de embalaje", TIPOS_EMBALAJE,
-                                    index=TIPOS_EMBALAJE.index(emb.get("tipo","—")) if emb.get("tipo","—") in TIPOS_EMBALAJE else 0,
-                                    key=f"embt_{pieza['id']}_{tr_key}")
-                                emb["tipo"] = emb_tipo
-                            with e2:
-                                emb_notas = st.text_input("Carrier / agente / condiciones",
-                                    value=emb.get("notas_embalaje",""),
-                                    key=f"embn_{pieza['id']}_{tr_key}",
-                                    placeholder="Ej: XPO Logistics · Agente Ramírez · Tarima ISPM-15")
-                                emb["notas_embalaje"] = emb_notas
-                            with e3:
-                                emb_l = st.number_input("Largo (cm)", min_value=0.0,
-                                    value=float(emb.get("largo_cm",0.0)), step=1.0, format="%.0f",
-                                    key=f"embl_{pieza['id']}_{tr_key}")
-                                emb["largo_cm"] = emb_l
-                            with e4:
-                                emb_a = st.number_input("Ancho (cm)", min_value=0.0,
-                                    value=float(emb.get("ancho_cm",0.0)), step=1.0, format="%.0f",
-                                    key=f"emba_{pieza['id']}_{tr_key}")
-                                emb["ancho_cm"] = emb_a
-                            with e5:
-                                emb_h = st.number_input("Alto (cm)", min_value=0.0,
-                                    value=float(emb.get("alto_cm",0.0)), step=1.0, format="%.0f",
-                                    key=f"embh_{pieza['id']}_{tr_key}")
-                                emb["alto_cm"] = emb_h
-                            with e6:
-                                emb_p = st.number_input("Peso bruto (kg)", min_value=0.0,
-                                    value=float(emb.get("peso_bruto_kg",0.0)), step=0.5, format="%.1f",
-                                    key=f"embp_{pieza['id']}_{tr_key}")
-                                emb["peso_bruto_kg"] = emb_p
-                            with e7:
-                                emb_pzas = st.number_input("Pzas / bulto", min_value=1,
-                                    value=int(emb.get("pzas_por_bulto",1)), step=1,
-                                    key=f"embpz_{pieza['id']}_{tr_key}")
-                                emb["pzas_por_bulto"] = emb_pzas
 
-                            # Resumen calculado
-                            cant_pieza = pieza.get("cantidad", 1)
-                            n_bultos   = math.ceil(cant_pieza / max(emb_pzas, 1))
-                            vol_m3     = (emb_l * emb_a * emb_h) / 1_000_000
-                            if emb_l > 0 or emb_p > 0:
-                                st.info(
-                                    f"{n_bultos} bulto(s) para {cant_pieza} pza(s)  ·  "
-                                    f"{emb_l:.0f} × {emb_a:.0f} × {emb_h:.0f} cm  ·  "
-                                    f"{vol_m3:.4f} m³/bulto  ·  "
-                                    f"Peso bruto total: {emb_p * n_bultos:.1f} kg")
+                            # Si global activo y NO es el primero → mostrar solo info
+                            if _usa_global and not _es_primero_activo:
+                                _gd = st.session_state.get(_emb_global_data_key, {})
+                                if _gd:
+                                    emb.update(_gd)
+                                    st.info(
+                                        f"Usando embalaje global: {_gd.get('tipo','—')}  ·  "
+                                        f"{_gd.get('largo_cm',0):.0f} × {_gd.get('ancho_cm',0):.0f} × {_gd.get('alto_cm',0):.0f} cm  ·  "
+                                        f"{_gd.get('peso_bruto_kg',0):.1f} kg  ·  "
+                                        f"{_gd.get('pzas_por_bulto',1)} pza(s)/bulto")
+                                emb_l = emb.get("largo_cm", 0.0)
+                                emb_a = emb.get("ancho_cm", 0.0)
+                                emb_h = emb.get("alto_cm", 0.0)
+                                emb_p = emb.get("peso_bruto_kg", 0.0)
+                                emb_pzas = emb.get("pzas_por_bulto", 1)
+                                emb_tipo = emb.get("tipo", "—")
+                                emb_notas = emb.get("notas_embalaje", "")
+                            else:
+                                # Formulario de embalaje editable
+                                e1, e2, e3, e4, e5, e6, e7 = st.columns([1.3, 1.5, 0.6, 0.6, 0.6, 0.7, 0.7])
+                                with e1:
+                                    emb_tipo = st.selectbox("Tipo de embalaje", TIPOS_EMBALAJE,
+                                        index=TIPOS_EMBALAJE.index(emb.get("tipo","—")) if emb.get("tipo","—") in TIPOS_EMBALAJE else 0,
+                                        key=f"embt_{pieza['id']}_{tr_key}")
+                                    emb["tipo"] = emb_tipo
+                                with e2:
+                                    emb_notas = st.text_input("Carrier / agente / condiciones",
+                                        value=emb.get("notas_embalaje",""),
+                                        key=f"embn_{pieza['id']}_{tr_key}",
+                                        placeholder="Ej: XPO Logistics · Agente Ramírez · Tarima ISPM-15")
+                                    emb["notas_embalaje"] = emb_notas
+                                with e3:
+                                    emb_l = st.number_input("Largo (cm)", min_value=0.0,
+                                        value=float(emb.get("largo_cm",0.0)), step=1.0, format="%.0f",
+                                        key=f"embl_{pieza['id']}_{tr_key}")
+                                    emb["largo_cm"] = emb_l
+                                with e4:
+                                    emb_a = st.number_input("Ancho (cm)", min_value=0.0,
+                                        value=float(emb.get("ancho_cm",0.0)), step=1.0, format="%.0f",
+                                        key=f"emba_{pieza['id']}_{tr_key}")
+                                    emb["ancho_cm"] = emb_a
+                                with e5:
+                                    emb_h = st.number_input("Alto (cm)", min_value=0.0,
+                                        value=float(emb.get("alto_cm",0.0)), step=1.0, format="%.0f",
+                                        key=f"embh_{pieza['id']}_{tr_key}")
+                                    emb["alto_cm"] = emb_h
+                                with e6:
+                                    emb_p = st.number_input("Peso bruto (kg)", min_value=0.0,
+                                        value=float(emb.get("peso_bruto_kg",0.0)), step=0.5, format="%.1f",
+                                        key=f"embp_{pieza['id']}_{tr_key}")
+                                    emb["peso_bruto_kg"] = emb_p
+                                with e7:
+                                    emb_pzas = st.number_input("Pzas / bulto", min_value=1,
+                                        value=int(emb.get("pzas_por_bulto",1)), step=1,
+                                        key=f"embpz_{pieza['id']}_{tr_key}")
+                                    emb["pzas_por_bulto"] = emb_pzas
 
-                            # Botón para copiar este embalaje a todos los demás tramos
-                            if (emb_l > 0 or emb_p > 0 or emb_tipo != "—") and len(tramos_pre) > 1:
-                                if st.button(
-                                    "Aplicar este embalaje a todos los tramos",
-                                    key=f"emb_copy_{pieza['id']}_{tr_key}",
-                                    help="Copia tipo, dimensiones y peso a los demás tramos de esta pieza"):
-                                    emb_copia = {
-                                        "tipo": emb_tipo,
-                                        "largo_cm": emb_l, "ancho_cm": emb_a, "alto_cm": emb_h,
+                                # Si es global, guardar en session_state para los demás
+                                if _usa_global and _es_primero_activo:
+                                    st.session_state[_emb_global_data_key] = {
+                                        "tipo": emb_tipo, "largo_cm": emb_l,
+                                        "ancho_cm": emb_a, "alto_cm": emb_h,
                                         "peso_bruto_kg": emb_p, "pzas_por_bulto": emb_pzas,
                                         "notas_embalaje": emb_notas,
                                     }
-                                    for tj in range(len(tramos_pre)):
-                                        if tj != ti:
-                                            tramos_pre[tj]["embalaje"] = emb_copia.copy()
-                                    st.session_state.piezas[pi]["logistica"]["tramos_pre"] = tramos_pre
-                                    st.rerun()
+
+                                # Resumen
+                                cant_pieza = pieza.get("cantidad", 1)
+                                n_bultos   = math.ceil(cant_pieza / max(emb_pzas, 1))
+                                vol_m3     = (emb_l * emb_a * emb_h) / 1_000_000
+                                if emb_l > 0 or emb_p > 0:
+                                    st.info(
+                                        f"{n_bultos} bulto(s) para {cant_pieza} pza(s)  ·  "
+                                        f"{emb_l:.0f} × {emb_a:.0f} × {emb_h:.0f} cm  ·  "
+                                        f"{vol_m3:.4f} m³/bulto  ·  "
+                                        f"Peso bruto total: {emb_p * n_bultos:.1f} kg")
 
                     tramos_pre[ti]["embalaje"] = emb
 

@@ -3135,6 +3135,24 @@ with tab1:
                                     f"{vol_m3:.4f} m³/bulto  ·  "
                                     f"Peso bruto total: {emb_p * n_bultos:.1f} kg")
 
+                            # Botón para copiar este embalaje a todos los demás tramos
+                            if (emb_l > 0 or emb_p > 0 or emb_tipo != "—") and len(tramos_pre) > 1:
+                                if st.button(
+                                    "Aplicar este embalaje a todos los tramos",
+                                    key=f"emb_copy_{pieza['id']}_{tr_key}",
+                                    help="Copia tipo, dimensiones y peso a los demás tramos de esta pieza"):
+                                    emb_copia = {
+                                        "tipo": emb_tipo,
+                                        "largo_cm": emb_l, "ancho_cm": emb_a, "alto_cm": emb_h,
+                                        "peso_bruto_kg": emb_p, "pzas_por_bulto": emb_pzas,
+                                        "notas_embalaje": emb_notas,
+                                    }
+                                    for tj in range(len(tramos_pre)):
+                                        if tj != ti:
+                                            tramos_pre[tj]["embalaje"] = emb_copia.copy()
+                                    st.session_state.piezas[pi]["logistica"]["tramos_pre"] = tramos_pre
+                                    st.rerun()
+
                     tramos_pre[ti]["embalaje"] = emb
 
                 st.session_state.piezas[pi]["logistica"]["tramos_pre"] = tramos_pre
@@ -3656,12 +3674,10 @@ with tab2:
 
     st.markdown("#### Resumen de piezas")
     filas         = []
-    total_general   = 0
-    total_log_orden = 0
+    total_general = 0
     for i, pieza in enumerate(st.session_state.piezas):
         res = calcular_pieza(pieza, margen_global)
-        total_general   += res["total"]
-        total_log_orden += res.get("costo_log_orden", 0.0)
+        total_general += res["total"]
         mp = pieza["materia_prima"]
         sem = res["semaforo"]
         tipo_ped_i = pieza.get("tipo_pedido", "Pedido único")
@@ -3693,8 +3709,6 @@ with tab2:
 
     st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
 
-    total_piezas = total_general
-    total_general = total_general + total_log_orden   # incluye logística para IVA y totales
     iva        = total_general * 0.16
     total_neto = total_general + iva
 

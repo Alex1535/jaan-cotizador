@@ -3035,25 +3035,26 @@ with tab1:
                         if tr.get("costo",0) > 0: partes.append(f"${tr['costo']:,.0f}")
                         if partes: resumen_tr = "  —  " + "  ·  ".join(partes)
 
-                    # Checkbox fuera del expander
-                    chk_col, lbl_col = st.columns([0.25, 5.5])
+                    # Checkbox + nombre editable en la misma fila + expander para el detalle
+                    chk_col, name_col = st.columns([0.25, 5.5])
                     with chk_col:
                         new_aplica = st.checkbox("", value=tr_aplica,
                             key=f"lp_{pieza['id']}_{tr_key}")
                         tramos_pre[ti]["aplica"] = new_aplica
                         tr_aplica = new_aplica
-                    with lbl_col:
-                        label_exp = f"**{nombre_tr}**{resumen_tr}"
-                        with st.expander(label_exp, expanded=tr_aplica):
-                            # Nombre del tramo editable
-                            st.caption("Nombre del tramo")
-                            lc = st.text_input("Nombre del tramo",
-                                value=tr.get("label_custom",""),
-                                key=f"lplc_{pieza['id']}_{tr_key}",
-                                placeholder=f"Predeterminado: {tr['label']}",
-                                label_visibility="collapsed")
-                            tramos_pre[ti]["label_custom"] = lc
+                    with name_col:
+                        lc = st.text_input("Nombre",
+                            value=tr.get("label_custom",""),
+                            key=f"lplc_{pieza['id']}_{tr_key}",
+                            placeholder=tr["label"],
+                            label_visibility="collapsed")
+                        tramos_pre[ti]["label_custom"] = lc
+                        nombre_tr = lc.strip() or tr["label"]
 
+                    # Expander para el detalle — solo visible si está activo
+                    if tr_aplica:
+                        label_exp = f"{nombre_tr}{resumen_tr}"
+                        with st.expander(label_exp, expanded=True):
                             # Fila 1: Ruta y costo
                             st.caption("Ruta y costo")
                             r1, r2, r3, r4 = st.columns([1.4, 1.4, 1.1, 1.1])

@@ -732,6 +732,8 @@ def nueva_pieza(idx, defaults):
         "plano_b64": "",
         "plano_drive_id": "",
         "plano_tipo": "",
+        # ── Custom Tooling ──
+        "custom_tooling": [],
         "cantidad":      10,
         "demanda_mensual": 0,
         "tipo_pedido":   "Pedido único",
@@ -906,6 +908,26 @@ def calcular_pieza(pieza, margen_pct):
     costo_log_con_margen = costo_log + util_log
 
     precio_pza = precio_pza + costo_log_con_margen
+
+    # ── Custom Tooling ────────────────────────────────────────────────────────
+    tooling_items = pieza.get("custom_tooling", [])
+    costo_tooling_pza = 0.0   # Opción B: amortizado en precio/pza
+    costo_tooling_total = 0.0 # Opción A y C: cargo separado
+
+    for t in tooling_items:
+        if not t.get("activo", True):
+            continue
+        costo_t  = float(t.get("costo", 0.0))
+        margen_t = float(t.get("margen_pct", 0.0))
+        precio_t = costo_t * (1 + margen_t / 100)
+        opcion   = t.get("opcion", "C")
+        if opcion == "B":
+            vida_util = max(int(t.get("vida_util", 1)), 1)
+            costo_tooling_pza += precio_t / vida_util
+        else:
+            costo_tooling_total += precio_t
+
+    precio_pza = precio_pza + costo_tooling_pza
     total      = precio_pza * cantidad
 
     return {
@@ -921,6 +943,8 @@ def calcular_pieza(pieza, margen_pct):
         "utilidad":      utilidad,
         "precio_pza":    precio_pza,
         "total":         total,
+        "costo_tooling_pza":   costo_tooling_pza,
+        "costo_tooling_total": costo_tooling_total,
         "precios_tipo":  precios,
         "fijo_hr":       fijo_hr,
         "hrs_prod":      hrs_prod,
@@ -1119,7 +1143,8 @@ simbolo = "USD $" if moneda_cot == "USD" else "$"
 
 def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ciudad, pais,
                            moneda_cot, tipo_cambio, margen_global, vigencia, t_entrega,
-                           cond_pago, total_general, iva, total_neto):
+                           cond_pago, total_general, iva, total_neto,
+                           template="simplificado"):
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
@@ -1181,44 +1206,201 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
     story.append(ct)
     story.append(Spacer(1,0.15*inch))
 
-    # Tabla piezas
-    story.append(Paragraph("Resumen de piezas", ps("h2",11,NAVY,True)))
-    story.append(Spacer(1,0.08*inch))
-    col_w = [0.3*inch,1.0*inch,1.4*inch,0.8*inch,0.7*inch,0.9*inch,0.7*inch,1.0*inch]
-    rows = [[Paragraph(h, ps(f"th{i}",8,WHITE,True)) for i,h in
-             enumerate(["#","Núm. Dibujo","Descripción","Material","Tratamiento","P. Unitario","Cant.","Total"])]]
-    for i,p in enumerate(piezas):
-        res = calcular_pieza(p, margen_global)
-        mp  = p.get("materia_prima",{})
-        cant = p.get("cantidad",0) if p.get("tipo_pedido")!="Por proyecto" else p.get("eau",0)
-        rows.append([
-            Paragraph(str(i+1),          ps(f"td{i}0",8)),
-            Paragraph(p.get("num_dibujo","—"), ps(f"td{i}1",8)),
-            Paragraph(p.get("descripcion","—"), ps(f"td{i}2",8)),
-            Paragraph(mp.get("material","—"),   ps(f"td{i}3",8)),
-            Paragraph(p.get("tratamiento","Ninguno"), ps(f"td{i}4",8)),
-            Paragraph(fmtc(res["precio_pza"]),  ps(f"td{i}5",8,align=TA_RIGHT)),
-            Paragraph(str(cant),                ps(f"td{i}6",8,align=TA_RIGHT)),
-            Paragraph(fmtc(res["total"]),       ps(f"td{i}7",8,align=TA_RIGHT)),
-        ])
-    pt = Table(rows, colWidths=col_w, repeatRows=1)
-    pt.setStyle(TableStyle([
-        ("BACKGROUND",(0,0),(-1,0),NAVY),
-        ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE,LGRAY]),
-        ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
-        ("LEFTPADDING",(0,0),(-1,-1),5),("RIGHTPADDING",(0,0),(-1,-1),5),
-        ("LINEBELOW",(0,0),(-1,-1),0.3,colors.HexColor("#dde1ea")),
-        ("LINEBELOW",(0,0),(-1,0),1,BLUE),
-    ]))
-    story.append(pt)
-    story.append(Spacer(1,0.2*inch))
+    # ── Tabla piezas según template ────────────────────────────────────────────
+    aplica_iva_pdf = "USA" not in (pais or "").upper()
+    total_tooling_cot = 0.0  # acumula tooling opciones A y C
 
-    # Totales
-    tt = Table([
-        ["", Paragraph("Subtotal:",   ps("ts1",9,align=TA_RIGHT)), Paragraph(fmtc(total_general), ps("tv1",9,bold=True,align=TA_RIGHT))],
+    if template == "detallado":
+        # Template Detallado — desglose por sección con precios de venta
+        story.append(Paragraph("Desglose de cotización por pieza", ps("h2",11,NAVY,True)))
+        story.append(Spacer(1,0.08*inch))
+
+        for i,p in enumerate(piezas):
+            res  = calcular_pieza(p, margen_global)
+            mp   = p.get("materia_prima",{})
+            cant = p.get("cantidad",0) if p.get("tipo_pedido")!="Por proyecto" else p.get("eau",0)
+
+            # Encabezado pieza
+            ph = Table([[
+                Paragraph(f"#{i+1}  {p.get('num_dibujo','—')} — {p.get('descripcion','—')}",
+                          ps(f"ph{i}",10,WHITE,True)),
+                Paragraph(f"Cant: {cant}", ps(f"phc{i}",9,WHITE,align=TA_RIGHT))
+            ]], colWidths=[5.5*inch,1.5*inch])
+            ph.setStyle(TableStyle([
+                ("BACKGROUND",(0,0),(-1,-1),BLUE),
+                ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
+                ("LEFTPADDING",(0,0),(0,-1),10),("RIGHTPADDING",(-1,0),(-1,-1),10),
+            ]))
+            story.append(ph)
+
+            # Calcular precios de venta por sección
+            if p.get("usar_margen_global", False):
+                mg_mo  = margen_global
+                mg_mat = margen_global
+                mg_tr  = margen_global
+            else:
+                mg_mo  = p.get("margen_mo",  35)
+                mg_mat = p.get("margen_mat", 35)
+                mg_tr  = p.get("margen_trat",35)
+
+            pv_mat = res["costo_material"] * (1 + mg_mat/100)
+            pv_mo  = res["costo_maq"]      * (1 + mg_mo/100)
+            pv_tr  = res["costo_trat"]     * (1 + mg_tr/100)
+            pv_log = res.get("costo_log_total", 0.0)
+
+            det_rows = [
+                [Paragraph("Concepto",ps("dh0",8,WHITE,True)),
+                 Paragraph("Precio venta/pza",ps("dh1",8,WHITE,True,TA_RIGHT)),
+                 Paragraph(f"Total ({cant} pzas)",ps("dh2",8,WHITE,True,TA_RIGHT))],
+                [Paragraph("Materia prima",ps("dr0",8)),
+                 Paragraph(fmtc(pv_mat),ps("dr1",8,align=TA_RIGHT)),
+                 Paragraph(fmtc(pv_mat*cant),ps("dr2",8,align=TA_RIGHT))],
+                [Paragraph("Mano de obra",ps("dr3",8)),
+                 Paragraph(fmtc(pv_mo),ps("dr4",8,align=TA_RIGHT)),
+                 Paragraph(fmtc(pv_mo*cant),ps("dr5",8,align=TA_RIGHT))],
+            ]
+            if pv_tr > 0:
+                det_rows.append([
+                    Paragraph(f"Tratamiento ({p.get('tratamiento','—')})",ps("dr6",8)),
+                    Paragraph(fmtc(pv_tr),ps("dr7",8,align=TA_RIGHT)),
+                    Paragraph(fmtc(pv_tr*cant),ps("dr8",8,align=TA_RIGHT))])
+            if pv_log > 0:
+                det_rows.append([
+                    Paragraph("Logística",ps("dr9",8)),
+                    Paragraph(fmtc(pv_log),ps("dr10",8,align=TA_RIGHT)),
+                    Paragraph(fmtc(pv_log*cant),ps("dr11",8,align=TA_RIGHT))])
+
+            subtotal_pza = pv_mat + pv_mo + pv_tr + pv_log
+            det_rows.append([
+                Paragraph("Precio unitario total",ps("drs",9,NAVY,True)),
+                Paragraph(fmtc(subtotal_pza),ps("drst",9,NAVY,True,TA_RIGHT)),
+                Paragraph(fmtc(subtotal_pza*cant),ps("drst2",9,NAVY,True,TA_RIGHT))])
+
+            dt = Table(det_rows, colWidths=[3.5*inch,1.75*inch,1.75*inch])
+            dt.setStyle(TableStyle([
+                ("BACKGROUND",(0,0),(-1,0),NAVY),
+                ("ROWBACKGROUNDS",(0,1),(-1,-2),[WHITE,LGRAY]),
+                ("BACKGROUND",(0,-1),(-1,-1),colors.HexColor("#EEF2FF")),
+                ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+                ("LEFTPADDING",(0,0),(-1,-1),8),("RIGHTPADDING",(0,0),(-1,-1),8),
+                ("LINEBELOW",(0,-2),(-1,-2),1,NAVY),
+            ]))
+            story.append(dt)
+            story.append(Spacer(1,0.12*inch))
+
+            # Custom tooling de esta pieza
+            for tool in p.get("custom_tooling", []):
+                if not tool.get("activo", True): continue
+                t_op = tool.get("opcion","C")
+                if t_op in ("A","C"):
+                    t_precio = float(tool.get("costo",0)) * (1 + float(tool.get("margen_pct",0))/100)
+                    t_iva    = t_precio * 0.16 if aplica_iva_pdf else 0
+                    total_tooling_cot += t_precio + t_iva
+
+    else:
+        # Template Simplificado — tabla compacta estándar
+        story.append(Paragraph("Resumen de piezas", ps("h2",11,NAVY,True)))
+        story.append(Spacer(1,0.08*inch))
+        col_w = [0.3*inch,1.0*inch,1.4*inch,0.8*inch,0.7*inch,0.9*inch,0.7*inch,1.0*inch]
+        rows = [[Paragraph(h, ps(f"th{i}",8,WHITE,True)) for i,h in
+                 enumerate(["#","Núm. Dibujo","Descripción","Material","Tratamiento","P. Unitario","Cant.","Total"])]]
+        for i,p in enumerate(piezas):
+            res = calcular_pieza(p, margen_global)
+            mp  = p.get("materia_prima",{})
+            cant = p.get("cantidad",0) if p.get("tipo_pedido")!="Por proyecto" else p.get("eau",0)
+            rows.append([
+                Paragraph(str(i+1),               ps(f"td{i}0",8)),
+                Paragraph(p.get("num_dibujo","—"), ps(f"td{i}1",8)),
+                Paragraph(p.get("descripcion","—"),ps(f"td{i}2",8)),
+                Paragraph(mp.get("material","—"),  ps(f"td{i}3",8)),
+                Paragraph(p.get("tratamiento","Ninguno"), ps(f"td{i}4",8)),
+                Paragraph(fmtc(res["precio_pza"]), ps(f"td{i}5",8,align=TA_RIGHT)),
+                Paragraph(str(cant),               ps(f"td{i}6",8,align=TA_RIGHT)),
+                Paragraph(fmtc(res["total"]),      ps(f"td{i}7",8,align=TA_RIGHT)),
+            ])
+            for tool in p.get("custom_tooling", []):
+                if not tool.get("activo", True): continue
+                if tool.get("opcion","C") in ("A","C"):
+                    t_precio = float(tool.get("costo",0)) * (1 + float(tool.get("margen_pct",0))/100)
+                    t_iva    = t_precio * 0.16 if aplica_iva_pdf else 0
+                    total_tooling_cot += t_precio + t_iva
+
+        pt = Table(rows, colWidths=col_w, repeatRows=1)
+        pt.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,0),NAVY),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE,LGRAY]),
+            ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+            ("LEFTPADDING",(0,0),(-1,-1),5),("RIGHTPADDING",(0,0),(-1,-1),5),
+            ("LINEBELOW",(0,0),(-1,-1),0.3,colors.HexColor("#dde1ea")),
+            ("LINEBELOW",(0,0),(-1,0),1,BLUE),
+        ]))
+        story.append(pt)
+        story.append(Spacer(1,0.15*inch))
+
+    # ── Sección Custom Tooling (Opciones A y C) ──────────────────────────────
+    all_tools_ac = [(p, t) for p in piezas
+                    for t in p.get("custom_tooling",[])
+                    if t.get("activo",True) and t.get("opcion","C") in ("A","C")]
+
+    if all_tools_ac:
+        story.append(Paragraph("Custom Tooling", ps("h2",11,NAVY,True)))
+        story.append(Spacer(1,0.06*inch))
+        tw = [0.3*inch,2.5*inch,1.2*inch,1.0*inch,0.9*inch,0.9*inch,0.7*inch]
+        tool_rows = [[Paragraph(h,ps(f"twh{i}",8,WHITE,True)) for i,h in
+                      enumerate(["#","Descripción","Pieza","Opción","Propiedad","Precio","IVA"])]]
+        for ti,(p,t) in enumerate(all_tools_ac):
+            t_precio = float(t.get("costo",0)) * (1 + float(t.get("margen_pct",0))/100)
+            t_iva    = t_precio * 0.16 if aplica_iva_pdf else 0
+            tool_rows.append([
+                Paragraph(str(ti+1), ps(f"twr{ti}0",8)),
+                Paragraph(t.get("descripcion","—"), ps(f"twr{ti}1",8)),
+                Paragraph(p.get("num_dibujo","—"), ps(f"twr{ti}2",8)),
+                Paragraph(t.get("opcion","C"), ps(f"twr{ti}3",8,align=TA_CENTER)),
+                Paragraph(t.get("propiedad","JAAN"), ps(f"twr{ti}4",8,align=TA_CENTER)),
+                Paragraph(fmtc(t_precio), ps(f"twr{ti}5",8,align=TA_RIGHT)),
+                Paragraph(fmtc(t_iva) if aplica_iva_pdf else "N/A", ps(f"twr{ti}6",8,align=TA_RIGHT)),
+            ])
+            if t.get("nota"):
+                tool_rows.append([Paragraph("",ps("n0",7)),
+                    Paragraph(f"* {t['nota']}",ps("n1",7,GRAY)),
+                    Paragraph("",ps("n2",7)),Paragraph("",ps("n3",7)),
+                    Paragraph("",ps("n4",7)),Paragraph("",ps("n5",7)),Paragraph("",ps("n6",7))])
+
+        twt = Table(tool_rows, colWidths=tw, repeatRows=1)
+        twt.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,0),NAVY),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE,LGRAY]),
+            ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+            ("LEFTPADDING",(0,0),(-1,-1),5),("RIGHTPADDING",(0,0),(-1,-1),5),
+            ("LINEBELOW",(0,0),(-1,-1),0.3,colors.HexColor("#dde1ea")),
+            ("LINEBELOW",(0,0),(-1,0),1,BLUE),
+        ]))
+        story.append(twt)
+
+        # Nota consumibles si alguna herramienta es propiedad del cliente
+        prop_cliente = [t for _,t in all_tools_ac if t.get("propiedad")=="Cliente"]
+        if prop_cliente:
+            story.append(Spacer(1,0.08*inch))
+            story.append(Paragraph(
+                "* El mantenimiento y reposición de consumibles e insertos del custom tooling "
+                "son responsabilidad del cliente. JAAN Manufacturing notificará cuando se "
+                "requiera reposición para continuar con la producción.",
+                ps("ctfn",7,GRAY)))
+        story.append(Spacer(1,0.15*inch))
+
+    story.append(Spacer(1,0.1*inch))
+
+    # Totales (incluyendo tooling si aplica)
+    total_con_tooling = total_neto + total_tooling_cot
+    filas_totales = [
+        ["", Paragraph("Subtotal piezas:", ps("ts1",9,align=TA_RIGHT)), Paragraph(fmtc(total_general), ps("tv1",9,bold=True,align=TA_RIGHT))],
         ["", Paragraph("IVA (16%):", ps("ts2",9,GRAY,align=TA_RIGHT)), Paragraph(fmtc(iva), ps("tv2",9,GRAY,align=TA_RIGHT))],
-        ["", Paragraph("TOTAL NETO:", ps("ts3",11,NAVY,True,TA_RIGHT)), Paragraph(fmtc(total_neto), ps("tv3",13,GREEN,True,TA_RIGHT))],
-    ], colWidths=[4.7*inch,1.3*inch,1.0*inch])
+    ]
+    if total_tooling_cot > 0:
+        filas_totales.append(["", Paragraph("Custom Tooling:", ps("tst",9,BLUE,align=TA_RIGHT)), Paragraph(fmtc(total_tooling_cot), ps("tvt",9,BLUE,True,align=TA_RIGHT))])
+    filas_totales.append(["", Paragraph("TOTAL NETO:", ps("ts3",11,NAVY,True,TA_RIGHT)), Paragraph(fmtc(total_con_tooling), ps("tv3",13,GREEN,True,TA_RIGHT))])
+
+    tt = Table(filas_totales, colWidths=[4.7*inch,1.3*inch,1.0*inch])
     tt.setStyle(TableStyle([
         ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
         ("LINEABOVE",(1,-1),(-1,-1),1,NAVY),
@@ -2720,6 +2902,134 @@ with tab1:
                         f"<b>Total logística orden:</b> {fmtc(_clt * pieza['cantidad'])}"
                         f"</div>", unsafe_allow_html=True)
 
+        # ── Custom Tooling ──────────────────────────────────────────────────────
+        with st.expander("▸  Custom Tooling", expanded=False):
+            st.caption("Herramientas especiales requeridas para esta pieza (broaches, form tools, fixtures, etc.)")
+
+            tooling_list = pieza.get("custom_tooling", [])
+            pais_cliente = st.session_state.get("_pais", "México")
+            aplica_iva   = "USA" not in pais_cliente.upper()
+
+            # ── Agregar herramienta ──────────────────────────────────────────
+            if st.button("➕ Agregar herramienta", key=f"add_tool_{pieza['id']}"):
+                tooling_list.append({
+                    "id": len(tooling_list) + 1,
+                    "descripcion": "",
+                    "costo": 0.0,
+                    "proveedor": "",
+                    "lead_time": "",
+                    "opcion": "C",
+                    "vida_util": 1000,
+                    "margen_pct": 0.0,
+                    "propiedad": "JAAN",
+                    "activo": True,
+                    "nota": "",
+                })
+                st.session_state.piezas[pi]["custom_tooling"] = tooling_list
+                st.rerun()
+
+            total_tooling_separado = 0.0
+
+            for ti, tool in enumerate(tooling_list):
+                with st.container():
+                    st.markdown(f"**Herramienta #{ti+1}**")
+                    tc1, tc2, tc3, tc4 = st.columns([3, 1.5, 1.5, 0.5])
+                    with tc1:
+                        desc = st.text_input("Descripción", value=tool.get("descripcion",""),
+                            key=f"tool_desc_{pieza['id']}_{ti}",
+                            placeholder="Ej: Broach Ø25mm AISI 4140")
+                        tooling_list[ti]["descripcion"] = desc
+                    with tc2:
+                        costo_t = st.number_input("Costo ($)", min_value=0.0,
+                            value=float(tool.get("costo", 0.0)),
+                            key=f"tool_costo_{pieza['id']}_{ti}",
+                            step=100.0)
+                        tooling_list[ti]["costo"] = costo_t
+                    with tc3:
+                        margen_t = st.number_input("Margen (%)", min_value=0.0, max_value=200.0,
+                            value=float(tool.get("margen_pct", 0.0)),
+                            key=f"tool_margen_{pieza['id']}_{ti}",
+                            help="Margen de utilidad sobre el costo del tooling. Usa 0% para cobrarlo al costo.")
+                        tooling_list[ti]["margen_pct"] = margen_t
+                    with tc4:
+                        if st.button("🗑", key=f"del_tool_{pieza['id']}_{ti}"):
+                            tooling_list.pop(ti)
+                            st.session_state.piezas[pi]["custom_tooling"] = tooling_list
+                            st.rerun()
+
+                    tp1, tp2, tp3 = st.columns([2, 2, 2])
+                    with tp1:
+                        prov = st.text_input("Proveedor (opcional)", value=tool.get("proveedor",""),
+                            key=f"tool_prov_{pieza['id']}_{ti}")
+                        tooling_list[ti]["proveedor"] = prov
+                    with tp2:
+                        lt = st.text_input("Lead time (opcional)", value=tool.get("lead_time",""),
+                            key=f"tool_lt_{pieza['id']}_{ti}", placeholder="Ej: 4-6 semanas")
+                        tooling_list[ti]["lead_time"] = lt
+                    with tp3:
+                        opcion = st.radio("Método de cobro", ["A", "B", "C"],
+                            index=["A","B","C"].index(tool.get("opcion","C")),
+                            key=f"tool_op_{pieza['id']}_{ti}",
+                            horizontal=True,
+                            help="""**Opción A — Cargo único (FAI/Muestras)**
+El cliente paga la herramienta una sola vez. Ideal para primeras muestras o FAI. La herramienta puede quedar como propiedad del cliente.
+
+**Opción B — Amortización por pieza**
+El costo se divide entre la vida útil estimada y se suma al precio unitario. El cliente no ve el cargo por separado.
+
+**Opción C — Línea separada en cotización**
+El tooling aparece como cargo independiente junto a las piezas. Transparente para el cliente.""")
+                        tooling_list[ti]["opcion"] = opcion
+
+                    if opcion == "B":
+                        tb1, tb2 = st.columns(2)
+                        with tb1:
+                            vida = st.number_input("Vida útil estimada (pzas)", min_value=1,
+                                value=int(tool.get("vida_util", 1000)),
+                                key=f"tool_vida_{pieza['id']}_{ti}")
+                            tooling_list[ti]["vida_util"] = vida
+                        with tb2:
+                            precio_t = costo_t * (1 + margen_t/100)
+                            costo_amort = precio_t / max(vida, 1)
+                            st.metric("Costo amortizado/pza", fmtc(costo_amort))
+                    else:
+                        prop_opts = ["Cliente", "JAAN"] if opcion == "A" else ["JAAN"]
+                        prop = st.radio("Propiedad de la herramienta",
+                            prop_opts,
+                            index=prop_opts.index(tool.get("propiedad","JAAN")) if tool.get("propiedad","JAAN") in prop_opts else 0,
+                            key=f"tool_prop_{pieza['id']}_{ti}",
+                            horizontal=True,
+                            help="Define quién es el dueño legal de la herramienta tras el pago.")
+                        tooling_list[ti]["propiedad"] = prop
+
+                        precio_t = costo_t * (1 + margen_t/100)
+                        iva_t = precio_t * 0.16 if aplica_iva else 0.0
+                        total_t = precio_t + iva_t
+                        total_tooling_separado += total_t
+
+                        st.markdown(
+                            f"<div style='background:#E6F1FB;border-left:3px solid #185FA5;"
+                            f"border-radius:6px;padding:8px 14px;font-size:13px;margin-top:4px'>"
+                            f"Precio venta: <b>{fmtc(precio_t)}</b>"
+                            f"{f' + IVA: <b>{fmtc(iva_t)}</b>' if aplica_iva else ' (sin IVA — cliente USA)'}"
+                            f" → <b>Total: {fmtc(total_t)}</b></div>",
+                            unsafe_allow_html=True)
+
+                    nota = st.text_input("Nota para cliente (opcional)", value=tool.get("nota",""),
+                        key=f"tool_nota_{pieza['id']}_{ti}",
+                        placeholder="Ej: One-time charge, customer property after payment")
+                    tooling_list[ti]["nota"] = nota
+                    st.markdown("---")
+
+            st.session_state.piezas[pi]["custom_tooling"] = tooling_list
+
+            if total_tooling_separado > 0:
+                st.markdown(
+                    f"<div style='background:#F0FDF4;border-left:3px solid #16a34a;"
+                    f"border-radius:6px;padding:10px 14px;font-size:14px;font-weight:600'>"
+                    f"💰 Total Custom Tooling (Opciones A+C): <b>{fmtc(total_tooling_separado)}</b></div>",
+                    unsafe_allow_html=True)
+
         # ── Márgenes de utilidad por componente ─────────────────────────────
         usar_global = st.checkbox(
             "Usar margen global para esta pieza",
@@ -3158,8 +3468,22 @@ with tab2:
     cuerpo_email = st.text_area("Mensaje", key=body_key, height=220)
 
 
+    # ── Selector de template PDF ────────────────────────────────────────────
+    st.markdown("**Formato del PDF:**")
+    pdf_template = st.radio(
+        "Template",
+        ["simplificado", "detallado"],
+        format_func=lambda x: "📄 Simplificado — P/U y total por pieza" if x=="simplificado"
+                              else "📊 Detallado — Desglose por sección (Aeronáutico)",
+        horizontal=True,
+        key="pdf_template_sel",
+        help="""**Simplificado**: Núm. dibujo, descripción, material, tratamiento, precio unitario y total. Ideal para clientes comerciales.
+
+**Detallado**: Desglose de precio de venta por sección (materia prima, mano de obra, tratamiento, logística). Ideal para clientes aeronáuticos que requieren justificación de costos."""
+    )
+
     # Generar PDF
-    pdf_cache_key = f"_pdf_{num_cot}"
+    pdf_cache_key = f"_pdf_{num_cot}_{pdf_template}"
     if pdf_cache_key not in st.session_state:
         try:
             _pdf = generar_pdf_cotizacion(
@@ -3167,7 +3491,8 @@ with tab2:
                 direccion, cp, ciudad, pais,
                 moneda_cot, tipo_cambio, margen_global,
                 vigencia, t_entrega, cond_pago,
-                total_general, iva, total_neto)
+                total_general, iva, total_neto,
+                template=pdf_template)
             st.session_state[pdf_cache_key] = _pdf
         except Exception as _e:
             st.session_state[pdf_cache_key] = None

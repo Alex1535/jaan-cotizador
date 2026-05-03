@@ -3087,7 +3087,7 @@ with tab1:
                             # Embalaje — usa global si aplica, sino personalizado por tramo
                             _emb_global_key = f"emb_global_activo_{pieza['id']}"
                             _emb_global_data_key = f"emb_global_data_{pieza['id']}"
-                            _usa_global = st.session_state.get(_emb_global_key, False)
+                            _usa_global = st.session_state.get(_emb_global_key, True)
 
                             # Solo mostrar el toggle en el primer tramo activo
                             _tramos_activos = [t for t in tramos_pre if t.get("aplica")]

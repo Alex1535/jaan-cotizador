@@ -1206,9 +1206,11 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
     ]], colWidths=[4.5*inch, 2.5*inch])
     hdr1.setStyle(TableStyle([
         ("BACKGROUND",(0,0),(-1,-1),NAVY),
+        ("BACKGROUND",(0,0),(0,-1),WHITE),          # fondo blanco solo en celda del logo
         ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-        ("TOPPADDING",(0,0),(-1,-1),12),("BOTTOMPADDING",(0,0),(-1,-1),6),
-        ("LEFTPADDING",(0,0),(0,-1),16),("RIGHTPADDING",(-1,0),(-1,-1),16),
+        ("TOPPADDING",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,-1),10),
+        ("LEFTPADDING",(0,0),(0,-1),12),("RIGHTPADDING",(-1,0),(-1,-1),16),
+        ("LEFTPADDING",(1,0),(1,-1),16),
     ]))
 
     # Fila 2: certificación ISO como banda delgada

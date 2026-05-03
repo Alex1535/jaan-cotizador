@@ -722,15 +722,10 @@ def nueva_pieza(idx, defaults):
             "destino_final": "",
             "peso_pza_log": 0.0,
             "margen_log_pct": 0,
-            "tramos_pre": [
-                {"id":"mp_frontera",    "label":"MP → Frontera USA",              "aplica":False, "costo":0.0, "modo":"fijo", "notas":""},
-                {"id":"aduana",         "label":"Aduana / Importación",           "aplica":False, "costo":0.0, "modo":"fijo", "notas":""},
-                {"id":"frontera_planta","label":"Frontera → Planta JAAN",         "aplica":False, "costo":0.0, "modo":"fijo", "notas":""},
-                {"id":"planta_trat",    "label":"Planta → Tratamiento (ida+vuelta)","aplica":False,"costo":0.0,"modo":"fijo","notas":""},
-                {"id":"planta_cliente", "label":"Planta → Cliente final",         "aplica":False, "costo":0.0, "modo":"fijo", "notas":""},
-            ],
+            "tramos_pre": _init_tramos_pre(),
             "tramos_extra": [],
             "comentarios_log": "",
+
         },
         "plano_nombre": "",
         "plano_b64": "",
@@ -757,13 +752,27 @@ def nueva_pieza(idx, defaults):
     }
 
 
+TIPOS_EMBALAJE = ["—","Caja","Tarima","Caja sobre tarima","Bulto","Bolsa VCI",
+                  "Tubo / Cilindro","Rack","Contenedor","A granel","Otro"]
+
+def _emb_default():
+    return {"tipo":"—","largo_cm":0.0,"ancho_cm":0.0,"alto_cm":0.0,
+            "peso_bruto_kg":0.0,"pzas_por_bulto":1,"notas_embalaje":""}
+
 TRAMOS_PRE_DEFAULT = [
-    {"id":"mp_frontera",    "label":"MP → Frontera USA",               "aplica":False, "costo":0.0, "modo":"fijo", "notas":""},
-    {"id":"aduana",         "label":"Aduana / Importación",            "aplica":False, "costo":0.0, "modo":"fijo", "notas":""},
-    {"id":"frontera_planta","label":"Frontera → Planta JAAN",          "aplica":False, "costo":0.0, "modo":"fijo", "notas":""},
-    {"id":"planta_trat",    "label":"Planta → Tratamiento (ida+vuelta)","aplica":False,"costo":0.0, "modo":"fijo", "notas":""},
-    {"id":"planta_cliente", "label":"Planta → Cliente final",          "aplica":False, "costo":0.0, "modo":"fijo", "notas":""},
+    {"id":"mp_frontera",    "label":"MP → Frontera USA",               "aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
+    {"id":"aduana",         "label":"Aduana / Importación",            "aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
+    {"id":"frontera_planta","label":"Frontera → Planta JAAN",          "aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
+    {"id":"planta_trat",    "label":"Planta → Tratamiento (ida+vuelta)","aplica":False,"origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
+    {"id":"planta_cliente", "label":"Planta → Cliente final",          "aplica":False, "origen":"", "destino":"", "costo":0.0, "modo":"fijo", "notas":"", "embalaje":None},
 ]
+
+def _init_tramos_pre():
+    import copy
+    ts = copy.deepcopy(TRAMOS_PRE_DEFAULT)
+    for t in ts:
+        t["embalaje"] = _emb_default()
+    return ts
 
 def _ensure_logistica(pieza):
     """Garantiza que el dict logistica tenga todas las keys necesarias (compatible con estructura antigua)"""
@@ -780,9 +789,15 @@ def _ensure_logistica(pieza):
         log = pieza["logistica"]
         # Migrar campos viejos → nueva estructura si es necesario
         if "tramos_pre" not in log:
-            log["tramos_pre"] = copy.deepcopy(TRAMOS_PRE_DEFAULT)
-            # Migrar tramos_extra desde "tramos" antiguo
+            log["tramos_pre"] = _init_tramos_pre()
             log["tramos_extra"] = log.pop("tramos", [])
+        else:
+            # Asegurar que cada tramo tenga embalaje
+            for t in log["tramos_pre"]:
+                if "embalaje" not in t or not isinstance(t.get("embalaje"), dict):
+                    t["embalaje"] = _emb_default()
+                if "origen" not in t: t["origen"] = ""
+                if "destino" not in t: t["destino"] = ""
         if "tramos_extra" not in log:
             log["tramos_extra"] = []
         if "destino_final" not in log:
@@ -795,6 +810,9 @@ def _ensure_logistica(pieza):
             log["comentarios_log"] = ""
         if "peso_pza_log" not in log:
             log["peso_pza_log"] = 0.0
+        if "embalaje" not in log or not isinstance(log.get("embalaje"), dict):
+            log["embalaje"] = {"tipo":"Caja","largo_cm":0.0,"ancho_cm":0.0,"alto_cm":0.0,
+                               "peso_bruto_kg":0.0,"pzas_por_bulto":1,"notas_embalaje":""}
         for k, v in default.items():
             if k not in log:
                 log[k] = copy.deepcopy(v) if isinstance(v, (list, dict)) else v
@@ -1435,27 +1453,17 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                 # Fila de condiciones: Incoterm | Destino de entrega | Tramos activos
                 tramos_pre   = log_p.get("tramos_pre", [])
                 tramos_extra = log_p.get("tramos_extra", [])
-                activos = [t["label"] for t in tramos_pre if t.get("aplica")]
-                activos += [t.get("ruta","") for t in tramos_extra if float(t.get("costo",0))>0]
-                cadena_str = " → ".join(activos) if activos else "—"
+                activos_pre  = [t for t in tramos_pre  if t.get("aplica")]
+                activos_ext  = [t for t in tramos_extra if float(t.get("costo",0))>0]
 
+                # Fila resumen: Incoterm | Destino
                 ld_rows = [
                     [Paragraph("Incoterm",ps(f"llh1{i}",8,GRAY)),
-                     Paragraph("Destino de entrega",ps(f"llh2{i}",8,GRAY)),
-                     Paragraph("Cadena logística",ps(f"llh3{i}",8,GRAY))],
-                    [Paragraph(f"<b>{inco}</b>",ps(f"llv1{i}",9)),
-                     Paragraph(dest or "—",ps(f"llv2{i}",9)),
-                     Paragraph(cadena_str,ps(f"llv3{i}",8,GRAY))],
+                     Paragraph("Destino de entrega",ps(f"llh2{i}",8,GRAY))],
+                    [Paragraph(f"<b>{inco}</b>",ps(f"llv1{i}",10,NAVY,True)),
+                     Paragraph(dest or "—",ps(f"llv2{i}",9))],
                 ]
-                if coment:
-                    ld_rows.append([
-                        Paragraph("Observaciones",ps(f"llhc{i}",8,GRAY)),
-                        Paragraph("",""),Paragraph("","")])
-                    ld_rows.append([
-                        Paragraph(coment,ps(f"llvc{i}",8,GRAY)),
-                        Paragraph("",""),Paragraph("","")])
-
-                ld = Table(ld_rows, colWidths=[1.2*inch, 2.8*inch, 3.0*inch])
+                ld = Table(ld_rows, colWidths=[1.5*inch, 5.5*inch])
                 ld.setStyle(TableStyle([
                     ("BACKGROUND",(0,0),(-1,0),LGRAY),
                     ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
@@ -1463,7 +1471,97 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                     ("LINEBELOW",(0,0),(-1,0),0.5,colors.HexColor("#dde1ea")),
                 ]))
                 story.append(ld)
-                story.append(Spacer(1,0.08*inch))
+
+                # Tabla de tramos activos
+                if activos_pre or activos_ext:
+                    tr_header = [
+                        Paragraph("Tramo",ps(f"trh0{i}",8,WHITE,True)),
+                        Paragraph("Origen",ps(f"trh1{i}",8,WHITE,True)),
+                        Paragraph("Destino",ps(f"trh2{i}",8,WHITE,True)),
+                        Paragraph("Costo/orden",ps(f"trh3{i}",8,WHITE,True,TA_RIGHT)),
+                        Paragraph("Notas",ps(f"trh4{i}",8,WHITE,True)),
+                    ]
+                    tr_rows = [tr_header]
+                    for tridx, t in enumerate(activos_pre):
+                        tr_costo_orden = (
+                            float(t.get("costo",0)) if t.get("modo","fijo") == "fijo"
+                            else float(t.get("costo",0)) * p.get("cantidad",1)
+                        )
+                        tr_rows.append([
+                            Paragraph(t["label"],ps(f"trv0{i}{tridx}",8)),
+                            Paragraph(t.get("origen","—"),ps(f"trv1{i}{tridx}",8,GRAY)),
+                            Paragraph(t.get("destino","—"),ps(f"trv2{i}{tridx}",8,GRAY)),
+                            Paragraph(fmtc(tr_costo_orden),ps(f"trv3{i}{tridx}",8,align=TA_RIGHT)),
+                            Paragraph(t.get("notas",""),ps(f"trv4{i}{tridx}",8,GRAY)),
+                        ])
+                    for tridx, t in enumerate(activos_ext):
+                        tr_costo_orden = float(t.get("costo",0))
+                        tr_rows.append([
+                            Paragraph(t.get("ruta","Tramo extra"),ps(f"tex0{i}{tridx}",8)),
+                            Paragraph("",ps(f"tex1{i}{tridx}",8)),
+                            Paragraph("",ps(f"tex2{i}{tridx}",8)),
+                            Paragraph(fmtc(tr_costo_orden),ps(f"tex3{i}{tridx}",8,align=TA_RIGHT)),
+                            Paragraph(t.get("notas",""),ps(f"tex4{i}{tridx}",8,GRAY)),
+                        ])
+                    trt = Table(tr_rows, colWidths=[1.7*inch,1.3*inch,1.3*inch,1.0*inch,1.7*inch])
+                    trt.setStyle(TableStyle([
+                        ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#334155")),
+                        ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE,LGRAY]),
+                        ("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),
+                        ("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),
+                        ("LINEBELOW",(0,0),(-1,-1),0.3,colors.HexColor("#dde1ea")),
+                    ]))
+                    story.append(trt)
+
+                if coment:
+                    story.append(Spacer(1,0.04*inch))
+                    story.append(Paragraph(f"Observaciones: {coment}", ps(f"llvc{i}",8,GRAY)))
+
+                # Embalaje
+                emb_p = log_p.get("embalaje", {})
+                emb_tipo_p = emb_p.get("tipo","")
+                if emb_tipo_p:
+                    cant_p      = p.get("cantidad",1)
+                    pzas_bulto  = max(int(emb_p.get("pzas_por_bulto",1)),1)
+                    num_bultos  = math.ceil(cant_p / pzas_bulto)
+                    largo_e     = float(emb_p.get("largo_cm",0))
+                    ancho_e     = float(emb_p.get("ancho_cm",0))
+                    alto_e      = float(emb_p.get("alto_cm",0))
+                    peso_bruto  = float(emb_p.get("peso_bruto_kg",0))
+                    peso_total  = peso_bruto * num_bultos
+                    vol_m3      = (largo_e * ancho_e * alto_e) / 1_000_000
+                    notas_emb   = emb_p.get("notas_embalaje","")
+
+                    dim_str = f"{largo_e:.0f} × {ancho_e:.0f} × {alto_e:.0f} cm" if largo_e else "—"
+                    emb_rows = [
+                        [Paragraph("Embalaje",ps(f"embh0{i}",8,GRAY)),
+                         Paragraph("Bultos",ps(f"embh1{i}",8,GRAY)),
+                         Paragraph("Dimensiones/bulto",ps(f"embh2{i}",8,GRAY)),
+                         Paragraph("Vol/bulto (m³)",ps(f"embh3{i}",8,GRAY)),
+                         Paragraph("Peso bruto total",ps(f"embh4{i}",8,GRAY))],
+                        [Paragraph(f"<b>{emb_tipo_p}</b>",ps(f"embv0{i}",9)),
+                         Paragraph(f"{num_bultos} bulto(s) · {pzas_bulto} pza(s)/bulto",ps(f"embv1{i}",8)),
+                         Paragraph(dim_str,ps(f"embv2{i}",8)),
+                         Paragraph(f"{vol_m3:.4f}",ps(f"embv3{i}",8,align=TA_RIGHT)),
+                         Paragraph(f"{peso_total:.1f} kg",ps(f"embv4{i}",8,align=TA_RIGHT))],
+                    ]
+                    if notas_emb:
+                        emb_rows.append([
+                            Paragraph("Instrucciones",ps(f"embh5{i}",8,GRAY)),
+                            Paragraph(notas_emb,ps(f"embv5{i}",8,GRAY)),
+                            Paragraph("",""),Paragraph("",""),Paragraph("","")])
+                    embt = Table(emb_rows, colWidths=[1.2*inch,1.8*inch,1.5*inch,1.0*inch,1.5*inch])
+                    embt.setStyle(TableStyle([
+                        ("BACKGROUND",(0,0),(-1,0),LGRAY),
+                        ("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),
+                        ("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),
+                        ("LINEBELOW",(0,0),(-1,0),0.5,colors.HexColor("#dde1ea")),
+                        ("SPAN",(1,-1),(4,-1)) if notas_emb else ("TOPPADDING",(0,0),(0,0),3),
+                    ]))
+                    story.append(Spacer(1,0.05*inch))
+                    story.append(embt)
+
+                story.append(Spacer(1,0.1*inch))
             story.append(Spacer(1,0.05*inch))
 
         # ── Sección Custom Tooling (Opciones A y C) ──────────────────────────────
@@ -2918,51 +3016,120 @@ with tab1:
 
                 # ── Tramos predefinidos ────────────────────────────────────
                 st.markdown("##### Cadena logística")
-                st.caption("✓ Activa los tramos que apliquen · Modo: cómo se cobra ese tramo · Notas: carrier, agente, condiciones")
+                st.caption("Activa (✓) los tramos que apliquen · Llena los datos de cada etapa")
 
                 tramos_pre = log.get("tramos_pre", [])
+
+                # Cabecera columnas fila principal
+                hh0,hh1,hh2,hh3,hh4,hh5 = st.columns([0.25,1.4,1.2,1.2,0.95,1.5])
+                with hh0: st.caption("✓")
+                with hh1: st.caption("Tramo")
+                with hh2: st.caption("Origen")
+                with hh3: st.caption("Destino")
+                with hh4: st.caption("Modo cobro")
+                with hh5: st.caption("Costo ($)")
+                # Cabecera fila embalaje
+                he0,he1,he2,he3,he4,he5,he6,he7 = st.columns([0.25,1.4,1.0,0.7,0.7,0.7,0.7,1.1])
+                with he1: st.caption("Tipo embalaje")
+                with he2: st.caption("Carrier / agente")
+                with he3: st.caption("L(cm)")
+                with he4: st.caption("A(cm)")
+                with he5: st.caption("H(cm)")
+                with he6: st.caption("Kg bruto")
+                with he7: st.caption("Pzas/bulto")
+
                 for ti, tr in enumerate(tramos_pre):
                     tr_key = tr["id"]
-                    c0, c1, c2, c3, c4 = st.columns([0.3, 1.9, 1.1, 1.1, 2.1])
+                    emb    = tr.get("embalaje") or _emb_default()
+
+                    # Fila principal
+                    c0,c1,c2,c3,c4,c5 = st.columns([0.25,1.4,1.2,1.2,0.95,1.5])
                     with c0:
                         tr_aplica = st.checkbox("", value=tr.get("aplica",False),
                             key=f"lp_{pieza['id']}_{tr_key}")
                         tramos_pre[ti]["aplica"] = tr_aplica
                     with c1:
-                        st.markdown(
-                            f"<div style='padding-top:8px;font-size:13px;"
-                            f"font-weight:{'600' if tr_aplica else '400'};"
-                            f"color:{'#0f1b3d' if tr_aplica else '#6b7280'}'>"
-                            f"{tr['label']}</div>", unsafe_allow_html=True)
+                        color = "#0f1b3d" if tr_aplica else "#9ca3af"
+                        fw    = "600" if tr_aplica else "400"
+                        st.markdown(f"<div style='padding-top:8px;font-size:13px;font-weight:{fw};color:{color}'>"
+                                    f"{tr['label']}</div>", unsafe_allow_html=True)
                     with c2:
-                        if tr_aplica:
-                            tr_modo = st.selectbox("Modo", MODOS,
-                                index=MODOS.index(tr.get("modo","fijo")) if tr.get("modo","fijo") in MODOS else 0,
-                                format_func=lambda x: MODOS_LBL[x],
-                                key=f"lpm_{pieza['id']}_{tr_key}",
-                                label_visibility="collapsed")
-                            tramos_pre[ti]["modo"] = tr_modo
-                        else:
-                            st.empty()
+                        tr_origen = st.text_input("Origen", value=tr.get("origen",""),
+                            key=f"lpo_{pieza['id']}_{tr_key}",
+                            placeholder="Lugar origen",
+                            label_visibility="collapsed")
+                        tramos_pre[ti]["origen"] = tr_origen
                     with c3:
-                        if tr_aplica:
-                            lbl_c = {"fijo":"Costo ($)","por_kg":"$/kg","por_pza":"$/pza"}[tramos_pre[ti]["modo"]]
-                            tr_costo = st.number_input(lbl_c, min_value=0.0,
-                                value=float(tr.get("costo",0.0)), step=50.0,
-                                key=f"lpc_{pieza['id']}_{tr_key}",
-                                label_visibility="collapsed")
-                            tramos_pre[ti]["costo"] = tr_costo
-                        else:
-                            st.empty()
+                        tr_destino = st.text_input("Destino", value=tr.get("destino",""),
+                            key=f"lpd_{pieza['id']}_{tr_key}",
+                            placeholder="Lugar destino",
+                            label_visibility="collapsed")
+                        tramos_pre[ti]["destino"] = tr_destino
                     with c4:
-                        if tr_aplica:
-                            tr_notas = st.text_input("Notas", value=tr.get("notas",""),
-                                key=f"lpn_{pieza['id']}_{tr_key}",
-                                placeholder="Carrier, agente, condiciones...",
-                                label_visibility="collapsed")
-                            tramos_pre[ti]["notas"] = tr_notas
-                        else:
-                            st.empty()
+                        tr_modo = st.selectbox("Modo", MODOS,
+                            index=MODOS.index(tr.get("modo","fijo")) if tr.get("modo","fijo") in MODOS else 0,
+                            format_func=lambda x: MODOS_LBL[x],
+                            key=f"lpm_{pieza['id']}_{tr_key}",
+                            label_visibility="collapsed")
+                        tramos_pre[ti]["modo"] = tr_modo
+                    with c5:
+                        tr_costo = st.number_input("Costo", min_value=0.0,
+                            value=float(tr.get("costo",0.0)), step=50.0,
+                            key=f"lpc_{pieza['id']}_{tr_key}",
+                            label_visibility="collapsed")
+                        tramos_pre[ti]["costo"] = tr_costo
+
+                    # Fila embalaje — siempre visible
+                    e0,e1,e2,e3,e4,e5,e6,e7 = st.columns([0.25,1.4,1.0,0.7,0.7,0.7,0.7,1.1])
+                    with e0: st.empty()
+                    with e1:
+                        emb_tipo = st.selectbox("Tipo embalaje",
+                            TIPOS_EMBALAJE,
+                            index=TIPOS_EMBALAJE.index(emb.get("tipo","—")) if emb.get("tipo","—") in TIPOS_EMBALAJE else 0,
+                            key=f"embt_{pieza['id']}_{tr_key}",
+                            label_visibility="collapsed")
+                        emb["tipo"] = emb_tipo
+                    with e2:
+                        emb_notas = st.text_input("Notas embalaje/carrier",
+                            value=emb.get("notas_embalaje",""),
+                            key=f"embn_{pieza['id']}_{tr_key}",
+                            placeholder="Carrier / agente / condiciones",
+                            label_visibility="collapsed")
+                        emb["notas_embalaje"] = emb_notas
+                    with e3:
+                        emb_l = st.number_input("L(cm)", min_value=0.0,
+                            value=float(emb.get("largo_cm",0.0)), step=1.0, format="%.0f",
+                            key=f"embl_{pieza['id']}_{tr_key}",
+                            label_visibility="collapsed")
+                        emb["largo_cm"] = emb_l
+                    with e4:
+                        emb_a = st.number_input("A(cm)", min_value=0.0,
+                            value=float(emb.get("ancho_cm",0.0)), step=1.0, format="%.0f",
+                            key=f"emba_{pieza['id']}_{tr_key}",
+                            label_visibility="collapsed")
+                        emb["ancho_cm"] = emb_a
+                    with e5:
+                        emb_h = st.number_input("H(cm)", min_value=0.0,
+                            value=float(emb.get("alto_cm",0.0)), step=1.0, format="%.0f",
+                            key=f"embh_{pieza['id']}_{tr_key}",
+                            label_visibility="collapsed")
+                        emb["alto_cm"] = emb_h
+                    with e6:
+                        emb_p = st.number_input("Kg bruto", min_value=0.0,
+                            value=float(emb.get("peso_bruto_kg",0.0)), step=0.5, format="%.1f",
+                            key=f"embp_{pieza['id']}_{tr_key}",
+                            label_visibility="collapsed")
+                        emb["peso_bruto_kg"] = emb_p
+                    with e7:
+                        emb_pzas = st.number_input("Pzas/bulto", min_value=1,
+                            value=int(emb.get("pzas_por_bulto",1)), step=1,
+                            key=f"embpz_{pieza['id']}_{tr_key}",
+                            label_visibility="collapsed")
+                        emb["pzas_por_bulto"] = emb_pzas
+
+                    tramos_pre[ti]["embalaje"] = emb
+                    st.markdown("<hr style='margin:2px 0 6px;border:none;border-top:0.5px solid #e5e7eb'>",
+                                unsafe_allow_html=True)
 
                 st.session_state.piezas[pi]["logistica"]["tramos_pre"] = tramos_pre
 

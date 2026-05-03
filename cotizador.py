@@ -3641,13 +3641,11 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                 unsafe_allow_html=True)
         else:
             _clt = res.get('costo_log_total', 0)
-            _clo = res.get('costo_log_orden', 0)
-            _total_con_log = res["total"] + _clo
             if _clt > 0:
-                r1, r2, r3, r4, r5, r6, r7 = st.columns(7)
+                r1, r2, r3, r4, r5, r6 = st.columns(6)
             else:
                 r1, r2, r3, r4, r5 = st.columns(5)
-                r6 = r7 = None
+                r6 = None
             r1.metric("Maquinado/pza",   fmtc(res["costo_maq"]))
             r2.metric("Material/pza",    fmtc(res["costo_material"]))
             r3.metric("Tratamiento/pza", fmtc(res["costo_trat"]))
@@ -3660,8 +3658,6 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                         f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
                         f"</div>", unsafe_allow_html=True)
                 r6.metric(f"Total {cant} pzas", fmtc(res["total"]))
-                r7.metric("+ Logística orden", fmtc(_clo),
-                    help="Cargo de logística separado del precio/pza")
             else:
                 with r4:
                     st.markdown(

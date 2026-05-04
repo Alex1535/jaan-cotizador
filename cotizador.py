@@ -1335,13 +1335,15 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                  Paragraph("Precio venta/pza",ps("dh1",8,WHITE,True,TA_RIGHT)),
                  Paragraph(f"Total ({cant} pzas)",ps("dh2",8,WHITE,True,TA_RIGHT))],
                 [Paragraph(
-                    "Materia prima" + (
+                    "Materia prima" + (lambda _m, _s, _c: (
                         "<br/><font size='7' color='grey'>" +
-                        (mp.get("material","") or "") +
-                        (" " + mp.get("spec","")).rstrip() +
-                        ("  ·  " + mp.get("comentarios_mp","").strip() if mp.get("comentarios_mp","").strip() else "") +
+                        " ".join(filter(None, [_m, _s])) +
+                        ("  ·  " + _c if _c else "") +
                         "</font>"
-                        if (mp.get("material") or mp.get("spec") or mp.get("comentarios_mp","").strip()) else ""
+                    ) if (_m or _s or _c) else "")(
+                        (mp.get("material","") or "").strip(),
+                        (mp.get("spec","") or "").strip(),
+                        (mp.get("comentarios_mp","") or "").strip()
                     ), ps("dr0",8)),
                  Paragraph(fmtc(pv_mat),ps("dr1",8,align=TA_RIGHT)),
                  Paragraph(fmtc(pv_mat*cant),ps("dr2",8,align=TA_RIGHT))],

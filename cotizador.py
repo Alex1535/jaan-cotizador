@@ -779,7 +779,10 @@ def _ensure_logistica(pieza):
     """Garantiza que el dict logistica tenga todas las keys necesarias (compatible con estructura antigua)"""
     import copy
     default = {
-        "aplica": False, "incoterm": "EXW", "destino_final": "",
+        "aplica": False, "incoterm": "EXW",
+        "entrega_empresa": "", "entrega_domicilio": "",
+        "entrega_ciudad": "", "entrega_estado": "",
+        "entrega_pais": "", "entrega_cp": "",
         "peso_pza_log": 0.0, "margen_log_pct": 0,
         "tramos_pre": copy.deepcopy(TRAMOS_PRE_DEFAULT),
         "tramos_extra": [], "comentarios_log": "",
@@ -802,8 +805,15 @@ def _ensure_logistica(pieza):
                 if "label_custom" not in t: t["label_custom"] = ""
         if "tramos_extra" not in log:
             log["tramos_extra"] = []
-        if "destino_final" not in log:
-            log["destino_final"] = ""
+        # Migrar destino_final antiguo si existe
+        if "destino_final" in log and log["destino_final"]:
+            if not log.get("entrega_ciudad"):
+                log["entrega_ciudad"] = log.pop("destino_final","")
+            else:
+                log.pop("destino_final", None)
+        for _k in ["entrega_empresa","entrega_domicilio","entrega_ciudad",
+                   "entrega_estado","entrega_pais","entrega_cp"]:
+            if _k not in log: log[_k] = ""
         if "margen_log_pct" not in log:
             log["margen_log_pct"] = log.pop("margen_log", pieza.get("margen_log", 0))
         if "incoterm" not in log:
@@ -1469,7 +1479,14 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                 res_p   = calcular_pieza(p, margen_global)
                 log_p   = p.get("logistica",{})
                 inco    = log_p.get("incoterm","EXW")
-                dest    = log_p.get("destino_final","") or ", ".join(filter(None,[ciudad,pais]))
+                dest    = ", ".join(filter(None,[
+                    log_p.get("entrega_empresa",""),
+                    log_p.get("entrega_domicilio",""),
+                    log_p.get("entrega_ciudad",""),
+                    log_p.get("entrega_estado",""),
+                    log_p.get("entrega_cp",""),
+                    log_p.get("entrega_pais",""),
+                ])) or ", ".join(filter(None,[ciudad,pais]))
                 coment  = log_p.get("comentarios_log","").strip()
                 costo_log_orden = res_p.get("costo_log_orden", 0.0)
 
@@ -1496,11 +1513,13 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                 # Fila resumen: Incoterm | Destino
                 ld_rows = [
                     [Paragraph("Incoterm",ps(f"llh1{i}",8,GRAY)),
-                     Paragraph("Destino de entrega",ps(f"llh2{i}",8,GRAY))],
+                     Paragraph("Empresa destinataria",ps(f"llh2{i}",8,GRAY)),
+                     Paragraph("Dirección de entrega",ps(f"llh3{i}",8,GRAY))],
                     [Paragraph(f"<b>{inco}</b>",ps(f"llv1{i}",10,NAVY,True)),
-                     Paragraph(dest or "—",ps(f"llv2{i}",9))],
+                     Paragraph(log_p.get("entrega_empresa","—") or "—",ps(f"llv2{i}",9)),
+                     Paragraph(dest or "—",ps(f"llv3{i}",8,GRAY))],
                 ]
-                ld = Table(ld_rows, colWidths=[1.5*inch, 5.5*inch])
+                ld = Table(ld_rows, colWidths=[1.2*inch, 2.0*inch, 3.8*inch])
                 ld.setStyle(TableStyle([
                     ("BACKGROUND",(0,0),(-1,0),LGRAY),
                     ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
@@ -3042,22 +3061,22 @@ with tab1:
                 MODOS    = ["fijo","por_kg","por_pza"]
                 MODOS_LBL = {"fijo":"Fijo por orden ($)","por_kg":"Por kg ($/kg)","por_pza":"Por pieza ($/pza)"}
 
-                # ── Incoterm, destino y peso ──────────────────────────────
-                hd1, hd2, hd3 = st.columns([1, 2, 1])
+                # ── Fila 1: Incoterm + Empresa + Peso/pza ────────────────
+                INCO_DESC = {
+                    "EXW": "Ex Works — vendedor pone en su local, comprador asume todo desde ahí",
+                    "FCA": "Free Carrier — vendedor entrega al transportista del comprador en punto acordado",
+                    "FOB": "Free On Board — vendedor entrega a bordo del buque; riesgo pasa al embarcar",
+                    "CFR": "Cost & Freight — vendedor paga flete a puerto destino; riesgo pasa al embarcar",
+                    "CIF": "Cost, Insurance & Freight — como CFR + seguro de carga incluido",
+                    "CPT": "Carriage Paid To — vendedor paga transporte a destino; riesgo pasa al primer transportista",
+                    "CIP": "Carriage & Insurance Paid — como CPT + seguro incluido",
+                    "DAP": "Delivered At Place — vendedor entrega en destino, sin pagar derechos de importación",
+                    "DDP": "Delivered Duty Paid — vendedor asume todo incluyendo impuestos hasta el destino final",
+                    "FAS": "Free Alongside Ship — vendedor entrega junto al buque; comprador asume desde ahí",
+                }
+                hd1, hd2, hd3 = st.columns([1.4, 2.0, 0.8])
                 with hd1:
                     incoterms    = ["EXW","FCA","FOB","CFR","CIF","CPT","CIP","DAP","DDP","FAS"]
-                    INCO_DESC    = {
-                        "EXW": "Ex Works — vendedor pone en su local, comprador asume todo desde ahí",
-                        "FCA": "Free Carrier — vendedor entrega al transportista del comprador en punto acordado",
-                        "FOB": "Free On Board — vendedor entrega a bordo del buque; riesgo pasa al embarcar",
-                        "CFR": "Cost & Freight — vendedor paga flete a puerto destino; riesgo pasa al embarcar",
-                        "CIF": "Cost, Insurance & Freight — como CFR + seguro de carga incluido",
-                        "CPT": "Carriage Paid To — vendedor paga transporte a destino; riesgo pasa al primer transportista",
-                        "CIP": "Carriage & Insurance Paid — como CPT + seguro incluido",
-                        "DAP": "Delivered At Place — vendedor entrega en destino, sin pagar derechos de importación",
-                        "DDP": "Delivered Duty Paid — vendedor asume todo incluyendo impuestos hasta el destino final",
-                        "FAS": "Free Alongside Ship — vendedor entrega junto al buque; comprador asume desde ahí",
-                    }
                     inc_saved    = log.get("incoterm","EXW")
                     inc_idx      = incoterms.index(inc_saved) if inc_saved in incoterms else 0
                     incoterm_sel = st.selectbox("Incoterm de entrega", incoterms, index=inc_idx,
@@ -3066,17 +3085,50 @@ with tab1:
                         help="Define quién asume riesgo y costos hasta el punto de entrega al cliente")
                     st.session_state.piezas[pi]["logistica"]["incoterm"] = incoterm_sel
                 with hd2:
-                    dest_fin = st.text_input("Destino final de entrega",
-                        value=log.get("destino_final",""),
-                        key=f"log_dest_{pieza['id']}",
-                        placeholder="Ej: Calexico CA USA / Planta Juárez / Almacén Guadalajara")
-                    st.session_state.piezas[pi]["logistica"]["destino_final"] = dest_fin
+                    ent_emp = st.text_input("Empresa destinataria",
+                        value=log.get("entrega_empresa",""),
+                        key=f"log_emp_{pieza['id']}",
+                        placeholder="Ej: Tech MFG Services LLC")
+                    st.session_state.piezas[pi]["logistica"]["entrega_empresa"] = ent_emp
                 with hd3:
                     peso_log = st.number_input("Peso/pza (kg)", min_value=0.0,
                         value=float(log.get("peso_pza_log",0.0)),
                         step=0.01, format="%.3f", key=f"log_peso_{pieza['id']}",
                         help="Solo si algún tramo cobra por kg")
                     st.session_state.piezas[pi]["logistica"]["peso_pza_log"] = peso_log
+
+                # ── Fila 2: Domicilio, Ciudad, Estado, País, ZIP/CP ───────
+                da1, da2, da3, da4, da5 = st.columns([2.2, 1.3, 1.2, 1.0, 0.7])
+                with da1:
+                    ent_dom = st.text_input("Domicilio",
+                        value=log.get("entrega_domicilio",""),
+                        key=f"log_dom_{pieza['id']}",
+                        placeholder="Ej: 389 Rood Road Warehouse #2")
+                    st.session_state.piezas[pi]["logistica"]["entrega_domicilio"] = ent_dom
+                with da2:
+                    ent_ciu = st.text_input("Ciudad",
+                        value=log.get("entrega_ciudad",""),
+                        key=f"log_ciu_{pieza['id']}",
+                        placeholder="Ej: Calexico")
+                    st.session_state.piezas[pi]["logistica"]["entrega_ciudad"] = ent_ciu
+                with da3:
+                    ent_est = st.text_input("Estado / Prov.",
+                        value=log.get("entrega_estado",""),
+                        key=f"log_est_{pieza['id']}",
+                        placeholder="Ej: CA / BC")
+                    st.session_state.piezas[pi]["logistica"]["entrega_estado"] = ent_est
+                with da4:
+                    ent_pai = st.text_input("País",
+                        value=log.get("entrega_pais",""),
+                        key=f"log_pai_{pieza['id']}",
+                        placeholder="Ej: USA / México")
+                    st.session_state.piezas[pi]["logistica"]["entrega_pais"] = ent_pai
+                with da5:
+                    ent_cp = st.text_input("ZIP / CP",
+                        value=log.get("entrega_cp",""),
+                        key=f"log_cp_{pieza['id']}",
+                        placeholder="92231")
+                    st.session_state.piezas[pi]["logistica"]["entrega_cp"] = ent_cp
 
                 # ── Tramos predefinidos ────────────────────────────────────
                 st.markdown("##### Cadena logística")
@@ -3316,7 +3368,8 @@ with tab1:
                     f"<div style='background:#E6F1FB;border-left:3px solid #185FA5;"
                     f"border-radius:6px;padding:8px 14px;font-size:13px;margin-top:8px'>"
                     f"<b>Incoterm:</b> {incoterm_sel} &nbsp;·&nbsp; "
-                    f"<b>Destino:</b> {dest_fin or '—'} &nbsp;·&nbsp; "
+                    f"<b>Empresa:</b> {st.session_state.piezas[pi]['logistica'].get('entrega_empresa','—') or '—'} &nbsp;·&nbsp; "
+                    f"<b>Destino:</b> {', '.join(filter(None,[st.session_state.piezas[pi]['logistica'].get('entrega_ciudad',''), st.session_state.piezas[pi]['logistica'].get('entrega_estado',''), st.session_state.piezas[pi]['logistica'].get('entrega_pais','')])) or '—'} &nbsp;·&nbsp; "
                     f"<b>Log/pza (cargo separado):</b> {fmtc(_clt)} &nbsp;·&nbsp; "
                     f"<b>Total logística orden:</b> {fmtc(_clo)}<br/>"
                     f"<span style='font-size:11px;opacity:0.7'>Cadena: "

@@ -951,8 +951,8 @@ def calcular_pieza(pieza, margen_pct):
     util_log = costo_log * (margen_log_pct / 100) if costo_log > 0 else 0.0
     costo_log_con_margen = costo_log + util_log
 
-    # Logística va SEPARADA del precio/pza — NO se suma al precio_pza
-    # (se cobra como línea aparte en la cotización)
+    # Logística INCLUIDA en precio/pza
+    precio_pza = precio_pza + costo_log_con_margen
 
     # ── Custom Tooling ────────────────────────────────────────────────────────
     tooling_items = pieza.get("custom_tooling", [])
@@ -975,8 +975,7 @@ def calcular_pieza(pieza, margen_pct):
     precio_pza = precio_pza + costo_tooling_pza
     total      = precio_pza * cantidad
 
-    # Total pieza SIN logística — logística es cargo separado
-    total_sin_log = precio_pza * cantidad
+    total_con_log = precio_pza * cantidad
 
     return {
         "ops_resultado": resultados,
@@ -992,8 +991,8 @@ def calcular_pieza(pieza, margen_pct):
         "costo_log_orden": costo_log_con_margen * cantidad if log.get("aplica", False) else 0.0,
         "subtotal":      subtotal,
         "utilidad":      utilidad,
-        "precio_pza":    precio_pza,           # SIN logística
-        "total":         total_sin_log,        # SIN logística
+        "precio_pza":    precio_pza,           # INCLUYE logística
+        "total":         total_con_log,        # INCLUYE logística
         "costo_tooling_pza":   costo_tooling_pza,
         "costo_tooling_total": costo_tooling_total,
         "precios_tipo":  precios,
@@ -1688,14 +1687,9 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
     story.append(Spacer(1,0.1*inch))
 
     # Totales — logística como cargo separado
-    total_logistica = sum(
-        calcular_pieza(p, margen_global).get("costo_log_orden", 0.0)
-        for p in piezas
-        if p.get("logistica", {}).get("aplica", False)
-    )
     iva_display        = iva if aplica_iva_pdf else 0.0
     iva_label          = "IVA (16%):" if aplica_iva_pdf else "IVA (0% — Exportación):"
-    total_con_tooling  = total_general + iva_display + total_tooling_cot + total_logistica
+    total_con_tooling  = total_general + iva_display + total_tooling_cot
 
     filas_totales = [
         ["", Paragraph("Subtotal piezas:", ps("ts1",9,align=TA_RIGHT)),
@@ -1703,10 +1697,7 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
         ["", Paragraph(iva_label, ps("ts2",9,GRAY,align=TA_RIGHT)),
               Paragraph(fmtc(iva_display), ps("tv2",9,GRAY,align=TA_RIGHT))],
     ]
-    if total_logistica > 0:
-        filas_totales.append([
-            "", Paragraph("Logística (cargo separado):", ps("tsl",9,BLUE,align=TA_RIGHT)),
-            Paragraph(fmtc(total_logistica), ps("tvl",9,BLUE,True,align=TA_RIGHT))])
+    # Logística incluida en precio/pza — no se lista por separado en totales
     if total_tooling_cot > 0:
         filas_totales.append([
             "", Paragraph("Custom Tooling:", ps("tst",9,BLUE,align=TA_RIGHT)),
@@ -3377,7 +3368,7 @@ with tab1:
                     f"<b>Incoterm:</b> {incoterm_sel} &nbsp;·&nbsp; "
                     f"<b>Empresa:</b> {st.session_state.piezas[pi]['logistica'].get('entrega_empresa','—') or '—'} &nbsp;·&nbsp; "
                     f"<b>Destino:</b> {', '.join(filter(None,[st.session_state.piezas[pi]['logistica'].get('entrega_ciudad',''), st.session_state.piezas[pi]['logistica'].get('entrega_estado',''), st.session_state.piezas[pi]['logistica'].get('entrega_pais','')])) or '—'} &nbsp;·&nbsp; "
-                    f"<b>Log/pza (cargo separado):</b> {fmtc(_clt)} &nbsp;·&nbsp; "
+                    f"<b>Logística/pza:</b> {fmtc(_clt)} &nbsp;·&nbsp; "
                     f"<b>Total logística orden:</b> {fmtc(_clo)}<br/>"
                     f"<span style='font-size:11px;opacity:0.7'>Cadena: "
                     f"{' → '.join(activos) if activos else 'Sin tramos activos'}</span>"

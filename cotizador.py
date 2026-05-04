@@ -1204,7 +1204,7 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter,
-                            rightMargin=0.75*inch, leftMargin=0.75*inch,
+                            rightMargin=0.55*inch, leftMargin=0.55*inch,
                             topMargin=0.75*inch, bottomMargin=0.75*inch)
 
     NAVY  = colors.HexColor("#0f1b3d")
@@ -1294,7 +1294,7 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
 
     if template == "detallado":
         # Template Detallado — desglose por sección con precios de venta
-        story.append(Paragraph("Desglose de cotización por pieza", ps("h2",11,NAVY,True)))
+        story.append(Paragraph("Desglose de cotización por pieza", ps("h2",10,NAVY,True)))
         story.append(Spacer(1,0.08*inch))
 
         for i,p in enumerate(piezas):
@@ -1374,15 +1374,15 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                     dom_d,
                     " ".join(filter(None,[ciudad_d, estado_d, cp_d])),
                     pais_d]))
-                entrega_lines = []
-                if empresa_d: entrega_lines.append(f"<b>Entregar a:</b> {empresa_d}")
-                if dir_linea: entrega_lines.append(f"<b>Dirección:</b> {dir_linea}")
-                if coment_d:  entrega_lines.append(coment_d)
-                entrega_txt = "<br/>".join(entrega_lines)
+                entrega_parts = []
+                if empresa_d: entrega_parts.append(empresa_d)
+                if dir_linea: entrega_parts.append(dir_linea)
+                if coment_d:  entrega_parts.append(coment_d)
+                entrega_txt = "  ·  ".join(entrega_parts)
                 det_rows.append([
                     Paragraph(
-                        f"Logística — <b>{incoterm_d}</b>"
-                        + (f"<br/><font size='7' color='grey'>{entrega_txt}</font>" if entrega_txt else ""),
+                        f"Logística &nbsp;<font color='#185FA5'><b>[{incoterm_d}]</b></font>"
+                        + (f"<br/><font size='6.5' color='grey'>{entrega_txt}</font>" if entrega_txt else ""),
                         ps("dr9",8)),
                     Paragraph(fmtc(pv_log),ps("dr10",8,align=TA_RIGHT)),
                     Paragraph(fmtc(pv_log*cant),ps("dr11",8,align=TA_RIGHT))])
@@ -1416,7 +1416,7 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
 
     else:
         # Template Simplificado — tabla compacta estándar
-        story.append(Paragraph("Resumen de piezas", ps("h2",11,NAVY,True)))
+        story.append(Paragraph("Resumen de piezas", ps("h2",10,NAVY,True)))
         story.append(Spacer(1,0.08*inch))
         col_w = [0.3*inch,1.0*inch,1.4*inch,0.8*inch,0.7*inch,0.9*inch,0.7*inch,1.0*inch]
         rows = [[Paragraph(h, ps(f"th{i}",8,WHITE,True)) for i,h in
@@ -1479,8 +1479,8 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
         piezas_con_log = [(i,p) for i,p in enumerate(piezas)
                           if p.get("logistica",{}).get("aplica", False)]
         if piezas_con_log:
-            story.append(Paragraph("Condiciones de logística", ps("h2log",11,NAVY,True)))
-            story.append(Spacer(1,0.06*inch))
+            story.append(Paragraph("Condiciones de logística", ps("h2log",10,NAVY,True)))
+            story.append(Spacer(1,0.04*inch))
             MODO_ETIQ = {"fijo":"Fijo por orden","por_kg":"Por kg","por_pza":"Por pieza"}
             for i,p in piezas_con_log:
                 res_p   = calcular_pieza(p, margen_global)
@@ -1573,8 +1573,8 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                     trt.setStyle(TableStyle([
                         ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#334155")),
                         ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE,LGRAY]),
-                        ("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),
-                        ("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),
+                        ("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),
+                        ("LEFTPADDING",(0,0),(-1,-1),5),("RIGHTPADDING",(0,0),(-1,-1),5),
                         ("LINEBELOW",(0,0),(-1,-1),0.3,colors.HexColor("#dde1ea")),
                     ]))
                     story.append(trt)

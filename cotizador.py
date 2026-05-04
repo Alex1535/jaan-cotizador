@@ -1361,22 +1361,29 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                     Paragraph(fmtc(pv_tr),ps("dr7",8,align=TA_RIGHT)),
                     Paragraph(fmtc(pv_tr*cant),ps("dr8",8,align=TA_RIGHT))])
             if pv_log > 0:
-                log_d    = p.get("logistica",{})
+                log_d      = p.get("logistica",{})
                 incoterm_d = log_d.get("incoterm","EXW")
-                MODO_LBL = {"fijo":"Fijo por orden","por_kg":"Por kg","por_pza":"Por pieza","pct_valor":"% del valor"}
-                modo_d   = MODO_LBL.get(log_d.get("modo_global","fijo"), log_d.get("modo_global","—"))
-                ce_d     = log_d.get("comercio_exterior", False)
-                dest_d   = ", ".join(filter(None,[ciudad, pais]))
-                coment_d = log_d.get("comentarios_log","").strip()
-                cond_d   = f"{incoterm_d} · {modo_d}"
-                if ce_d:
-                    cond_d += f" · Comercio exterior (arancel {log_d.get('arancel_pct',0):.1f}%, seguro {log_d.get('seguro_pct',0):.1f}%)"
-                if dest_d:
-                    cond_d += f" · Destino: {dest_d}"
-                if coment_d:
-                    cond_d += f" · {coment_d}"
+                empresa_d  = log_d.get("entrega_empresa","").strip()
+                dom_d      = log_d.get("entrega_domicilio","").strip()
+                ciudad_d   = log_d.get("entrega_ciudad","").strip()
+                estado_d   = log_d.get("entrega_estado","").strip()
+                cp_d       = log_d.get("entrega_cp","").strip()
+                pais_d     = log_d.get("entrega_pais","").strip()
+                coment_d   = log_d.get("comentarios_log","").strip()
+                dir_linea  = ", ".join(filter(None,[
+                    dom_d,
+                    " ".join(filter(None,[ciudad_d, estado_d, cp_d])),
+                    pais_d]))
+                entrega_lines = []
+                if empresa_d: entrega_lines.append(f"<b>Entregar a:</b> {empresa_d}")
+                if dir_linea: entrega_lines.append(f"<b>Dirección:</b> {dir_linea}")
+                if coment_d:  entrega_lines.append(coment_d)
+                entrega_txt = "<br/>".join(entrega_lines)
                 det_rows.append([
-                    Paragraph(f"Logística<br/><font size='7' color='grey'>{cond_d}</font>",ps("dr9",8)),
+                    Paragraph(
+                        f"Logística — <b>{incoterm_d}</b>"
+                        + (f"<br/><font size='7' color='grey'>{entrega_txt}</font>" if entrega_txt else ""),
+                        ps("dr9",8)),
                     Paragraph(fmtc(pv_log),ps("dr10",8,align=TA_RIGHT)),
                     Paragraph(fmtc(pv_log*cant),ps("dr11",8,align=TA_RIGHT))])
 
@@ -1478,15 +1485,18 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
             for i,p in piezas_con_log:
                 res_p   = calcular_pieza(p, margen_global)
                 log_p   = p.get("logistica",{})
-                inco    = log_p.get("incoterm","EXW")
-                dest    = ", ".join(filter(None,[
-                    log_p.get("entrega_empresa",""),
-                    log_p.get("entrega_domicilio",""),
-                    log_p.get("entrega_ciudad",""),
-                    log_p.get("entrega_estado",""),
-                    log_p.get("entrega_cp",""),
-                    log_p.get("entrega_pais",""),
-                ])) or ", ".join(filter(None,[ciudad,pais]))
+                inco       = log_p.get("incoterm","EXW")
+                empresa_s  = log_p.get("entrega_empresa","").strip()
+                dom_s      = log_p.get("entrega_domicilio","").strip()
+                ciudad_s   = log_p.get("entrega_ciudad","").strip()
+                estado_s   = log_p.get("entrega_estado","").strip()
+                cp_s       = log_p.get("entrega_cp","").strip()
+                pais_s     = log_p.get("entrega_pais","").strip()
+                dir_s      = ", ".join(filter(None,[
+                    dom_s,
+                    " ".join(filter(None,[ciudad_s, estado_s, cp_s])),
+                    pais_s]))
+                dest       = dir_s  # dirección sin empresa (empresa va separada)
                 coment  = log_p.get("comentarios_log","").strip()
                 costo_log_orden = res_p.get("costo_log_orden", 0.0)
 
@@ -1513,11 +1523,11 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                 # Fila resumen: Incoterm | Destino
                 ld_rows = [
                     [Paragraph("Incoterm",ps(f"llh1{i}",8,GRAY)),
-                     Paragraph("Empresa destinataria",ps(f"llh2{i}",8,GRAY)),
+                     Paragraph("Entregar a",ps(f"llh2{i}",8,GRAY)),
                      Paragraph("Dirección de entrega",ps(f"llh3{i}",8,GRAY))],
                     [Paragraph(f"<b>{inco}</b>",ps(f"llv1{i}",10,NAVY,True)),
-                     Paragraph(log_p.get("entrega_empresa","—") or "—",ps(f"llv2{i}",9)),
-                     Paragraph(dest or "—",ps(f"llv3{i}",8,GRAY))],
+                     Paragraph(empresa_s or "—",ps(f"llv2{i}",9,NAVY,True)),
+                     Paragraph(dest or "—",ps(f"llv3{i}",8))],
                 ]
                 ld = Table(ld_rows, colWidths=[1.2*inch, 2.0*inch, 3.8*inch])
                 ld.setStyle(TableStyle([

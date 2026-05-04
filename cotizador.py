@@ -3911,7 +3911,11 @@ with tab2:
     )
 
     # Generar PDF
-    pdf_cache_key = f"_pdf_{num_cot}_{pdf_template}"
+    import hashlib, json
+    _piezas_hash = hashlib.md5(
+        json.dumps(st.session_state.piezas, default=str, sort_keys=True).encode()
+    ).hexdigest()[:10]
+    pdf_cache_key = f"_pdf_{num_cot}_{pdf_template}_{_piezas_hash}"
     if pdf_cache_key not in st.session_state:
         try:
             _pdf = generar_pdf_cotizacion(

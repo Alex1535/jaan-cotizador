@@ -676,6 +676,7 @@ def nueva_operacion(idx):
 
 def nueva_materia_prima():
     return {"figura": "Redondo (barra)", "material": "Inox 303",
+            "spec": "",
             "dims": [0.0,0.0,0.0,0.0], "precio_kg": 0.0,
             "desperdicio": 10.0, "costo_manual": 0.0, "modo": "Por tramo",
             "proveedor": "",
@@ -1397,7 +1398,9 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                 Paragraph(str(i+1),               ps(f"td{i}0",8)),
                 Paragraph(p.get("num_dibujo","—"), ps(f"td{i}1",8)),
                 Paragraph(p.get("descripcion","—"),ps(f"td{i}2",8)),
-                Paragraph(mp.get("material","—"),  ps(f"td{i}3",8)),
+                Paragraph(
+                    (mp.get("material","—") + (" " + mp.get("spec","")).rstrip() if mp.get("spec") else mp.get("material","—")),
+                    ps(f"td{i}3",8)),
                 Paragraph(p.get("tratamiento","Ninguno"), ps(f"td{i}4",8)),
                 Paragraph(fmtc(res["precio_pza"]), ps(f"td{i}5",8,align=TA_RIGHT)),
                 Paragraph(str(cant),               ps(f"td{i}6",8,align=TA_RIGHT)),
@@ -2568,12 +2571,26 @@ with tab1:
                     mat_custom_default = mat_saved if mat_saved not in mat_lista or mat_saved == "Otro" else ""
                     if mat_custom_key not in st.session_state:
                         st.session_state[mat_custom_key] = mat_custom_default
-                    material_custom = st.text_input("Nombre del material",
-                        key=mat_custom_key,
-                        placeholder="Ej: Inconel 718, Titanio CP, PVC...")
+                    mc1, mc2 = st.columns([1, 1])
+                    with mc1:
+                        material_custom = st.text_input("Nombre del material",
+                            key=mat_custom_key,
+                            placeholder="Ej: Inconel 718, Titanio CP, PVC...")
+                    with mc2:
+                        spec_val = st.text_input("Spec",
+                            value=mp.get("spec",""),
+                            key=f"mpspec_{pieza['id']}",
+                            placeholder="Ej: ASTM-A-513, AMS 4928, DIN 1.4305")
+                        st.session_state.piezas[pi]["materia_prima"]["spec"] = spec_val
                     material = material_custom if material_custom.strip() else "Otro"
                 else:
                     material = material_sel
+                    # Campo Spec siempre visible
+                    spec_val = st.text_input("Spec",
+                        value=mp.get("spec",""),
+                        key=f"mpspec_{pieza['id']}",
+                        placeholder="Ej: ASTM-A-513, AMS 4928, DIN 1.4305")
+                    st.session_state.piezas[pi]["materia_prima"]["spec"] = spec_val
                 st.session_state.piezas[pi]["materia_prima"]["material"] = material
             with mpc:
                 modos = ["Por kg", "Por tramo", "Manual"]
@@ -2996,11 +3013,24 @@ with tab1:
                 hd1, hd2, hd3 = st.columns([1, 2, 1])
                 with hd1:
                     incoterms    = ["EXW","FCA","FOB","CFR","CIF","CPT","CIP","DAP","DDP","FAS"]
+                    INCO_DESC    = {
+                        "EXW": "Ex Works — vendedor pone en su local, comprador asume todo desde ahí",
+                        "FCA": "Free Carrier — vendedor entrega al transportista del comprador en punto acordado",
+                        "FOB": "Free On Board — vendedor entrega a bordo del buque; riesgo pasa al embarcar",
+                        "CFR": "Cost & Freight — vendedor paga flete a puerto destino; riesgo pasa al embarcar",
+                        "CIF": "Cost, Insurance & Freight — como CFR + seguro de carga incluido",
+                        "CPT": "Carriage Paid To — vendedor paga transporte a destino; riesgo pasa al primer transportista",
+                        "CIP": "Carriage & Insurance Paid — como CPT + seguro incluido",
+                        "DAP": "Delivered At Place — vendedor entrega en destino, sin pagar derechos de importación",
+                        "DDP": "Delivered Duty Paid — vendedor asume todo incluyendo impuestos hasta el destino final",
+                        "FAS": "Free Alongside Ship — vendedor entrega junto al buque; comprador asume desde ahí",
+                    }
                     inc_saved    = log.get("incoterm","EXW")
                     inc_idx      = incoterms.index(inc_saved) if inc_saved in incoterms else 0
                     incoterm_sel = st.selectbox("Incoterm de entrega", incoterms, index=inc_idx,
                         key=f"log_inc_{pieza['id']}",
-                        help="Define quién asume riesgo y costo hasta el punto de entrega al cliente")
+                        format_func=lambda x: f"{x} — {INCO_DESC[x]}",
+                        help="Define quién asume riesgo y costos hasta el punto de entrega al cliente")
                     st.session_state.piezas[pi]["logistica"]["incoterm"] = incoterm_sel
                 with hd2:
                     dest_fin = st.text_input("Destino final de entrega",

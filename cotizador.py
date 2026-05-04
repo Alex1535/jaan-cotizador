@@ -3353,14 +3353,7 @@ with tab1:
                     st.session_state.piezas[pi]["logistica"]["tramos_extra"] = tramos_extra
                     st.rerun()
 
-                # ── Margen logística ───────────────────────────────────────
-                mg1, _ = st.columns([1, 3])
-                with mg1:
-                    margen_log_ui = st.number_input("Margen logística (%)", min_value=0, max_value=100,
-                        value=int(log.get("margen_log_pct", 0)), step=5,
-                        key=f"log_margen_{pieza['id']}",
-                        help="Utilidad que JAAN aplica sobre el costo total de logística")
-                    st.session_state.piezas[pi]["logistica"]["margen_log_pct"] = margen_log_ui
+                # (Margen logística se controla desde el panel de utilidades abajo)
 
                 # ── Comentarios ────────────────────────────────────────────
                 coment_log = st.text_area("Notas / instrucciones de logística",
@@ -3554,12 +3547,16 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                 st.session_state.piezas[pi]["margen_trat"] = m_trat
             with mg4:
                 aplica_log = pieza.get("logistica", {}).get("aplica", False)
+                _ml_val = int(pieza.get("logistica", {}).get("margen_log_pct",
+                               pieza.get("margen_log", 0)))
                 m_log = st.number_input("⇢ Utilidad logística (%)",
                     min_value=0, max_value=200,
-                    value=int(pieza.get("margen_log", 0)),
+                    value=_ml_val,
                     key=f"margen_log_{pieza['id']}",
                     disabled=not aplica_log)
+                # Guardar en ambos lugares para compatibilidad
                 st.session_state.piezas[pi]["margen_log"] = m_log
+                st.session_state.piezas[pi]["logistica"]["margen_log_pct"] = m_log
 
         # Semáforo de viabilidad
         if demanda > 0:

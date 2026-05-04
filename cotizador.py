@@ -1329,8 +1329,9 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                         "<br/><font size='7' color='grey'>" +
                         (mp.get("material","") or "") +
                         (" " + mp.get("spec","")).rstrip() +
+                        ("  ·  " + mp.get("comentarios_mp","").strip() if mp.get("comentarios_mp","").strip() else "") +
                         "</font>"
-                        if mp.get("material") or mp.get("spec") else ""
+                        if (mp.get("material") or mp.get("spec") or mp.get("comentarios_mp","").strip()) else ""
                     ), ps("dr0",8)),
                  Paragraph(fmtc(pv_mat),ps("dr1",8,align=TA_RIGHT)),
                  Paragraph(fmtc(pv_mat*cant),ps("dr2",8,align=TA_RIGHT))],
@@ -1340,7 +1341,13 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
             ]
             if pv_tr > 0:
                 det_rows.append([
-                    Paragraph(f"Tratamiento ({p.get('tratamiento','—')})",ps("dr6",8)),
+                    Paragraph(
+                        f"Tratamiento ({p.get('tratamiento','—')})" + (
+                            "<br/><font size='7' color='grey'>" +
+                            p.get("comentarios_trat","").strip() +
+                            "</font>"
+                            if p.get("comentarios_trat","").strip() else ""
+                        ), ps("dr6",8)),
                     Paragraph(fmtc(pv_tr),ps("dr7",8,align=TA_RIGHT)),
                     Paragraph(fmtc(pv_tr*cant),ps("dr8",8,align=TA_RIGHT))])
             if pv_log > 0:
@@ -1401,18 +1408,37 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
             res = calcular_pieza(p, margen_global)
             mp  = p.get("materia_prima",{})
             cant = p.get("cantidad",0) if p.get("tipo_pedido")!="Por proyecto" else p.get("eau",0)
+            mat_str = (mp.get("material","—") or "—")
+            if mp.get("spec","").strip():
+                mat_str += " " + mp.get("spec","").strip()
             rows.append([
                 Paragraph(str(i+1),               ps(f"td{i}0",8)),
                 Paragraph(p.get("num_dibujo","—"), ps(f"td{i}1",8)),
                 Paragraph(p.get("descripcion","—"),ps(f"td{i}2",8)),
-                Paragraph(
-                    (mp.get("material","—") + (" " + mp.get("spec","")).rstrip() if mp.get("spec") else mp.get("material","—")),
-                    ps(f"td{i}3",8)),
+                Paragraph(mat_str,                 ps(f"td{i}3",8)),
                 Paragraph(p.get("tratamiento","Ninguno"), ps(f"td{i}4",8)),
                 Paragraph(fmtc(res["precio_pza"]), ps(f"td{i}5",8,align=TA_RIGHT)),
                 Paragraph(str(cant),               ps(f"td{i}6",8,align=TA_RIGHT)),
                 Paragraph(fmtc(res["total"]),      ps(f"td{i}7",8,align=TA_RIGHT)),
             ])
+            # Comentarios adicionales MP y Tratamiento bajo la fila
+            coment_mp_s   = mp.get("comentarios_mp","").strip()
+            coment_trat_s = p.get("comentarios_trat","").strip()
+            if coment_mp_s or coment_trat_s:
+                notas_parts = []
+                if coment_mp_s:   notas_parts.append(f"Mat.: {coment_mp_s}")
+                if coment_trat_s: notas_parts.append(f"Trat.: {coment_trat_s}")
+                nota_txt = "  ·  ".join(notas_parts)
+                rows.append([
+                    Paragraph("",ps(f"nt{i}0",7)),
+                    Paragraph(f"<i>{nota_txt}</i>",ps(f"nt{i}1",7,GRAY)),
+                    Paragraph("",ps(f"nt{i}2",7)),
+                    Paragraph("",ps(f"nt{i}3",7)),
+                    Paragraph("",ps(f"nt{i}4",7)),
+                    Paragraph("",ps(f"nt{i}5",7)),
+                    Paragraph("",ps(f"nt{i}6",7)),
+                    Paragraph("",ps(f"nt{i}7",7)),
+                ])
             for tool in p.get("custom_tooling", []):
                 if not tool.get("activo", True): continue
                 if tool.get("opcion","C") in ("A","C"):

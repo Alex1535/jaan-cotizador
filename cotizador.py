@@ -982,6 +982,8 @@ def calcular_pieza(pieza, margen_pct):
         "ops_resultado": resultados,
         "tiempo_min":    tiempo_pza * 60,
         "costo_maq":     costo_maq,
+        "costo_setup":   sum(max(o["setup_pza"]*o["precio_hr"] for o in e) for e in etapas),
+        "costo_ciclo":   sum(max(o["ciclo_hrs"]*o["precio_hr"] for o in e) for e in etapas),
         "costo_material": costo_mat,
         "costo_trat":    pieza["costo_trat"],
         "costo_log":     costo_log,
@@ -3771,26 +3773,40 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
             else:
                 r1, r2, r3, r4, r5 = st.columns(5)
                 r6 = None
-            r1.metric("Maquinado/pza",   fmtc(res["costo_maq"]))
-            r2.metric("Material/pza",    fmtc(res["costo_material"]))
-            r3.metric("Tratamiento/pza", fmtc(res["costo_trat"]))
-            if r6 is not None:
-                r4.metric("Logística/pza", fmtc(_clt))
-                with r5:
-                    st.markdown(
-                        f"<div style='padding:4px 0'>"
-                        f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
-                        f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
-                        f"</div>", unsafe_allow_html=True)
-                r6.metric(f"Total {cant} pzas", fmtc(res["total"]))
+            # Precios de venta por componente (costo + utilidad)
+            _mg_mo   = pieza.get("margen_mo",   35) if not pieza.get("usar_margen_global") else margen_global
+            _mg_mat  = pieza.get("margen_mat",  35) if not pieza.get("usar_margen_global") else margen_global
+            _mg_trat = pieza.get("margen_trat", 35) if not pieza.get("usar_margen_global") else margen_global
+            _pv_setup = res.get("costo_setup",0) * (1 + _mg_mo  / 100)
+            _pv_ciclo = res.get("costo_ciclo",0) * (1 + _mg_mo  / 100)
+            _pv_mat  = res["costo_material"]     * (1 + _mg_mat  / 100)
+            _pv_trat = res["costo_trat"]         * (1 + _mg_trat / 100)
+            if _clt > 0:
+                c1,c2,c3,c4,c5,c6,c7 = st.columns(7)
             else:
-                with r4:
+                c1,c2,c3,c4,c5,c6 = st.columns(6)
+                c7 = None
+            c1.metric("Setup/pza",       fmtc(_pv_setup))
+            c2.metric("Maquinado/pza",   fmtc(_pv_ciclo))
+            c3.metric("Material/pza",    fmtc(_pv_mat))
+            c4.metric("Tratamiento/pza", fmtc(_pv_trat))
+            if c7 is not None:
+                c5.metric("Logística/pza", fmtc(_clt))
+                with c6:
                     st.markdown(
                         f"<div style='padding:4px 0'>"
                         f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
                         f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
                         f"</div>", unsafe_allow_html=True)
-                r5.metric(f"Total {cant} pzas", fmtc(res["total"]))
+                c7.metric(f"Total {cant} pzas", fmtc(res["total"]))
+            else:
+                with c5:
+                    st.markdown(
+                        f"<div style='padding:4px 0'>"
+                        f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
+                        f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
+                        f"</div>", unsafe_allow_html=True)
+                c6.metric(f"Total {cant} pzas", fmtc(res["total"]))
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -3906,11 +3922,16 @@ with tab2:
             } for oi, op in enumerate(res["ops_resultado"])])
             st.dataframe(df_ops, use_container_width=True, hide_index=True)
             m1,m2,m3,m4,m5 = st.columns(5)
-            m1.metric("Maquinado/pza",    fmtc(res["costo_maq"]))
-            m2.metric("Material/pza",     fmtc(res["costo_material"]))
-            m3.metric("Tratamiento/pza",  fmtc(res["costo_trat"]))
-            m4.metric("Precio final/pza", fmtc(res["precio_pza"]))
-            m5.metric("Total orden",      fmtc(res["total"]))
+            _mg_mo3   = pieza.get("margen_mo",   35) if not pieza.get("usar_margen_global") else margen_global
+            _mg_mat3  = pieza.get("margen_mat",  35) if not pieza.get("usar_margen_global") else margen_global
+            _mg_trat3 = pieza.get("margen_trat", 35) if not pieza.get("usar_margen_global") else margen_global
+            m1,m2,m3,m4,m5,m6 = st.columns(6)
+            m1.metric("Setup/pza",        fmtc(res.get("costo_setup",0) * (1 + _mg_mo3/100)))
+            m2.metric("Maquinado/pza",    fmtc(res.get("costo_ciclo",0) * (1 + _mg_mo3/100)))
+            m3.metric("Material/pza",     fmtc(res["costo_material"] * (1 + _mg_mat3/100)))
+            m4.metric("Tratamiento/pza",  fmtc(res["costo_trat"] * (1 + _mg_trat3/100)))
+            m5.metric("Precio final/pza", fmtc(res["precio_pza"]))
+            m6.metric("Total orden",      fmtc(res["total"]))
             st.markdown("---")
 
     if st.button("💾 Guardar cotización", use_container_width=True):

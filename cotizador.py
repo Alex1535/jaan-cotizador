@@ -2157,12 +2157,15 @@ with tab1:
         conf1, conf2, _ = st.columns([1, 1, 4])
         with conf1:
             if st.button("✅ Sí, nueva cotización", type="primary"):
-                # Limpiar todo el estado relevante
-                _keys_to_clear = [k for k in st.session_state.keys()
-                                  if k not in ("usuario", "rol", "logged_in")]
-                for _k in _keys_to_clear:
-                    del st.session_state[_k]
+                # Preservar datos de autenticación
+                _keep = {k: st.session_state[k] for k in
+                         ("autenticado","usuario","sufijo_cot","sufijo_anterior")
+                         if k in st.session_state}
+                st.session_state.clear()
+                for k, v in _keep.items():
+                    st.session_state[k] = v
                 st.session_state.piezas = [nueva_pieza(1, DEFAULTS)]
+                st.session_state["_confirm_nueva_cot"] = False
                 st.rerun()
         with conf2:
             if st.button("❌ Cancelar"):

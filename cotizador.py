@@ -4317,6 +4317,37 @@ with tab3:
                                 st.session_state[f"mmo_{pid}"]    = int(p.get("margen_mo", 35))
                                 st.session_state[f"mmat_{pid}"]   = int(p.get("margen_mat", 35))
                                 st.session_state[f"mtrat_{pid}"]  = int(p.get("margen_trat", 35))
+                                # Logística
+                                _log = p.get("logistica", {})
+                                st.session_state[f"log_aplica_{pid}"] = bool(_log.get("aplica", False))
+                                st.session_state[f"log_inc_{pid}"]    = _log.get("incoterm", "EXW")
+                                st.session_state[f"log_emp_{pid}"]    = _log.get("entrega_empresa", "")
+                                st.session_state[f"log_dom_{pid}"]    = _log.get("entrega_domicilio", "")
+                                st.session_state[f"log_ciu_{pid}"]    = _log.get("entrega_ciudad", "")
+                                st.session_state[f"log_est_{pid}"]    = _log.get("entrega_estado", "")
+                                st.session_state[f"log_pai_{pid}"]    = _log.get("entrega_pais", "")
+                                st.session_state[f"log_cp_{pid}"]     = _log.get("entrega_cp", "")
+                                st.session_state[f"log_peso_{pid}"]   = float(_log.get("peso_pza_log", 0.0))
+                                st.session_state[f"log_margen_{pid}"] = int(_log.get("margen_log_pct", 0))
+                                st.session_state[f"log_coment_{pid}"] = _log.get("comentarios_log", "")
+                                # Tramos pre de logística
+                                for _tr in _log.get("tramos_pre", []):
+                                    _tk = _tr["id"]
+                                    st.session_state[f"lp_{pid}_{_tk}"]   = bool(_tr.get("aplica", False))
+                                    st.session_state[f"lplc_{pid}_{_tk}"] = _tr.get("label_custom", "")
+                                    st.session_state[f"lpo_{pid}_{_tk}"]  = _tr.get("origen", "")
+                                    st.session_state[f"lpd_{pid}_{_tk}"]  = _tr.get("destino", "")
+                                    st.session_state[f"lpm_{pid}_{_tk}"]  = _tr.get("modo", "fijo")
+                                    st.session_state[f"lpc_{pid}_{_tk}"]  = float(_tr.get("costo", 0.0))
+                                    st.session_state[f"lpn_{pid}_{_tk}"]  = _tr.get("notas", "")
+                                    _emb = _tr.get("embalaje") or {}
+                                    st.session_state[f"embt_{pid}_{_tk}"] = _emb.get("tipo", "—")
+                                    st.session_state[f"embn_{pid}_{_tk}"] = _emb.get("notas_embalaje", "")
+                                    st.session_state[f"embl_{pid}_{_tk}"] = float(_emb.get("largo_cm", 0.0))
+                                    st.session_state[f"emba_{pid}_{_tk}"] = float(_emb.get("ancho_cm", 0.0))
+                                    st.session_state[f"embh_{pid}_{_tk}"] = float(_emb.get("alto_cm", 0.0))
+                                    st.session_state[f"embp_{pid}_{_tk}"] = float(_emb.get("peso_bruto_kg", 0.0))
+                                    st.session_state[f"embpz_{pid}_{_tk}"] = int(_emb.get("pzas_por_bulto", 1))
                                 # Operaciones
                                 for op in p.get("operaciones", []):
                                     oid = op["id"]

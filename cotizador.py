@@ -4032,12 +4032,21 @@ with tab2:
 **Detallado**: Desglose de precio de venta por sección (materia prima, mano de obra, tratamiento, logística). Ideal para clientes aeronáuticos que requieren justificación de costos."""
     )
 
-    # Generar PDF
-    import hashlib, json
-    _piezas_hash = hashlib.md5(
-        json.dumps(st.session_state.piezas, default=str, sort_keys=True).encode()
-    ).hexdigest()[:10]
-    pdf_cache_key = f"_pdf_{num_cot}_{pdf_template}_{_piezas_hash}"
+    # Botón para regenerar PDF cuando el usuario modifique datos
+    _regen_col, _ = st.columns([1, 3])
+    with _regen_col:
+        if st.button("🔄 Actualizar PDF", key="regen_pdf_btn",
+                     help="Regenera el PDF con los datos actuales"):
+            st.session_state["_pdf_version"] = st.session_state.get("_pdf_version", 0) + 1
+            # Limpiar cache de PDFs anteriores
+            for _k in list(st.session_state.keys()):
+                if _k.startswith("_pdf_"):
+                    del st.session_state[_k]
+            st.rerun()
+
+    # Cache key basado en contador de versión — evita recalcular hash en cada keystroke
+    _pdf_version = st.session_state.get("_pdf_version", 0)
+    pdf_cache_key = f"_pdf_{num_cot}_{pdf_template}_v{_pdf_version}"
     if pdf_cache_key not in st.session_state:
         try:
             _pdf = generar_pdf_cotizacion(

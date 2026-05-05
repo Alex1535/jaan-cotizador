@@ -2130,14 +2130,44 @@ components.html("""
 
 # ══ TAB 1 ═════════════════════════════════════════════════════════════════════
 with tab1:
-    col_t, col_b = st.columns([4, 1])
+    col_t, col_b, col_c, col_d = st.columns([3.0, 1.1, 1.1, 1.1])
     with col_t:
         st.markdown(f"#### {len(st.session_state.piezas)} pieza(s) en esta cotización")
     with col_b:
-        if st.button("➕ Nueva pieza"):
+        if st.button("➕ Nueva pieza", use_container_width=True):
             nid = max(p["id"] for p in st.session_state.piezas) + 1
             st.session_state.piezas.append(nueva_pieza(nid, DEFAULTS))
             st.rerun()
+    with col_c:
+        if st.button("💾 Guardar", use_container_width=True,
+                     help="Guarda la cotización actual en el historial"):
+            try:
+                guardar_cotizacion()
+                st.success(f"✅ Cotización {num_cot} guardada correctamente.")
+            except Exception as _e:
+                st.error(f"Error al guardar: {_e}")
+    with col_d:
+        if st.button("🗒 Nueva cotización", use_container_width=True,
+                     help="Limpia todas las piezas y datos para empezar desde cero"):
+            st.session_state["_confirm_nueva_cot"] = True
+
+    # Confirmación
+    if st.session_state.get("_confirm_nueva_cot"):
+        st.warning("⚠️ ¿Seguro que quieres iniciar una nueva cotización? Se perderán todos los datos actuales.")
+        conf1, conf2, _ = st.columns([1, 1, 4])
+        with conf1:
+            if st.button("✅ Sí, nueva cotización", type="primary"):
+                # Limpiar todo el estado relevante
+                _keys_to_clear = [k for k in st.session_state.keys()
+                                  if k not in ("usuario", "rol", "logged_in")]
+                for _k in _keys_to_clear:
+                    del st.session_state[_k]
+                st.session_state.piezas = [nueva_pieza(1, DEFAULTS)]
+                st.rerun()
+        with conf2:
+            if st.button("❌ Cancelar"):
+                st.session_state["_confirm_nueva_cot"] = False
+                st.rerun()
 
     piezas_a_eliminar = []
 

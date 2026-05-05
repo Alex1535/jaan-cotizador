@@ -669,6 +669,7 @@ def fmt(v, moneda="MXN", tc=17.31):
 
 def nueva_operacion(idx):
     return {"id": idx, "label": f"Op {idx*10}",
+            "descripcion": "",
             "tipo_maq": "Lathe 2 Axis",
             "num_maquinas": 1, "setup_hrs": 0.5,
             "ciclo_hrs": 0.25, "paralelo": False}
@@ -981,8 +982,8 @@ def calcular_pieza(pieza, margen_pct):
         "ops_resultado": resultados,
         "tiempo_min":    tiempo_pza * 60,
         "costo_maq":     costo_maq,
-        "costo_setup":   sum(max(o["setup_pza"]*o["precio_hr"] for o in e) for e in etapas),
-        "costo_ciclo":   sum(max(o["ciclo_hrs"]*o["precio_hr"] for o in e) for e in etapas),
+        "costo_setup":   _costo_setup,
+        "costo_ciclo":   _costo_ciclo,
         "costo_material": costo_mat,
         "costo_trat":    pieza["costo_trat"],
         "costo_log":     costo_log,
@@ -2569,9 +2570,11 @@ with tab1:
                         ciclo_val = float(op["ciclo_hrs"])
                         paralelo_val = bool(op.get("paralelo", False))
 
+                        desc_val = op.get("descripcion", op.get("description", "")).strip()
                         nuevas_ops.append({
                             "id":           new_id,
                             "label":        op["label"],
+                            "descripcion":  desc_val,
                             "tipo_maq":     tipo_val,
                             "num_maquinas": 1,
                             "setup_hrs":    setup_val,
@@ -2587,6 +2590,7 @@ with tab1:
                             f"ciclo_{pieza['id']}_{new_id}",
                             f"par_{pieza['id']}_{new_id}",
                             f"lbl_{pieza['id']}_{new_id}",
+                            f"desc_{pieza['id']}_{new_id}",
                         ]:
                             if key in st.session_state:
                                 del st.session_state[key]
@@ -2598,6 +2602,7 @@ with tab1:
                         st.session_state[f"par_{pieza['id']}_{new_id}"]   = paralelo_val
                         st.session_state[f"nm_{pieza['id']}_{new_id}"]    = 1
                         st.session_state[f"lbl_{pieza['id']}_{new_id}"]   = op["label"]
+                        st.session_state[f"desc_{pieza['id']}_{new_id}"]  = desc_val
 
                     st.session_state.piezas[pi]["operaciones"] = nuevas_ops
                     st.success(f"✅ {len(nuevas_ops)} operaciones aplicadas")
@@ -3633,6 +3638,11 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                         key=f"lbl_{pieza['id']}_{op['id']}",
                         label_visibility="collapsed")
                     st.session_state.piezas[pi]["operaciones"][oi]["label"] = lbl2
+                    desc2 = st.text_input("desc", value=op.get("descripcion",""),
+                        key=f"desc_{pieza['id']}_{op['id']}",
+                        placeholder="Descripción...",
+                        label_visibility="collapsed")
+                    st.session_state.piezas[pi]["operaciones"][oi]["descripcion"] = desc2
 
                 with cols[1]:
                     tipo_sel = st.selectbox("t", TIPOS_MAQUINA,

@@ -1329,10 +1329,12 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                 mg_mat = p.get("margen_mat", 35)
                 mg_tr  = p.get("margen_trat",35)
 
-            pv_mat = res["costo_material"] * (1 + mg_mat/100)
-            pv_mo  = res["costo_maq"]      * (1 + mg_mo/100)
-            pv_tr  = res["costo_trat"]     * (1 + mg_tr/100)
-            pv_log = res.get("costo_log_total", 0.0)
+            pv_mat   = res["costo_material"] * (1 + mg_mat/100)
+            pv_mo    = res["costo_maq"]      * (1 + mg_mo/100)
+            pv_setup = res.get("costo_setup", 0.0) * (1 + mg_mo/100)
+            pv_ciclo = res.get("costo_ciclo", 0.0) * (1 + mg_mo/100)
+            pv_tr    = res["costo_trat"]     * (1 + mg_tr/100)
+            pv_log   = res.get("costo_log_total", 0.0)
 
             det_rows = [
                 [Paragraph("Concepto",ps("dh0",8,WHITE,True)),
@@ -1351,9 +1353,12 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                     ), ps("dr0",8)),
                  Paragraph(fmtc(pv_mat),ps("dr1",8,align=TA_RIGHT)),
                  Paragraph(fmtc(pv_mat*cant),ps("dr2",8,align=TA_RIGHT))],
-                [Paragraph("Mano de obra",ps("dr3",8)),
-                 Paragraph(fmtc(pv_mo),ps("dr4",8,align=TA_RIGHT)),
-                 Paragraph(fmtc(pv_mo*cant),ps("dr5",8,align=TA_RIGHT))],
+                [Paragraph("Set up",ps("dr3",8)),
+                 Paragraph(fmtc(pv_setup),ps("dr4",8,align=TA_RIGHT)),
+                 Paragraph(fmtc(pv_setup*cant),ps("dr5",8,align=TA_RIGHT))],
+                [Paragraph("Maquinado",ps("dr3b",8)),
+                 Paragraph(fmtc(pv_ciclo),ps("dr4b",8,align=TA_RIGHT)),
+                 Paragraph(fmtc(pv_ciclo*cant),ps("dr5b",8,align=TA_RIGHT))],
             ]
             if pv_tr > 0:
                 det_rows.append([

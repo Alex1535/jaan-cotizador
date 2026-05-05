@@ -902,8 +902,10 @@ def calcular_pieza(pieza, margen_pct):
             etapas.append([op])
         else:
             etapas[-1].append(op)
-    tiempo_pza = sum(max(o["total_pza"] for o in e) for e in etapas)
-    costo_maq  = sum(max(o["costo_pza"] for o in e) for e in etapas)
+    tiempo_pza    = sum(max(o["total_pza"] for o in e) for e in etapas)
+    costo_maq     = sum(max(o["costo_pza"] for o in e) for e in etapas)
+    _costo_setup  = sum(max(o["setup_pza"] * o["precio_hr"] for o in e) for e in etapas)
+    _costo_ciclo  = sum(max(o["ciclo_hrs"] * o["precio_hr"] for o in e) for e in etapas)
 
     # Semáforo de demanda
     demanda    = pieza.get("demanda_mensual", 0)

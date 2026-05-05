@@ -1666,9 +1666,19 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
             ])
             if t.get("nota"):
                 tool_rows.append([Paragraph("",ps("n0",7)),
-                    Paragraph(f"* {t['nota']}",ps("n1",7,GRAY)),
+                    Paragraph(f"<i>{t['nota']}</i>",ps("n1",7,GRAY)),
                     Paragraph("",ps("n2",7)),Paragraph("",ps("n3",7)),
                     Paragraph("",ps("n4",7)),Paragraph("",ps("n5",7)),Paragraph("",ps("n6",7))])
+
+        # Calcular índices de filas con nota para hacer SPAN
+        _span_cmds = []
+        _row_idx = 1
+        for _p, _t in all_tools_ac:
+            _row_idx += 1  # fila de la herramienta
+            if _t.get("nota"):
+                _span_cmds.append(("SPAN", (1, _row_idx), (6, _row_idx)))
+                _span_cmds.append(("BACKGROUND", (0, _row_idx), (-1, _row_idx), colors.HexColor("#f8f9fa")))
+                _row_idx += 1  # fila de la nota
 
         twt = Table(tool_rows, colWidths=tw, repeatRows=1)
         twt.setStyle(TableStyle([
@@ -1678,7 +1688,7 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
             ("LEFTPADDING",(0,0),(-1,-1),5),("RIGHTPADDING",(0,0),(-1,-1),5),
             ("LINEBELOW",(0,0),(-1,-1),0.3,colors.HexColor("#dde1ea")),
             ("LINEBELOW",(0,0),(-1,0),1,BLUE),
-        ]))
+        ] + _span_cmds))
         story.append(twt)
 
         # Nota consumibles si alguna herramienta es propiedad del cliente

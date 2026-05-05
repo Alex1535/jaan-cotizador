@@ -3640,11 +3640,6 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                         key=f"lbl_{pieza['id']}_{op['id']}",
                         label_visibility="collapsed")
                     st.session_state.piezas[pi]["operaciones"][oi]["label"] = lbl2
-                    desc2 = st.text_input("desc", value=op.get("descripcion",""),
-                        key=f"desc_{pieza['id']}_{op['id']}",
-                        placeholder="Descripción...",
-                        label_visibility="collapsed")
-                    st.session_state.piezas[pi]["operaciones"][oi]["descripcion"] = desc2
 
                 with cols[1]:
                     tipo_sel = st.selectbox("t", TIPOS_MAQUINA,
@@ -3700,6 +3695,14 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                     if len(pieza["operaciones"]) > 1:
                         if st.button("×", key=f"delop_{pieza['id']}_{op['id']}"):
                             ops_a_eliminar.append(oi)
+
+                # Descripción — fila completa ancha
+                desc2 = st.text_input("Descripción de la operación",
+                    value=op.get("descripcion",""),
+                    key=f"desc_{pieza['id']}_{op['id']}",
+                    placeholder="Ej: Torneado exterior de todos los diámetros, chaflanes y radios...",
+                    label_visibility="collapsed")
+                st.session_state.piezas[pi]["operaciones"][oi]["descripcion"] = desc2
 
                 # Costo inline — usa precios de ESTA pieza
                 tipo_rt  = st.session_state.get(key_tipo, tipo_sel)

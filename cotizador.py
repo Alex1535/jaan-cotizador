@@ -719,7 +719,7 @@ def nueva_pieza(idx, defaults):
         "margen_log": 0,
         # ── Logística ──
         "logistica": {
-            "aplica": False,
+            "aplica": True,
             "incoterm": "EXW",
             "destino_final": "",
             "peso_pza_log": 0.0,
@@ -780,7 +780,7 @@ def _ensure_logistica(pieza):
     """Garantiza que el dict logistica tenga todas las keys necesarias (compatible con estructura antigua)"""
     import copy
     default = {
-        "aplica": False, "incoterm": "EXW",
+        "aplica": True, "incoterm": "EXW",
         "entrega_empresa": "", "entrega_domicilio": "",
         "entrega_ciudad": "", "entrega_estado": "",
         "entrega_pais": "", "entrega_cp": "",

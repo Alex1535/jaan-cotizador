@@ -1420,11 +1420,11 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                 cotas_d    = int(insp_d.get("num_cotas", 0))
                 cota_c_d   = float(insp_d.get("costo_por_cota", 0.0))
                 notas_id   = insp_d.get("notas_inspeccion", "").strip()
-                insp_detalle = f"{tipo_insp} · {cotas_d} cotas críticas × {fmtc(cota_c_d)}"
+                insp_detalle = f"{tipo_insp} · {cotas_d} cotas críticas"
                 if notas_id: insp_detalle += f" · {notas_id}"
                 det_rows.append([
                     Paragraph(
-                        f"Inspección final"
+                        f"Inspección final y validación"
                         f"<br/><font size='6.5' color='grey'>{insp_detalle}</font>",
                         ps("dr_insp",8)),
                     Paragraph(fmtc(pv_insp_pdf), ps("dr_insp1",8,align=TA_RIGHT)),

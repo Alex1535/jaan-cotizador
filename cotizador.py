@@ -4607,6 +4607,33 @@ with tab3:
                             st.session_state["_t_entrega"]   = cond.get("tiempo_entrega", "22-30 días hábiles")
                             st.session_state["_cond_pago"]   = cond.get("cond_pago", "40% anticipo - 60% contra-entrega")
 
+                            # ── Inspección — borrar y restaurar por pieza ────
+                            for p in piezas_cargadas:
+                                _pid  = p["id"]
+                                _insp = p.get("inspeccion", {})
+                                # Borrar keys existentes
+                                for _ik in list(st.session_state.keys()):
+                                    if any(_ik.startswith(f"{_pfx}_{_pid}") for _pfx in [
+                                        "insp_aplica","insp_tipo","insp_setup","insp_hr",
+                                        "insp_hr_cmm","insp_hr_oh","insp_cotas","insp_mins",
+                                        "insp_override","insp_cota_costo","insp_fai",
+                                        "insp_notas","margen_insp"]):
+                                        del st.session_state[_ik]
+                                # Restaurar valores
+                                st.session_state[f"insp_aplica_{_pid}"]     = bool(_insp.get("aplica", False))
+                                st.session_state[f"insp_tipo_{_pid}"]       = _insp.get("tipo", "CMM")
+                                st.session_state[f"insp_setup_{_pid}"]      = float(_insp.get("setup_hrs", 2.0))
+                                st.session_state[f"insp_hr_{_pid}"]         = float(_insp.get("costo_hr_inspector", 142.0))
+                                st.session_state[f"insp_hr_cmm_{_pid}"]     = float(_insp.get("costo_hr_cmm", 60.0))
+                                st.session_state[f"insp_hr_oh_{_pid}"]      = float(_insp.get("costo_hr_overhead", 50.0))
+                                st.session_state[f"insp_cotas_{_pid}"]      = int(_insp.get("num_cotas", 0))
+                                st.session_state[f"insp_mins_{_pid}"]       = float(_insp.get("mins_por_cota", 3.0))
+                                st.session_state[f"insp_override_{_pid}"]   = bool(_insp.get("costo_cota_override", False))
+                                st.session_state[f"insp_cota_costo_{_pid}"] = float(_insp.get("costo_por_cota", 10.0))
+                                st.session_state[f"insp_fai_{_pid}"]        = int(_insp.get("num_muestras_fai", 0))
+                                st.session_state[f"insp_notas_{_pid}"]      = _insp.get("notas_inspeccion", "")
+                                st.session_state[f"margen_insp_{_pid}"]     = int(_insp.get("margen_inspeccion_pct", 30))
+
                             st.session_state["_last_loaded_cot"] = sel_num
                             st.success(f"✅ Proyecto {sel_num} cargado completo — ve a Piezas y Ruteo")
                             st.rerun()

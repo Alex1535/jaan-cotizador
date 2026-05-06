@@ -3742,14 +3742,15 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                 _setup_pza = (setup_insp * _hr_total_res) / max(cant_pza, 1)
                 _cotas_pza = num_cotas * costo_cota
                 _costo_insp_pza = _setup_pza + _cotas_pza
-                _util_insp_pza  = _costo_insp_pza * (mg_insp / 100)
-                _pv_insp_pza    = _costo_insp_pza + _util_insp_pza
+                _mg_insp_res   = int(insp.get("margen_inspeccion_pct", 30))
+                _util_insp_pza = _costo_insp_pza * (_mg_insp_res / 100)
+                _pv_insp_pza   = _costo_insp_pza + _util_insp_pza
                 if _costo_insp_pza > 0:
                     st.info(
                         f"Setup CMM/pza: {fmtc(_setup_pza)}  ·  "
                         f"{num_cotas} cotas × {fmtc(costo_cota)} = {fmtc(_cotas_pza)}  ·  "
                         f"Costo insp/pza: {fmtc(_costo_insp_pza)}  ·  "
-                        f"Con {mg_insp}% utilidad: **{fmtc(_pv_insp_pza)}/pza**  ·  "
+                        f"Con {_mg_insp_res}% utilidad: {fmtc(_pv_insp_pza)}/pza  ·  "
                         f"Total orden: {fmtc(_pv_insp_pza * cant_pza)}")
 
         # ── Márgenes de utilidad por componente ─────────────────────────────

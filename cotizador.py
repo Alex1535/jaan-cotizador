@@ -1779,10 +1779,7 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
         ["", Paragraph(iva_label, ps("ts2",9,GRAY,align=TA_RIGHT)),
               Paragraph(fmtc(iva_display), ps("tv2",9,GRAY,align=TA_RIGHT))],
     ]
-    if total_insp_orden > 0:
-        filas_totales.append([
-            "", Paragraph("Inspección y validación:", ps("tsi",9,colors.HexColor("#7c3aed"),align=TA_RIGHT)),
-            Paragraph(fmtc(total_insp_orden), ps("tvi",9,colors.HexColor("#7c3aed"),True,align=TA_RIGHT))])
+    # Inspección incluida en precio/pza — no se lista por separado en totales
     # Logística incluida en precio/pza — no se lista por separado en totales
     if total_tooling_cot > 0:
         filas_totales.append([

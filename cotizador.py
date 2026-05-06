@@ -3728,13 +3728,7 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                         help="First Article Inspection — piezas para inspección completa")
                     st.session_state.piezas[pi]["inspeccion"]["num_muestras_fai"] = muestras_fai
 
-                mg1i, mg2i = st.columns([1, 3])
-                with mg1i:
-                    mg_insp = st.number_input("Utilidad inspección (%)",
-                        min_value=0, max_value=200,
-                        value=int(insp.get("margen_inspeccion_pct", 30)),
-                        step=5, key=f"insp_mg_{pieza['id']}")
-                    st.session_state.piezas[pi]["inspeccion"]["margen_inspeccion_pct"] = mg_insp
+                # (Utilidad inspección se controla en el panel de utilidades abajo)
 
                 notas_insp = st.text_input("Notas de inspección",
                     value=insp.get("notas_inspeccion", ""),
@@ -3774,7 +3768,7 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                     disabled=True,
                     help="Se usa el margen global del sidebar")
         else:
-            mg1, mg2, mg3, mg4 = st.columns(4)
+            mg1, mg2, mg3, mg4, mg5 = st.columns(5)
             with mg1:
                 m_mo = st.number_input("⚙ Utilidad mano de obra (%)",
                     min_value=0, max_value=200,
@@ -3803,9 +3797,18 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                     value=_ml_val,
                     key=f"margen_log_{pieza['id']}",
                     disabled=not aplica_log)
-                # Guardar en ambos lugares para compatibilidad
                 st.session_state.piezas[pi]["margen_log"] = m_log
                 st.session_state.piezas[pi]["logistica"]["margen_log_pct"] = m_log
+            with mg5:
+                aplica_insp = pieza.get("inspeccion", {}).get("aplica", False)
+                _mi_val = int(pieza.get("inspeccion", {}).get("margen_inspeccion_pct", 30))
+                m_insp = st.number_input("◉ Utilidad inspección (%)",
+                    min_value=0, max_value=200,
+                    value=_mi_val,
+                    step=5,
+                    key=f"margen_insp_{pieza['id']}",
+                    disabled=not aplica_insp)
+                st.session_state.piezas[pi]["inspeccion"]["margen_inspeccion_pct"] = m_insp
 
         # Semáforo de viabilidad
         if demanda > 0:

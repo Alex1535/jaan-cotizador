@@ -741,10 +741,12 @@ def nueva_pieza(idx, defaults):
             "tipo": "CMM",
             "setup_hrs": 2.0,
             "costo_hr_inspector": 142.0,
-            "costo_hr_cmm": 120.0,
+            "costo_hr_cmm": 60.0,
             "costo_hr_overhead": 50.0,
             "num_cotas": 0,
             "costo_por_cota": 10.0,
+            "mins_por_cota": 3.0,
+            "costo_cota_override": False,
             "num_muestras_fai": 0,
             "notas_inspeccion": "",
             "margen_inspeccion_pct": 30,
@@ -3629,7 +3631,7 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
             if "inspeccion" not in pieza:
                 st.session_state.piezas[pi]["inspeccion"] = {
                     "aplica": False, "tipo": "CMM", "setup_hrs": 2.0,
-                    "costo_hr_inspector": 142.0, "costo_hr_cmm": 120.0,
+                    "costo_hr_inspector": 142.0, "costo_hr_cmm": 60.0,
                     "costo_hr_overhead": 50.0, "num_cotas": 0,
                     "costo_por_cota": 10.0, "num_muestras_fai": 0,
                     "notas_inspeccion": "", "margen_inspeccion_pct": 30,
@@ -3693,21 +3695,44 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                         help="Cotas que requieren medición CMM o calibrador certificado")
                     st.session_state.piezas[pi]["inspeccion"]["num_cotas"] = num_cotas
                 with c2:
-                    costo_cota = st.number_input("Costo por cota ($)",
-                        min_value=0.0, value=float(insp.get("costo_por_cota", 0.0)),
-                        step=1.0, format="%.2f", key=f"insp_cota_costo_{pieza['id']}",
-                        help="Costo unitario de medir cada cota crítica")
-                    st.session_state.piezas[pi]["inspeccion"]["costo_por_cota"] = costo_cota
+                    # Calcular costo/cota automático desde tarifa total y minutos/cota
+                    _hr_tot_c = hr_insp + insp.get("costo_hr_cmm",0) + insp.get("costo_hr_overhead",0)
+                    mins_cota = st.number_input("Min / cota",
+                        min_value=0.5, max_value=60.0,
+                        value=float(insp.get("mins_por_cota", 3.0)),
+                        step=0.5, format="%.1f", key=f"insp_mins_{pieza['id']}",
+                        help="Minutos promedio para medir cada cota en CMM")
+                    st.session_state.piezas[pi]["inspeccion"]["mins_por_cota"] = mins_cota
+                    _costo_auto = round((_hr_tot_c / 60) * mins_cota, 2)
+                    st.caption(f"Auto: {fmtc(_costo_auto)}/cota")
                 with c3:
+                    _override = insp.get("costo_cota_override", False)
+                    override_on = st.checkbox("Costo manual por cota",
+                        value=_override, key=f"insp_override_{pieza['id']}",
+                        help="Activa para ingresar costo/cota manualmente en lugar del calculado")
+                    st.session_state.piezas[pi]["inspeccion"]["costo_cota_override"] = override_on
+                    if override_on:
+                        costo_cota = st.number_input("Costo/cota ($)",
+                            min_value=0.0,
+                            value=float(insp.get("costo_por_cota", _costo_auto)),
+                            step=1.0, format="%.2f",
+                            key=f"insp_cota_costo_{pieza['id']}",
+                            label_visibility="collapsed")
+                    else:
+                        costo_cota = _costo_auto
+                    st.session_state.piezas[pi]["inspeccion"]["costo_por_cota"] = costo_cota
+                with c4:
                     muestras_fai = st.number_input("Muestras FAI (pzas)",
                         min_value=0, value=int(insp.get("num_muestras_fai", 0)),
                         step=1, key=f"insp_fai_{pieza['id']}",
-                        help="First Article Inspection — número de piezas para inspección completa")
+                        help="First Article Inspection — piezas para inspección completa")
                     st.session_state.piezas[pi]["inspeccion"]["num_muestras_fai"] = muestras_fai
-                with c4:
+
+                mg1i, mg2i = st.columns([1, 3])
+                with mg1i:
                     mg_insp = st.number_input("Utilidad inspección (%)",
                         min_value=0, max_value=200,
-                        value=int(insp.get("margen_inspeccion_pct", 0)),
+                        value=int(insp.get("margen_inspeccion_pct", 30)),
                         step=5, key=f"insp_mg_{pieza['id']}")
                     st.session_state.piezas[pi]["inspeccion"]["margen_inspeccion_pct"] = mg_insp
 

@@ -834,8 +834,11 @@ def _ensure_logistica(pieza):
     return pieza
 
 
+@st.cache_data(show_spinner=False, hash_funcs={dict: lambda d: __import__('json').dumps(d, default=str, sort_keys=True)})
 def calcular_pieza(pieza, margen_pct):
     """Cálculo completo usando los parámetros operativos PROPIOS de la pieza"""
+    import copy
+    pieza = copy.deepcopy(pieza)
     _ensure_logistica(pieza)
     ops      = pieza["operaciones"]
     cantidad = pieza["cantidad"]
@@ -1076,6 +1079,7 @@ with st.sidebar:
                 help="El número consecutivo se asigna automáticamente por sufijo").upper().strip()
     st.session_state["sufijo_cot"] = sufijo
 
+    @st.cache_data(ttl=30, show_spinner=False)
     def get_siguiente_numero(sufijo):
         """Obtiene el siguiente número consecutivo para el sufijo dado"""
         import requests

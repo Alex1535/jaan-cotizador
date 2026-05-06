@@ -739,13 +739,15 @@ def nueva_pieza(idx, defaults):
         "inspeccion": {
             "aplica": False,
             "tipo": "CMM",
-            "setup_hrs": 1.0,
-            "costo_hr_inspector": 0.0,
+            "setup_hrs": 2.0,
+            "costo_hr_inspector": 142.0,
+            "costo_hr_cmm": 120.0,
+            "costo_hr_overhead": 50.0,
             "num_cotas": 0,
-            "costo_por_cota": 0.0,
+            "costo_por_cota": 10.0,
             "num_muestras_fai": 0,
             "notas_inspeccion": "",
-            "margen_inspeccion_pct": 0,
+            "margen_inspeccion_pct": 30,
         },
         "cantidad":      10,
         "demanda_mensual": 0,
@@ -976,11 +978,14 @@ def calcular_pieza(pieza, margen_pct):
     insp        = pieza.get("inspeccion", {})
     costo_insp  = 0.0
     if insp.get("aplica", False):
-        _hr_insp    = float(insp.get("costo_hr_inspector", 0.0))
-        _setup_insp = float(insp.get("setup_hrs", 1.0))
-        _cotas      = int(insp.get("num_cotas", 0))
-        _costo_cota = float(insp.get("costo_por_cota", 0.0))
-        _costo_setup_insp = (_setup_insp * _hr_insp) / max(cantidad, 1)
+        _hr_inspector = float(insp.get("costo_hr_inspector", 0.0))
+        _hr_cmm       = float(insp.get("costo_hr_cmm", 0.0))
+        _hr_overhead  = float(insp.get("costo_hr_overhead", 0.0))
+        _hr_total     = _hr_inspector + _hr_cmm + _hr_overhead  # Tarifa total/hr
+        _setup_insp   = float(insp.get("setup_hrs", 1.0))
+        _cotas        = int(insp.get("num_cotas", 0))
+        _costo_cota   = float(insp.get("costo_por_cota", 0.0))
+        _costo_setup_insp = (_setup_insp * _hr_total) / max(cantidad, 1)
         _costo_cotas_insp = _cotas * _costo_cota
         costo_insp  = _costo_setup_insp + _costo_cotas_insp
     mg_insp     = int(insp.get("margen_inspeccion_pct", 0))
@@ -3623,10 +3628,11 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
             insp = pieza.get("inspeccion", {})
             if "inspeccion" not in pieza:
                 st.session_state.piezas[pi]["inspeccion"] = {
-                    "aplica": False, "tipo": "CMM", "setup_hrs": 1.0,
-                    "costo_hr_inspector": 0.0, "num_cotas": 0,
-                    "costo_por_cota": 0.0, "num_muestras_fai": 0,
-                    "notas_inspeccion": "", "margen_inspeccion_pct": 0,
+                    "aplica": False, "tipo": "CMM", "setup_hrs": 2.0,
+                    "costo_hr_inspector": 142.0, "costo_hr_cmm": 120.0,
+                    "costo_hr_overhead": 50.0, "num_cotas": 0,
+                    "costo_por_cota": 10.0, "num_muestras_fai": 0,
+                    "notas_inspeccion": "", "margen_inspeccion_pct": 30,
                 }
                 insp = st.session_state.piezas[pi]["inspeccion"]
 
@@ -3650,10 +3656,33 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                         help="Horas de programación y montaje — se dividen entre la cantidad de piezas")
                     st.session_state.piezas[pi]["inspeccion"]["setup_hrs"] = setup_insp
                 with i3:
-                    hr_insp = st.number_input("Tarifa inspector ($/hr)",
+                    hr_insp = st.number_input("Inspector ($/hr)",
                         min_value=0.0, value=float(insp.get("costo_hr_inspector", 0.0)),
-                        step=5.0, key=f"insp_hr_{pieza['id']}")
+                        step=5.0, key=f"insp_hr_{pieza['id']}",
+                        help="Costo del operador / inspector certificado por hora")
                     st.session_state.piezas[pi]["inspeccion"]["costo_hr_inspector"] = hr_insp
+
+                i4, i5, i6 = st.columns([1.2, 1.2, 1.2])
+                with i4:
+                    hr_cmm = st.number_input("CMM — Máquina ($/hr)",
+                        min_value=0.0, value=float(insp.get("costo_hr_cmm", 0.0)),
+                        step=1.0, key=f"insp_hr_cmm_{pieza['id']}",
+                        help="Depreciación + mantenimiento + software de la CMM por hora")
+                    st.session_state.piezas[pi]["inspeccion"]["costo_hr_cmm"] = hr_cmm
+                with i5:
+                    hr_overhead = st.number_input("Overhead ($/hr)",
+                        min_value=0.0, value=float(insp.get("costo_hr_overhead", 0.0)),
+                        step=1.0, key=f"insp_hr_oh_{pieza['id']}",
+                        help="Renta sala climatizada, electricidad, consumibles por hora")
+                    st.session_state.piezas[pi]["inspeccion"]["costo_hr_overhead"] = hr_overhead
+                with i6:
+                    _hr_total_ui = hr_insp + hr_cmm + hr_overhead
+                    st.markdown(
+                        f"<div style='padding-top:28px'>"
+                        f"<div style='font-size:12px;color:#6b7280'>Tarifa total/hr</div>"
+                        f"<div style='font-size:1.4rem;font-weight:700;color:#0f1b3d'>"
+                        f"{fmtc(_hr_total_ui)}</div></div>",
+                        unsafe_allow_html=True)
 
                 st.caption("Cotas críticas")
                 c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
@@ -3690,7 +3719,8 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
 
                 # Resumen
                 cant_pza   = pieza.get("cantidad", 1)
-                _setup_pza = (setup_insp * hr_insp) / max(cant_pza, 1)
+                _hr_total_res = hr_insp + insp.get("costo_hr_cmm",0) + insp.get("costo_hr_overhead",0)
+                _setup_pza = (setup_insp * _hr_total_res) / max(cant_pza, 1)
                 _cotas_pza = num_cotas * costo_cota
                 _costo_insp_pza = _setup_pza + _cotas_pza
                 _util_insp_pza  = _costo_insp_pza * (mg_insp / 100)

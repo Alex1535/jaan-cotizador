@@ -735,6 +735,18 @@ def nueva_pieza(idx, defaults):
         "plano_tipo": "",
         # ── Custom Tooling ──
         "custom_tooling": [],
+        # ── Inspección Final ──
+        "inspeccion": {
+            "aplica": False,
+            "tipo": "CMM",
+            "setup_hrs": 1.0,
+            "costo_hr_inspector": 0.0,
+            "num_cotas": 0,
+            "costo_por_cota": 0.0,
+            "num_muestras_fai": 0,
+            "notas_inspeccion": "",
+            "margen_inspeccion_pct": 0,
+        },
         "cantidad":      10,
         "demanda_mensual": 0,
         "tipo_pedido":   "Pedido único",
@@ -960,6 +972,22 @@ def calcular_pieza(pieza, margen_pct):
     # Logística INCLUIDA en precio/pza
     precio_pza = precio_pza + costo_log_con_margen
 
+    # ── Inspección Final ──────────────────────────────────────────────────────
+    insp        = pieza.get("inspeccion", {})
+    costo_insp  = 0.0
+    if insp.get("aplica", False):
+        _hr_insp    = float(insp.get("costo_hr_inspector", 0.0))
+        _setup_insp = float(insp.get("setup_hrs", 1.0))
+        _cotas      = int(insp.get("num_cotas", 0))
+        _costo_cota = float(insp.get("costo_por_cota", 0.0))
+        _costo_setup_insp = (_setup_insp * _hr_insp) / max(cantidad, 1)
+        _costo_cotas_insp = _cotas * _costo_cota
+        costo_insp  = _costo_setup_insp + _costo_cotas_insp
+    mg_insp     = int(insp.get("margen_inspeccion_pct", 0))
+    util_insp   = costo_insp * (mg_insp / 100)
+    pv_insp     = costo_insp + util_insp
+    precio_pza  = precio_pza + pv_insp
+
     # ── Custom Tooling ────────────────────────────────────────────────────────
     tooling_items = pieza.get("custom_tooling", [])
     costo_tooling_pza = 0.0   # Opción B: amortizado en precio/pza
@@ -997,8 +1025,11 @@ def calcular_pieza(pieza, margen_pct):
         "costo_log_orden": costo_log_con_margen * cantidad if log.get("aplica", False) else 0.0,
         "subtotal":      subtotal,
         "utilidad":      utilidad,
-        "precio_pza":    precio_pza,           # INCLUYE logística
-        "total":         total_con_log,        # INCLUYE logística
+        "costo_insp":    costo_insp,
+        "util_insp":     util_insp,
+        "pv_insp":       pv_insp,
+        "precio_pza":    precio_pza,           # INCLUYE logística + inspección
+        "total":         total_con_log,        # INCLUYE logística + inspección
         "costo_tooling_pza":   costo_tooling_pza,
         "costo_tooling_total": costo_tooling_total,
         "precios_tipo":  precios,
@@ -1375,6 +1406,23 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                         ), ps("dr6",8)),
                     Paragraph(fmtc(pv_tr),ps("dr7",8,align=TA_RIGHT)),
                     Paragraph(fmtc(pv_tr*cant),ps("dr8",8,align=TA_RIGHT))])
+            pv_insp_pdf = res.get("pv_insp", 0.0)
+            if pv_insp_pdf > 0:
+                insp_d     = p.get("inspeccion", {})
+                tipo_insp  = insp_d.get("tipo", "CMM")
+                cotas_d    = int(insp_d.get("num_cotas", 0))
+                cota_c_d   = float(insp_d.get("costo_por_cota", 0.0))
+                notas_id   = insp_d.get("notas_inspeccion", "").strip()
+                insp_detalle = f"{tipo_insp} · {cotas_d} cotas críticas × {fmtc(cota_c_d)}"
+                if notas_id: insp_detalle += f" · {notas_id}"
+                det_rows.append([
+                    Paragraph(
+                        f"Inspección final"
+                        f"<br/><font size='6.5' color='grey'>{insp_detalle}</font>",
+                        ps("dr_insp",8)),
+                    Paragraph(fmtc(pv_insp_pdf), ps("dr_insp1",8,align=TA_RIGHT)),
+                    Paragraph(fmtc(pv_insp_pdf*cant), ps("dr_insp2",8,align=TA_RIGHT))])
+
             if pv_log > 0:
                 log_d      = p.get("logistica",{})
                 incoterm_d = log_d.get("incoterm","EXW")
@@ -1402,7 +1450,8 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                     Paragraph(fmtc(pv_log),ps("dr10",8,align=TA_RIGHT)),
                     Paragraph(fmtc(pv_log*cant),ps("dr11",8,align=TA_RIGHT))])
 
-            subtotal_pza = pv_mat + pv_mo + pv_tr + pv_log
+            pv_insp_pdf  = res.get("pv_insp", 0.0)
+            subtotal_pza = pv_mat + pv_mo + pv_tr + pv_log + pv_insp_pdf
             det_rows.append([
                 Paragraph("Precio unitario total",ps("drs",9,NAVY,True)),
                 Paragraph(fmtc(subtotal_pza),ps("drst",9,NAVY,True,TA_RIGHT)),
@@ -1713,12 +1762,20 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
     iva_label          = "IVA (16%):" if aplica_iva_pdf else "IVA (0% — Exportación):"
     total_con_tooling  = total_general + iva_display + total_tooling_cot
 
+    total_insp_orden = sum(
+        calcular_pieza(p, margen_global).get("pv_insp", 0.0) * p.get("cantidad", 1)
+        for p in piezas if p.get("inspeccion", {}).get("aplica", False)
+    )
     filas_totales = [
         ["", Paragraph("Subtotal piezas:", ps("ts1",9,align=TA_RIGHT)),
               Paragraph(fmtc(total_general), ps("tv1",9,bold=True,align=TA_RIGHT))],
         ["", Paragraph(iva_label, ps("ts2",9,GRAY,align=TA_RIGHT)),
               Paragraph(fmtc(iva_display), ps("tv2",9,GRAY,align=TA_RIGHT))],
     ]
+    if total_insp_orden > 0:
+        filas_totales.append([
+            "", Paragraph("Inspección y validación:", ps("tsi",9,colors.HexColor("#7c3aed"),align=TA_RIGHT)),
+            Paragraph(fmtc(total_insp_orden), ps("tvi",9,colors.HexColor("#7c3aed"),True,align=TA_RIGHT))])
     # Logística incluida en precio/pza — no se lista por separado en totales
     if total_tooling_cot > 0:
         filas_totales.append([
@@ -3561,6 +3618,91 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
                     f"💰 Total Custom Tooling (Opciones A+C): <b>{fmtc(total_tooling_separado)}</b></div>",
                     unsafe_allow_html=True)
 
+        # ── Inspección Final y Validación ────────────────────────────────────
+        with st.expander("▸  Inspección final y validación", expanded=False):
+            insp = pieza.get("inspeccion", {})
+            if "inspeccion" not in pieza:
+                st.session_state.piezas[pi]["inspeccion"] = {
+                    "aplica": False, "tipo": "CMM", "setup_hrs": 1.0,
+                    "costo_hr_inspector": 0.0, "num_cotas": 0,
+                    "costo_por_cota": 0.0, "num_muestras_fai": 0,
+                    "notas_inspeccion": "", "margen_inspeccion_pct": 0,
+                }
+                insp = st.session_state.piezas[pi]["inspeccion"]
+
+            aplica_insp = st.checkbox("Incluir costo de inspección en esta pieza",
+                value=insp.get("aplica", False),
+                key=f"insp_aplica_{pieza['id']}")
+            st.session_state.piezas[pi]["inspeccion"]["aplica"] = aplica_insp
+
+            if aplica_insp:
+                TIPOS_INSP = ["CMM", "Visual + Calibradores", "CMM + Visual", "Escaneo 3D", "Rugosímetro", "Otro"]
+                i1, i2, i3 = st.columns([1.2, 1.2, 1.2])
+                with i1:
+                    tipo_insp = st.selectbox("Tipo de inspección", TIPOS_INSP,
+                        index=TIPOS_INSP.index(insp.get("tipo","CMM")) if insp.get("tipo","CMM") in TIPOS_INSP else 0,
+                        key=f"insp_tipo_{pieza['id']}")
+                    st.session_state.piezas[pi]["inspeccion"]["tipo"] = tipo_insp
+                with i2:
+                    setup_insp = st.number_input("Setup CMM / programación (hrs)",
+                        min_value=0.0, value=float(insp.get("setup_hrs", 1.0)),
+                        step=0.5, format="%.1f", key=f"insp_setup_{pieza['id']}",
+                        help="Horas de programación y montaje — se dividen entre la cantidad de piezas")
+                    st.session_state.piezas[pi]["inspeccion"]["setup_hrs"] = setup_insp
+                with i3:
+                    hr_insp = st.number_input("Tarifa inspector ($/hr)",
+                        min_value=0.0, value=float(insp.get("costo_hr_inspector", 0.0)),
+                        step=5.0, key=f"insp_hr_{pieza['id']}")
+                    st.session_state.piezas[pi]["inspeccion"]["costo_hr_inspector"] = hr_insp
+
+                st.caption("Cotas críticas")
+                c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+                with c1:
+                    num_cotas = st.number_input("Número de cotas críticas",
+                        min_value=0, value=int(insp.get("num_cotas", 0)),
+                        step=1, key=f"insp_cotas_{pieza['id']}",
+                        help="Cotas que requieren medición CMM o calibrador certificado")
+                    st.session_state.piezas[pi]["inspeccion"]["num_cotas"] = num_cotas
+                with c2:
+                    costo_cota = st.number_input("Costo por cota ($)",
+                        min_value=0.0, value=float(insp.get("costo_por_cota", 0.0)),
+                        step=1.0, format="%.2f", key=f"insp_cota_costo_{pieza['id']}",
+                        help="Costo unitario de medir cada cota crítica")
+                    st.session_state.piezas[pi]["inspeccion"]["costo_por_cota"] = costo_cota
+                with c3:
+                    muestras_fai = st.number_input("Muestras FAI (pzas)",
+                        min_value=0, value=int(insp.get("num_muestras_fai", 0)),
+                        step=1, key=f"insp_fai_{pieza['id']}",
+                        help="First Article Inspection — número de piezas para inspección completa")
+                    st.session_state.piezas[pi]["inspeccion"]["num_muestras_fai"] = muestras_fai
+                with c4:
+                    mg_insp = st.number_input("Utilidad inspección (%)",
+                        min_value=0, max_value=200,
+                        value=int(insp.get("margen_inspeccion_pct", 0)),
+                        step=5, key=f"insp_mg_{pieza['id']}")
+                    st.session_state.piezas[pi]["inspeccion"]["margen_inspeccion_pct"] = mg_insp
+
+                notas_insp = st.text_input("Notas de inspección",
+                    value=insp.get("notas_inspeccion", ""),
+                    key=f"insp_notas_{pieza['id']}",
+                    placeholder="Ej: Reporte CMM requerido · Certificado de calibración · FAI per AS9102")
+                st.session_state.piezas[pi]["inspeccion"]["notas_inspeccion"] = notas_insp
+
+                # Resumen
+                cant_pza   = pieza.get("cantidad", 1)
+                _setup_pza = (setup_insp * hr_insp) / max(cant_pza, 1)
+                _cotas_pza = num_cotas * costo_cota
+                _costo_insp_pza = _setup_pza + _cotas_pza
+                _util_insp_pza  = _costo_insp_pza * (mg_insp / 100)
+                _pv_insp_pza    = _costo_insp_pza + _util_insp_pza
+                if _costo_insp_pza > 0:
+                    st.info(
+                        f"Setup CMM/pza: {fmtc(_setup_pza)}  ·  "
+                        f"{num_cotas} cotas × {fmtc(costo_cota)} = {fmtc(_cotas_pza)}  ·  "
+                        f"Costo insp/pza: {fmtc(_costo_insp_pza)}  ·  "
+                        f"Con {mg_insp}% utilidad: **{fmtc(_pv_insp_pza)}/pza**  ·  "
+                        f"Total orden: {fmtc(_pv_insp_pza * cant_pza)}")
+
         # ── Márgenes de utilidad por componente ─────────────────────────────
         usar_global = st.checkbox(
             "Usar margen global para esta pieza",
@@ -3839,32 +3981,25 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
             _pv_ciclo = res.get("costo_ciclo",0) * (1 + _mg_mo  / 100)
             _pv_mat  = res["costo_material"]     * (1 + _mg_mat  / 100)
             _pv_trat = res["costo_trat"]         * (1 + _mg_trat / 100)
+            _pv_insp = res.get("pv_insp", 0.0)
+            _ncols = 6 + (1 if _clt > 0 else 0) + (1 if _pv_insp > 0 else 0)
+            _bar_cols = st.columns(_ncols)
+            _bar_cols[0].metric("Setup/pza",       fmtc(_pv_setup))
+            _bar_cols[1].metric("Maquinado/pza",   fmtc(_pv_ciclo))
+            _bar_cols[2].metric("Material/pza",    fmtc(_pv_mat))
+            _bar_cols[3].metric("Tratamiento/pza", fmtc(_pv_trat))
+            _bi = 4
             if _clt > 0:
-                c1,c2,c3,c4,c5,c6,c7 = st.columns(7)
-            else:
-                c1,c2,c3,c4,c5,c6 = st.columns(6)
-                c7 = None
-            c1.metric("Setup/pza",       fmtc(_pv_setup))
-            c2.metric("Maquinado/pza",   fmtc(_pv_ciclo))
-            c3.metric("Material/pza",    fmtc(_pv_mat))
-            c4.metric("Tratamiento/pza", fmtc(_pv_trat))
-            if c7 is not None:
-                c5.metric("Logística/pza", fmtc(_clt))
-                with c6:
-                    st.markdown(
-                        f"<div style='padding:4px 0'>"
-                        f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
-                        f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
-                        f"</div>", unsafe_allow_html=True)
-                c7.metric(f"Total {cant} pzas", fmtc(res["total"]))
-            else:
-                with c5:
-                    st.markdown(
-                        f"<div style='padding:4px 0'>"
-                        f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
-                        f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
-                        f"</div>", unsafe_allow_html=True)
-                c6.metric(f"Total {cant} pzas", fmtc(res["total"]))
+                _bar_cols[_bi].metric("Logística/pza", fmtc(_clt)); _bi += 1
+            if _pv_insp > 0:
+                _bar_cols[_bi].metric("Inspección/pza", fmtc(_pv_insp)); _bi += 1
+            with _bar_cols[_bi]:
+                st.markdown(
+                    f"<div style='padding:4px 0'>"
+                    f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"
+                    f"<div style='font-size:2rem;font-weight:700;color:#16a34a;line-height:1.2'>{fmtc(res['precio_pza'])}</div>"
+                    f"</div>", unsafe_allow_html=True)
+            _bar_cols[_bi+1].metric(f"Total {cant} pzas", fmtc(res["total"]))
 
         st.markdown("</div>", unsafe_allow_html=True)
 

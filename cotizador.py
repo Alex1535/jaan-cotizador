@@ -4429,10 +4429,17 @@ with tab3:
                                 # plano_b64, plano_nombre, plano_tipo están en el dict de la pieza
                                 # Nota: cotizacion_mp_b64 se restaura directo desde piezas_cargadas, no necesita key de widget
                                 # Márgenes
-                                st.session_state[f"mg_{pid}"]     = bool(p.get("usar_margen_global", False))
-                                st.session_state[f"mmo_{pid}"]    = int(p.get("margen_mo", 35))
-                                st.session_state[f"mmat_{pid}"]   = int(p.get("margen_mat", 35))
-                                st.session_state[f"mtrat_{pid}"]  = int(p.get("margen_trat", 35))
+                                st.session_state[f"mg_{pid}"]          = bool(p.get("usar_margen_global", False))
+                                st.session_state[f"mmo_{pid}"]         = int(p.get("margen_mo", 35))
+                                st.session_state[f"mmat_{pid}"]        = int(p.get("margen_mat", 35))
+                                st.session_state[f"mtrat_{pid}"]       = int(p.get("margen_trat", 35))
+                                # Margen logística
+                                _ml = int(p.get("logistica", {}).get("margen_log_pct",
+                                          p.get("margen_log", 0)))
+                                for _mk in list(st.session_state.keys()):
+                                    if _mk == f"margen_log_{pid}":
+                                        del st.session_state[_mk]
+                                st.session_state[f"margen_log_{pid}"]  = _ml
                                 # Logística — borrar keys existentes para que los widgets lean value= correctamente
                                 _log = p.get("logistica", {})
                                 for _lk in list(st.session_state.keys()):

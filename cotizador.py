@@ -342,7 +342,6 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
 
     resource_type = "raw" if mime_type == "application/pdf" else "image"
     timestamp     = str(int(time.time()))
-    folder        = "jaan-planos"
 
     # Firma: parámetros en orden alfabético, sin api_key ni resource_type ni file
     params = {"folder": folder, "timestamp": timestamp}

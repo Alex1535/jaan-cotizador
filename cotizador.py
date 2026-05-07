@@ -296,6 +296,39 @@ GSHEET_HEADERS = ["numero","fecha","usuario_email","cliente","atencion",
                   "subtotal","iva","total_neto","vigencia",
                   "tiempo_entrega","cond_pago","datos_json"]
 
+def _get_sheet_tab_name():
+    """Retorna el nombre de la pestaña según el rol del usuario."""
+    usuario = st.session_state.get("usuario", {})
+    rol     = usuario.get("rol", "vendedor")
+    email   = usuario.get("email", "default")
+    if rol == "admin":
+        # Admin puede ver su propio tab o el de todos — por defecto usa "admin"
+        return "admin"
+    # Vendedor: pestaña con su email (sin caracteres especiales)
+    tab = email.replace("@", "_").replace(".", "_").replace(" ", "_")
+    return tab[:50]  # max 50 chars
+
+def _ensure_tab(token, sheet_id, tab_name):
+    """Crea la pestaña si no existe en el spreadsheet."""
+    import requests
+    # Leer pestañas existentes
+    resp = requests.get(
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}",
+        headers={"Authorization": f"Bearer {token}"})
+    if resp.status_code != 200:
+        return False
+    sheets = resp.json().get("sheets", [])
+    existing = [s["properties"]["title"] for s in sheets]
+    if tab_name in existing:
+        return True
+    # Crear pestaña nueva
+    body = {"requests": [{"addSheet": {"properties": {"title": tab_name}}}]}
+    r2 = requests.post(
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}:batchUpdate",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json=body)
+    return r2.status_code == 200
+
 def _get_token_and_sheet():
     """Helper: retorna (token, sheet_id, error)"""
     token, err = get_gsheet_token()
@@ -306,28 +339,39 @@ def _get_token_and_sheet():
         return None, None, err2
     return token, sheet_id, None
 
-def _ensure_headers(token, sheet_id):
-    """Crea la fila de encabezados si el sheet está vacío"""
+def _get_token_sheet_tab():
+    """Helper: retorna (token, sheet_id, tab_name, error)"""
+    token, sheet_id, err = _get_token_and_sheet()
+    if not token:
+        return None, None, None, err
+    tab = _get_sheet_tab_name()
+    _ensure_tab(token, sheet_id, tab)
+    return token, sheet_id, tab, None
+
+def _ensure_headers(token, sheet_id, tab="Sheet1"):
+    """Crea la fila de encabezados si la pestaña está vacía"""
     import requests
+    rng = f"'{tab}'!A1"
     check = requests.get(
-        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1",
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{rng}",
         headers={"Authorization": f"Bearer {token}"})
     if check.status_code == 200 and not check.json().get("values"):
         requests.post(
-            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1:append?valueInputOption=RAW",
+            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{rng}:append?valueInputOption=RAW",
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             json={"values": [GSHEET_HEADERS]})
 
-def _find_row_number(token, sheet_id, numero_cot):
+def _find_row_number(token, sheet_id, numero_cot, tab="Sheet1"):
     """Busca en columna A el número de cotización. Retorna número de fila (1-based) o None."""
     import requests
+    rng = f"'{tab}'!A2:A2000"
     resp = requests.get(
-        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A2:A2000",
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{rng}",
         headers={"Authorization": f"Bearer {token}"})
     if resp.status_code != 200:
         return None
     rows = resp.json().get("values", [])
-    for i, row in enumerate(rows, 2):   # fila 2 en adelante (1 es header)
+    for i, row in enumerate(rows, 2):
         if row and row[0].strip() == numero_cot.strip():
             return i
     return None
@@ -391,14 +435,15 @@ def descargar_plano_drive(file_id):
 
 
 def append_to_gsheet(values):
-    """Agrega una fila nueva al Google Sheet"""
+    """Agrega una fila nueva a la pestaña del usuario"""
     import requests
-    token, sheet_id, err = _get_token_and_sheet()
+    token, sheet_id, tab, err = _get_token_sheet_tab()
     if not token:
         return False, err
-    _ensure_headers(token, sheet_id)
+    _ensure_headers(token, sheet_id, tab)
+    rng = f"'{tab}'!A1"
     url = (f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}"
-           f"/values/A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS")
+           f"/values/{rng}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS")
     resp = requests.post(url,
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         json={"values": [values]})
@@ -407,20 +452,18 @@ def append_to_gsheet(values):
     return False, f"Error {resp.status_code}: {resp.text[:200]}"
 
 def update_gsheet_row(numero_cot, values):
-    """Actualiza la fila existente de una cotización. Si no existe, la agrega."""
+    """Actualiza la fila existente de una cotización en la pestaña del usuario."""
     import requests
-    token, sheet_id, err = _get_token_and_sheet()
+    token, sheet_id, tab, err = _get_token_sheet_tab()
     if not token:
         return False, err
-    _ensure_headers(token, sheet_id)
-    row_num = _find_row_number(token, sheet_id, numero_cot)
+    _ensure_headers(token, sheet_id, tab)
+    row_num = _find_row_number(token, sheet_id, numero_cot, tab)
     if row_num is None:
-        # No existe → insertar como nueva
         return append_to_gsheet(values)
-    # Existe → sobreescribir esa fila completa
     n_cols = len(values)
     end_col = chr(ord("A") + n_cols - 1) if n_cols <= 26 else "Z"
-    range_str = f"A{row_num}:{end_col}{row_num}"
+    range_str = f"'{tab}'!A{row_num}:{end_col}{row_num}"
     resp = requests.put(
         f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{range_str}?valueInputOption=RAW",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
@@ -1816,17 +1859,53 @@ def cargar_cotizaciones():
         return st.session_state.get("cotizaciones", [])
     
     try:
-        resp = requests.get(
-            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1:Z2000",
-            headers={"Authorization": f"Bearer {token}"})
-        if resp.status_code != 200:
-            return st.session_state.get("cotizaciones", [])
-        
-        data = resp.json()
+        usuario = st.session_state.get("usuario", {})
+        rol     = usuario.get("rol", "vendedor")
+
+        def _fetch_tab(tab_name):
+            rng = f"'{tab_name}'!A1:Z2000"
+            r = requests.get(
+                f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{rng}",
+                headers={"Authorization": f"Bearer {token}"})
+            if r.status_code != 200:
+                return []
+            v = r.json().get("values", [])
+            return v if len(v) >= 2 else []
+
+        if rol == "admin":
+            # Admin: leer todas las pestañas
+            meta = requests.get(
+                f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}",
+                headers={"Authorization": f"Bearer {token}"})
+            all_tabs = [s["properties"]["title"]
+                       for s in meta.json().get("sheets", [])] if meta.status_code == 200 else ["Sheet1"]
+            # Combinar todas las pestañas
+            all_values = []
+            headers = None
+            for tab_name in all_tabs:
+                tab_data = _fetch_tab(tab_name)
+                if not tab_data:
+                    continue
+                if headers is None:
+                    headers = tab_data[0]
+                    all_values.extend(tab_data[1:])
+                else:
+                    all_values.extend(tab_data[1:])  # Saltar encabezado de cada tab
+            if not headers:
+                return []
+            values = [headers] + all_values
+        else:
+            # Vendedor: solo su pestaña
+            tab_name = _get_sheet_tab_name()
+            values = _fetch_tab(tab_name)
+            if not values:
+                return []
+
+        data = {"values": values}
         values = data.get("values", [])
         if len(values) < 2:
             return []
-        
+
         headers = values[0]
         import json as _json
 
@@ -1995,7 +2074,7 @@ def actualizar_status_gsheet(numero, nuevo_status):
     sheet_id = st.secrets.get("GSHEET_ID", "").strip()
     # Leer todas las filas para encontrar la fila correcta
     resp = requests.get(
-        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/A1:Z1000",
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/'{_get_sheet_tab_name()}'!A1:Z1000",
         headers={"Authorization": f"Bearer {token}"})
     if resp.status_code != 200:
         return False, "No se pudo leer el sheet"

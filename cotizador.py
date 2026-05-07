@@ -1530,7 +1530,7 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
         # Template Simplificado — tabla compacta estándar
         story.append(Paragraph("Resumen de piezas", ps("h2",10,NAVY,True)))
         story.append(Spacer(1,0.08*inch))
-        col_w = [0.3*inch,1.0*inch,1.4*inch,0.8*inch,0.7*inch,0.9*inch,0.7*inch,1.0*inch]
+        col_w = [0.3*inch,1.0*inch,1.3*inch,0.8*inch,1.0*inch,0.9*inch,0.5*inch,1.0*inch]
         rows = [[Paragraph(h, ps(f"th{i}",8,WHITE,True)) for i,h in
                  enumerate(["#","Núm. Dibujo","Descripción","Material","Tratamiento","P. Unitario","Cant.","Total"])]]
         for i,p in enumerate(piezas):

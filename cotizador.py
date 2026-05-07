@@ -332,8 +332,8 @@ def _find_row_number(token, sheet_id, numero_cot):
             return i
     return None
 
-def subir_plano_drive(file_bytes, filename, mime_type="application/pdf", folder="jaan-planos"):
-    """Sube archivo a Cloudinary en la carpeta especificada."""
+def subir_plano_drive(file_bytes, filename, mime_type="application/pdf", folder="jaan-planos", public_id=None):
+    """Sube archivo a Cloudinary. Si public_id se pasa, sobreescribe el archivo existente."""
     import requests, hashlib, time
 
     cloud_name = st.secrets.get("CLOUDINARY_CLOUD_NAME", "dhzywtmp1")
@@ -344,18 +344,18 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf", folder=
 
     resource_type = "raw" if mime_type == "application/pdf" else "image"
     timestamp     = str(int(time.time()))
-    params        = {"folder": folder, "timestamp": timestamp}
+    # Construir params para firma — incluir public_id si se especifica
+    params = {"folder": folder, "timestamp": timestamp}
+    if public_id:
+        params["overwrite"]  = "true"
+        params["public_id"]  = public_id
     to_sign   = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
     signature = hashlib.sha1(f"{to_sign}{api_secret}".encode()).hexdigest()
 
+    post_data = {"api_key": api_key, "signature": signature, **params}
     resp = requests.post(
         f"https://api.cloudinary.com/v1_1/{cloud_name}/{resource_type}/upload",
-        data={
-            "api_key":   api_key,
-            "timestamp": timestamp,
-            "signature": signature,
-            "folder":    folder,
-        },
+        data=post_data,
         files={"file": (filename, file_bytes, mime_type)},
         timeout=60
     )
@@ -1750,9 +1750,13 @@ def guardar_cotizacion():
         )
         if _pdf_bytes:
             _pdf_filename = f"Cotizacion_{num_cot}.pdf"
+            # Usar public_id fijo = jaan-pdfs-cotizaciones/Cotizacion_AIE-011
+            # para sobreescribir siempre el mismo archivo
+            _pdf_public_id = f"jaan-pdfs-cotizaciones/Cotizacion_{num_cot}"
             _pid, _url, _err = subir_plano_drive(
                 _pdf_bytes, _pdf_filename, "application/pdf",
-                folder="jaan-pdfs-cotizaciones"
+                folder="jaan-pdfs-cotizaciones",
+                public_id=_pdf_public_id
             )
             if _url:
                 pdf_cloud_url = _url

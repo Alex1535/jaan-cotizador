@@ -338,7 +338,9 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
 
     cloud_name = st.secrets.get("CLOUDINARY_CLOUD_NAME", "dhzywtmp1")
     api_key    = st.secrets.get("CLOUDINARY_API_KEY", "923179743215412")
-    api_secret = st.secrets.get("CLOUDINARY_API_SECRET", "9vt8nHg1Fl307K61gtlwmqTEHgM")
+    api_secret = st.secrets.get("CLOUDINARY_API_SECRET", "")
+    if not api_secret:
+        return None, None, "CLOUDINARY_API_SECRET no configurado en Secrets"
 
     resource_type = "raw" if mime_type == "application/pdf" else "image"
     timestamp     = str(int(time.time()))

@@ -683,6 +683,7 @@ def nueva_materia_prima():
             "proveedor": "",
             "cotizacion_mp_nombre": "",
             "cotizacion_mp_b64": "",
+            "cotizacion_mp_url": "",
             "dims_manual": [0.0, 0.0, 0.0],
             "comentarios_mp": "",
             # Campos para cálculo por tramo (todo en pulgadas)
@@ -3027,33 +3028,49 @@ with tab1:
                 )
                 st.session_state.piezas[pi]["materia_prima"]["proveedor"] = prov_mp
             with provmp_c2:
+                # Key dinámica para evitar re-uploads al rerun
+                _mp_ver_key = f"_mp_version_{pieza['id']}"
+                _mp_uploader_key = f"cotmpfile_{pieza['id']}_{st.session_state.get(_mp_ver_key, 0)}"
                 cot_mp_file = st.file_uploader(
                     "Cotización del proveedor (PDF/imagen)",
                     type=["pdf", "png", "jpg", "jpeg"],
-                    key=f"cotmpfile_{pieza['id']}",
-                    help="Se guardará junto con la cotización"
+                    key=_mp_uploader_key,
+                    help="Se sube a Cloudinary junto con la cotización"
                 )
                 if cot_mp_file is not None:
-                    import base64 as _b64
                     file_bytes_mp = cot_mp_file.read()
-                    b64_mp = _b64.b64encode(file_bytes_mp).decode("utf-8")
-                    st.session_state.piezas[pi]["materia_prima"]["cotizacion_mp_nombre"] = cot_mp_file.name
-                    st.session_state.piezas[pi]["materia_prima"]["cotizacion_mp_b64"]    = b64_mp
-                    st.success(f"✅ Archivo cargado: {cot_mp_file.name}")
-                # Mostrar archivo existente si ya hay uno guardado
+                    mime_mp = "application/pdf" if cot_mp_file.name.lower().endswith(".pdf") else "image/png"
+                    with st.spinner("☁️ Subiendo cotización MP..."):
+                        _mp_pid, _mp_url, _mp_err = subir_plano_drive(
+                            file_bytes_mp, cot_mp_file.name, mime_mp)
+                    if _mp_url:
+                        st.session_state.piezas[pi]["materia_prima"]["cotizacion_mp_nombre"] = cot_mp_file.name
+                        st.session_state.piezas[pi]["materia_prima"]["cotizacion_mp_url"]    = _mp_url
+                        st.session_state.piezas[pi]["materia_prima"]["cotizacion_mp_b64"]    = ""
+                        # Incrementar versión para limpiar el widget
+                        st.session_state[_mp_ver_key] = st.session_state.get(_mp_ver_key, 0) + 1
+                        st.success(f"✅ Archivo cargado: {cot_mp_file.name}")
+                    else:
+                        st.error(f"Error subiendo: {_mp_err}")
+
+                # Mostrar archivo existente
                 nombre_mp_guardado = mp.get("cotizacion_mp_nombre", "")
+                mp_url_guardado    = mp.get("cotizacion_mp_url", "")
                 b64_mp_guardado    = mp.get("cotizacion_mp_b64", "")
-                if nombre_mp_guardado and b64_mp_guardado and cot_mp_file is None:
-                    import base64 as _b64
-                    file_bytes_mg = _b64.b64decode(b64_mp_guardado)
-                    st.markdown(f"📄 Archivo guardado: **{nombre_mp_guardado}**")
-                    st.download_button(
-                        f"⬇️ Descargar {nombre_mp_guardado}",
-                        data=file_bytes_mg,
-                        file_name=nombre_mp_guardado,
-                        mime="application/octet-stream",
-                        key=f"dlcotmp_{pieza['id']}"
-                    )
+                if nombre_mp_guardado and cot_mp_file is None:
+                    if mp_url_guardado:
+                        st.markdown(f"📄 **{nombre_mp_guardado}** — [Ver/Descargar]({mp_url_guardado})")
+                    elif b64_mp_guardado:
+                        import base64 as _b64
+                        file_bytes_mg = _b64.b64decode(b64_mp_guardado)
+                        st.markdown(f"📄 Archivo guardado: **{nombre_mp_guardado}**")
+                        st.download_button(
+                            f"⬇️ Descargar {nombre_mp_guardado}",
+                            data=file_bytes_mg,
+                            file_name=nombre_mp_guardado,
+                            mime="application/octet-stream",
+                            key=f"dlcotmp_{pieza['id']}"
+                        )
             st.markdown("</div>", unsafe_allow_html=True)
 
         # ── Tratamiento, cantidad y demanda ──────────────────────────────────

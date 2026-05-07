@@ -1434,21 +1434,19 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                 log_d      = p.get("logistica",{})
                 incoterm_d = log_d.get("incoterm","EXW")
                 empresa_d  = log_d.get("entrega_empresa","").strip()
-                dom_d      = log_d.get("entrega_domicilio","").strip()
                 ciudad_d   = log_d.get("entrega_ciudad","").strip()
                 estado_d   = log_d.get("entrega_estado","").strip()
                 cp_d       = log_d.get("entrega_cp","").strip()
                 pais_d     = log_d.get("entrega_pais","").strip()
-                coment_d   = log_d.get("comentarios_log","").strip()
+                dom_d      = log_d.get("entrega_domicilio","").strip()
                 dir_linea  = ", ".join(filter(None,[
                     dom_d,
                     " ".join(filter(None,[ciudad_d, estado_d, cp_d])),
                     pais_d]))
-                entrega_parts = []
-                if empresa_d: entrega_parts.append(empresa_d)
-                if dir_linea: entrega_parts.append(dir_linea)
-                if coment_d:  entrega_parts.append(coment_d)
-                entrega_txt = "  ·  ".join(entrega_parts)
+                # Solo Incoterm + empresa + dirección (sin tramos internos)
+                entrega_txt = ""
+                if empresa_d: entrega_txt += empresa_d
+                if dir_linea: entrega_txt += ("  ·  " if empresa_d else "") + dir_linea
                 det_rows.append([
                     Paragraph(
                         f"Logística &nbsp;<font color='#185FA5'><b>[{incoterm_d}]</b></font>"
@@ -1546,162 +1544,8 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
         story.append(pt)
         story.append(Spacer(1,0.15*inch))
 
-        # ── Logística como cargo separado en el PDF ──────────────────────────
-        piezas_con_log = [(i,p) for i,p in enumerate(piezas)
-                          if p.get("logistica",{}).get("aplica", False)]
-        if piezas_con_log:
-            story.append(Paragraph("Condiciones de logística", ps("h2log",10,NAVY,True)))
-            story.append(Spacer(1,0.04*inch))
-            MODO_ETIQ = {"fijo":"Fijo por orden","por_kg":"Por kg","por_pza":"Por pieza"}
-            for i,p in piezas_con_log:
-                res_p   = calcular_pieza(p, margen_global)
-                log_p   = p.get("logistica",{})
-                inco       = log_p.get("incoterm","EXW")
-                empresa_s  = log_p.get("entrega_empresa","").strip()
-                dom_s      = log_p.get("entrega_domicilio","").strip()
-                ciudad_s   = log_p.get("entrega_ciudad","").strip()
-                estado_s   = log_p.get("entrega_estado","").strip()
-                cp_s       = log_p.get("entrega_cp","").strip()
-                pais_s     = log_p.get("entrega_pais","").strip()
-                dir_s      = ", ".join(filter(None,[
-                    dom_s,
-                    " ".join(filter(None,[ciudad_s, estado_s, cp_s])),
-                    pais_s]))
-                dest       = dir_s  # dirección sin empresa (empresa va separada)
-                coment  = log_p.get("comentarios_log","").strip()
-                costo_log_orden = res_p.get("costo_log_orden", 0.0)
 
-                # Encabezado pieza
-                ph_l = Table([[
-                    Paragraph(f"#{i+1}  {p.get('num_dibujo','—')} — {p.get('descripcion','—')}",
-                              ps(f"lph{i}",9,WHITE,True)),
-                    Paragraph(f"Cargo logística: {fmtc(costo_log_orden)}",
-                              ps(f"lphv{i}",9,WHITE,True,TA_RIGHT))
-                ]], colWidths=[5.0*inch,2.0*inch])
-                ph_l.setStyle(TableStyle([
-                    ("BACKGROUND",(0,0),(-1,-1),BLUE),
-                    ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
-                    ("LEFTPADDING",(0,0),(0,-1),10),("RIGHTPADDING",(-1,0),(-1,-1),10),
-                ]))
-                story.append(ph_l)
-
-                # Fila de condiciones: Incoterm | Destino de entrega | Tramos activos
-                tramos_pre   = log_p.get("tramos_pre", [])
-                tramos_extra = log_p.get("tramos_extra", [])
-                activos_pre  = [t for t in tramos_pre  if t.get("aplica")]
-                activos_ext  = [t for t in tramos_extra if float(t.get("costo",0))>0]
-
-                # Fila resumen: Incoterm | Destino
-                ld_rows = [
-                    [Paragraph("Incoterm",ps(f"llh1{i}",8,GRAY)),
-                     Paragraph("Entregar a",ps(f"llh2{i}",8,GRAY)),
-                     Paragraph("Dirección de entrega",ps(f"llh3{i}",8,GRAY))],
-                    [Paragraph(f"<b>{inco}</b>",ps(f"llv1{i}",10,NAVY,True)),
-                     Paragraph(empresa_s or "—",ps(f"llv2{i}",9,NAVY,True)),
-                     Paragraph(dest or "—",ps(f"llv3{i}",8))],
-                ]
-                ld = Table(ld_rows, colWidths=[1.2*inch, 2.0*inch, 3.8*inch])
-                ld.setStyle(TableStyle([
-                    ("BACKGROUND",(0,0),(-1,0),LGRAY),
-                    ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
-                    ("LEFTPADDING",(0,0),(-1,-1),8),("RIGHTPADDING",(0,0),(-1,-1),8),
-                    ("LINEBELOW",(0,0),(-1,0),0.5,colors.HexColor("#dde1ea")),
-                ]))
-                story.append(ld)
-
-                # Tabla de tramos activos
-                if activos_pre or activos_ext:
-                    tr_header = [
-                        Paragraph("Tramo",ps(f"trh0{i}",8,WHITE,True)),
-                        Paragraph("Origen",ps(f"trh1{i}",8,WHITE,True)),
-                        Paragraph("Destino",ps(f"trh2{i}",8,WHITE,True)),
-                        Paragraph("Costo/orden",ps(f"trh3{i}",8,WHITE,True,TA_RIGHT)),
-                        Paragraph("Notas",ps(f"trh4{i}",8,WHITE,True)),
-                    ]
-                    tr_rows = [tr_header]
-                    for tridx, t in enumerate(activos_pre):
-                        tr_costo_orden = (
-                            float(t.get("costo",0)) if t.get("modo","fijo") == "fijo"
-                            else float(t.get("costo",0)) * p.get("cantidad",1)
-                        )
-                        tr_rows.append([
-                            Paragraph(t.get("label_custom","").strip() or t["label"],ps(f"trv0{i}{tridx}",8)),
-                            Paragraph(t.get("origen","—"),ps(f"trv1{i}{tridx}",8,GRAY)),
-                            Paragraph(t.get("destino","—"),ps(f"trv2{i}{tridx}",8,GRAY)),
-                            Paragraph(fmtc(tr_costo_orden),ps(f"trv3{i}{tridx}",8,align=TA_RIGHT)),
-                            Paragraph(t.get("notas",""),ps(f"trv4{i}{tridx}",8,GRAY)),
-                        ])
-                    for tridx, t in enumerate(activos_ext):
-                        tr_costo_orden = float(t.get("costo",0))
-                        tr_rows.append([
-                            Paragraph(t.get("ruta","Tramo extra"),ps(f"tex0{i}{tridx}",8)),
-                            Paragraph("",ps(f"tex1{i}{tridx}",8)),
-                            Paragraph("",ps(f"tex2{i}{tridx}",8)),
-                            Paragraph(fmtc(tr_costo_orden),ps(f"tex3{i}{tridx}",8,align=TA_RIGHT)),
-                            Paragraph(t.get("notas",""),ps(f"tex4{i}{tridx}",8,GRAY)),
-                        ])
-                    trt = Table(tr_rows, colWidths=[1.7*inch,1.3*inch,1.3*inch,1.0*inch,1.7*inch])
-                    trt.setStyle(TableStyle([
-                        ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#334155")),
-                        ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE,LGRAY]),
-                        ("TOPPADDING",(0,0),(-1,-1),2),("BOTTOMPADDING",(0,0),(-1,-1),2),
-                        ("LEFTPADDING",(0,0),(-1,-1),5),("RIGHTPADDING",(0,0),(-1,-1),5),
-                        ("LINEBELOW",(0,0),(-1,-1),0.3,colors.HexColor("#dde1ea")),
-                    ]))
-                    story.append(trt)
-
-                if coment:
-                    story.append(Spacer(1,0.04*inch))
-                    story.append(Paragraph(f"Observaciones: {coment}", ps(f"llvc{i}",8,GRAY)))
-
-                # Embalaje
-                emb_p = log_p.get("embalaje", {})
-                emb_tipo_p = emb_p.get("tipo","")
-                if emb_tipo_p:
-                    cant_p      = p.get("cantidad",1)
-                    pzas_bulto  = max(int(emb_p.get("pzas_por_bulto",1)),1)
-                    num_bultos  = math.ceil(cant_p / pzas_bulto)
-                    largo_e     = float(emb_p.get("largo_cm",0))
-                    ancho_e     = float(emb_p.get("ancho_cm",0))
-                    alto_e      = float(emb_p.get("alto_cm",0))
-                    peso_bruto  = float(emb_p.get("peso_bruto_kg",0))
-                    peso_total  = peso_bruto * num_bultos
-                    vol_m3      = (largo_e * ancho_e * alto_e) / 1_000_000
-                    notas_emb   = emb_p.get("notas_embalaje","")
-
-                    dim_str = f"{largo_e:.0f} × {ancho_e:.0f} × {alto_e:.0f} cm" if largo_e else "—"
-                    emb_rows = [
-                        [Paragraph("Embalaje",ps(f"embh0{i}",8,GRAY)),
-                         Paragraph("Bultos",ps(f"embh1{i}",8,GRAY)),
-                         Paragraph("Dimensiones/bulto",ps(f"embh2{i}",8,GRAY)),
-                         Paragraph("Vol/bulto (m³)",ps(f"embh3{i}",8,GRAY)),
-                         Paragraph("Peso bruto total",ps(f"embh4{i}",8,GRAY))],
-                        [Paragraph(f"<b>{emb_tipo_p}</b>",ps(f"embv0{i}",9)),
-                         Paragraph(f"{num_bultos} bulto(s) · {pzas_bulto} pza(s)/bulto",ps(f"embv1{i}",8)),
-                         Paragraph(dim_str,ps(f"embv2{i}",8)),
-                         Paragraph(f"{vol_m3:.4f}",ps(f"embv3{i}",8,align=TA_RIGHT)),
-                         Paragraph(f"{peso_total:.1f} kg",ps(f"embv4{i}",8,align=TA_RIGHT))],
-                    ]
-                    if notas_emb:
-                        emb_rows.append([
-                            Paragraph("Instrucciones",ps(f"embh5{i}",8,GRAY)),
-                            Paragraph(notas_emb,ps(f"embv5{i}",8,GRAY)),
-                            Paragraph("",""),Paragraph("",""),Paragraph("","")])
-                    embt = Table(emb_rows, colWidths=[1.2*inch,1.8*inch,1.5*inch,1.0*inch,1.5*inch])
-                    embt.setStyle(TableStyle([
-                        ("BACKGROUND",(0,0),(-1,0),LGRAY),
-                        ("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),3),
-                        ("LEFTPADDING",(0,0),(-1,-1),6),("RIGHTPADDING",(0,0),(-1,-1),6),
-                        ("LINEBELOW",(0,0),(-1,0),0.5,colors.HexColor("#dde1ea")),
-                        ("SPAN",(1,-1),(4,-1)) if notas_emb else ("TOPPADDING",(0,0),(0,0),3),
-                    ]))
-                    story.append(Spacer(1,0.05*inch))
-                    story.append(embt)
-
-                story.append(Spacer(1,0.1*inch))
-            story.append(Spacer(1,0.05*inch))
-
-        # ── Sección Custom Tooling (Opciones A y C) ──────────────────────────────
+    # ── Sección Custom Tooling (Opciones A y C) ──────────────────────────────
     all_tools_ac = [(p, t) for p in piezas
                     for t in p.get("custom_tooling",[])
                     if t.get("activo",True) and t.get("opcion","C") in ("A","C")]

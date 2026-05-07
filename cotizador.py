@@ -1909,7 +1909,7 @@ def guardar_cotizacion():
             _pdf_filename = f"Cotizacion_{num_cot}.pdf"
             _pid, _url, _err = upload_to_cloudinary(
                 _pdf_bytes, _pdf_filename, "application/pdf",
-                folder="jaan-cotizaciones"
+                folder="jaan-pdfs-cotizaciones"
             )
             if _url:
                 pdf_cloud_url = _url
@@ -3041,8 +3041,9 @@ with tab1:
                     file_bytes_mp = cot_mp_file.read()
                     mime_mp = "application/pdf" if cot_mp_file.name.lower().endswith(".pdf") else "image/png"
                     with st.spinner("☁️ Subiendo cotización MP..."):
-                        _mp_pid, _mp_url, _mp_err = subir_plano_drive(
-                            file_bytes_mp, cot_mp_file.name, mime_mp)
+                        _mp_pid, _mp_url, _mp_err = upload_to_cloudinary(
+                            file_bytes_mp, cot_mp_file.name, mime_mp,
+                            folder="jaan-cotizaciones-mp")
                     if _mp_url:
                         st.session_state.piezas[pi]["materia_prima"]["cotizacion_mp_nombre"] = cot_mp_file.name
                         st.session_state.piezas[pi]["materia_prima"]["cotizacion_mp_url"]    = _mp_url

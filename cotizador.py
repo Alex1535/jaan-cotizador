@@ -2986,7 +2986,19 @@ with tab1:
                 b64_mp_guardado    = mp.get("cotizacion_mp_b64", "")
                 if nombre_mp_guardado and cot_mp_file is None:
                     if mp_url_guardado:
-                        st.markdown(f"📄 **{nombre_mp_guardado}** — [Ver/Descargar]({mp_url_guardado})")
+                        # Convertir URL raw de Cloudinary a URL de descarga directa
+                        _dl_url = mp_url_guardado
+                        if "cloudinary.com" in _dl_url and "/raw/upload/" in _dl_url:
+                            _dl_url = _dl_url.replace("/raw/upload/", "/raw/upload/fl_attachment/")
+                        col_mp1, col_mp2 = st.columns([3, 1])
+                        with col_mp1:
+                            st.markdown(f"📄 **{nombre_mp_guardado}**")
+                        with col_mp2:
+                            st.markdown(f"[⬇️ Descargar]({_dl_url})", unsafe_allow_html=True)
+                        st.markdown(
+                            f'<a href="{_dl_url}" target="_blank" '
+                            f'style="font-size:12px;color:#185FA5">🔗 Abrir en nueva pestaña</a>',
+                            unsafe_allow_html=True)
                     elif b64_mp_guardado:
                         import base64 as _b64
                         file_bytes_mg = _b64.b64decode(b64_mp_guardado)

@@ -332,13 +332,13 @@ def _find_row_number(token, sheet_id, numero_cot):
             return i
     return None
 
-def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
-    """Sube plano a Cloudinary y retorna (public_id, url, error)."""
+def subir_plano_drive(file_bytes, filename, mime_type="application/pdf", public_id_override=None):
+    """Sube plano a Cloudinary. Si public_id_override se pasa, sobreescribe el archivo existente."""
     import requests, hashlib, time
 
-    cloud_name = "dhzywtmp1"
-    api_key    = "923179743215412"
-    api_secret = "9vt8nHg1Fl307K61gtlwmqTEHgM"
+    cloud_name = st.secrets.get("CLOUDINARY_CLOUD_NAME", "dhzywtmp1")
+    api_key    = st.secrets.get("CLOUDINARY_API_KEY", "923179743215412")
+    api_secret = st.secrets.get("CLOUDINARY_API_SECRET", "9vt8nHg1Fl307K61gtlwmqTEHgM")
 
     resource_type = "raw" if mime_type == "application/pdf" else "image"
     timestamp     = str(int(time.time()))
@@ -355,6 +355,8 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
             "timestamp": timestamp,
             "signature": signature,
             "folder":    folder,
+            **( {"public_id": public_id_override, "overwrite": "true", "invalidate": "true"}
+                if public_id_override else {} ),
         },
         files={"file": (filename, file_bytes, mime_type)},
         timeout=60
@@ -2368,9 +2370,14 @@ with tab1:
                 is_img_type = plano_file.name.lower().endswith((".png",".jpg",".jpeg"))
                 # Subir a Google Drive si no tiene drive_id aún
                 if not st.session_state.piezas[pi].get("plano_drive_id") or _reemplazar:
-                    with st.spinner("☁️ Subiendo plano a Google Drive..."):
+                    with st.spinner("☁️ Subiendo plano..."):
                         mime = "image/png" if is_img_type else "application/pdf"
-                        file_id, plano_url, drive_err = subir_plano_drive(file_bytes_prev, plano_file.name, mime)
+                        # Reusar public_id existente para sobreescribir en lugar de crear nuevo
+                        _existing_pid = st.session_state.piezas[pi].get("plano_drive_id","")
+                        _pid_override = _existing_pid if (_reemplazar and _existing_pid and "cloudinary" not in _existing_pid) else None
+                        file_id, plano_url, drive_err = subir_plano_drive(
+                            file_bytes_prev, plano_file.name, mime,
+                            public_id_override=_pid_override)
                     if file_id:
                         st.session_state.piezas[pi]["plano_nombre"]    = plano_file.name
                         st.session_state.piezas[pi]["plano_drive_id"]  = file_id

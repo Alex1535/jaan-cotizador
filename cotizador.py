@@ -1891,16 +1891,18 @@ def guardar_cotizacion():
             limpias.append(pc)
         return limpias
 
-    # ── Subir PDF a Cloudinary (misma carpeta que planos) ─────────────────────
+    # ── Generar PDF y subir a Cloudinary automáticamente ─────────────────────
     pdf_cloud_url = st.session_state.get("_pdf_cloud_url_" + num_cot, "")
     try:
-        _pdf_version = st.session_state.get("_pdf_version", 0)
-        _pdf_cache_key = f"_pdf_{num_cot}_simplificado_v{_pdf_version}"
-        _pdf_bytes = st.session_state.get(_pdf_cache_key)
-        if not _pdf_bytes:
-            # Intentar también template detallado
-            _pdf_cache_key2 = f"_pdf_{num_cot}_detallado_v{_pdf_version}"
-            _pdf_bytes = st.session_state.get(_pdf_cache_key2)
+        # Siempre generar PDF fresco al guardar
+        _pdf_bytes = generar_pdf_cotizacion(
+            st.session_state.piezas, num_cot, cliente, atencion,
+            direccion, cp, ciudad, pais,
+            moneda_cot, tipo_cambio, margen_global,
+            vigencia, t_entrega, cond_pago,
+            total, total * 0.16, total + total * 0.16,
+            template="simplificado"
+        )
         if _pdf_bytes:
             _pdf_filename = f"Cotizacion_{num_cot}.pdf"
             _pid, _url, _err = upload_to_cloudinary(

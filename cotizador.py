@@ -343,21 +343,18 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf", public_
     resource_type = "raw" if mime_type == "application/pdf" else "image"
     timestamp     = str(int(time.time()))
 
-    # Firma: parámetros en orden alfabético, sin api_key ni resource_type ni file
+    # Firma: todos los parámetros en orden alfabético (sin api_key, resource_type, file)
     params = {"folder": folder, "timestamp": timestamp}
-    to_sign = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+    if public_id_override:
+        params["invalidate"] = "true"
+        params["overwrite"]  = "true"
+        params["public_id"]  = public_id_override
+    to_sign   = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
     signature = hashlib.sha1(f"{to_sign}{api_secret}".encode()).hexdigest()
 
     resp = requests.post(
         f"https://api.cloudinary.com/v1_1/{cloud_name}/{resource_type}/upload",
-        data={
-            "api_key":   api_key,
-            "timestamp": timestamp,
-            "signature": signature,
-            "folder":    folder,
-            **( {"public_id": public_id_override, "overwrite": "true", "invalidate": "true"}
-                if public_id_override else {} ),
-        },
+        data={"api_key": api_key, "signature": signature, **params},
         files={"file": (filename, file_bytes, mime_type)},
         timeout=60
     )

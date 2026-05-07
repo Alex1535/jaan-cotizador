@@ -1884,15 +1884,35 @@ def guardar_cotizacion():
         limpias = []
         for p in piezas:
             pc = dict(p)
-            # Limpiar b64 pero CONSERVAR drive_id y nombre
             pc["plano_b64"] = ""
-            # plano_drive_id, plano_nombre, plano_tipo se conservan
             mp = dict(pc.get("materia_prima", {}))
             mp["cotizacion_mp_b64"] = ""
             pc["materia_prima"] = mp
             pc["cotizacion_trat_b64"] = ""
             limpias.append(pc)
         return limpias
+
+    # ── Subir PDF a Cloudinary (misma carpeta que planos) ─────────────────────
+    pdf_cloud_url = st.session_state.get("_pdf_cloud_url_" + num_cot, "")
+    try:
+        _pdf_version = st.session_state.get("_pdf_version", 0)
+        _pdf_cache_key = f"_pdf_{num_cot}_simplificado_v{_pdf_version}"
+        _pdf_bytes = st.session_state.get(_pdf_cache_key)
+        if not _pdf_bytes:
+            # Intentar también template detallado
+            _pdf_cache_key2 = f"_pdf_{num_cot}_detallado_v{_pdf_version}"
+            _pdf_bytes = st.session_state.get(_pdf_cache_key2)
+        if _pdf_bytes:
+            _pdf_filename = f"Cotizacion_{num_cot}.pdf"
+            _pid, _url, _err = upload_to_cloudinary(
+                _pdf_bytes, _pdf_filename, "application/pdf",
+                folder="jaan-cotizaciones"
+            )
+            if _url:
+                pdf_cloud_url = _url
+                st.session_state["_pdf_cloud_url_" + num_cot] = _url
+    except Exception as _eu:
+        pass  # No bloquear el guardado si falla la subida del PDF
 
     fila = [
         num_cot,
@@ -1908,14 +1928,17 @@ def guardar_cotizacion():
                                "tiempo_entrega": t_entrega,
                                "cond_pago": cond_pago}
         }, default=str, ensure_ascii=False),
-        # columna plano_url: primer plano encontrado entre las piezas
         next((p.get("plano_url","") for p in st.session_state.piezas if p.get("plano_url")), ""),
+        pdf_cloud_url,  # URL del PDF en Cloudinary
     ]
 
     # Upsert: actualiza si ya existe, inserta si es nueva
     ok, err2 = update_gsheet_row(num_cot, fila)
     if ok:
-        st.success(f"✅ Cotización {num_cot} guardada en Google Sheets — {len(st.session_state.piezas)} pieza(s)")
+        _msg = f"✅ Cotización {num_cot} guardada — {len(st.session_state.piezas)} pieza(s)"
+        if pdf_cloud_url:
+            _msg += f"  ·  [📄 Ver PDF]({pdf_cloud_url})"
+        st.success(_msg)
     else:
         # Guardar localmente como fallback
         if "cotizaciones" not in st.session_state:

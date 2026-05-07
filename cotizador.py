@@ -332,8 +332,8 @@ def _find_row_number(token, sheet_id, numero_cot):
             return i
     return None
 
-def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
-    """Sube plano a Cloudinary."""
+def subir_plano_drive(file_bytes, filename, mime_type="application/pdf", folder="jaan-planos"):
+    """Sube archivo a Cloudinary en la carpeta especificada."""
     import requests, hashlib, time
 
     cloud_name = st.secrets.get("CLOUDINARY_CLOUD_NAME", "dhzywtmp1")
@@ -344,7 +344,6 @@ def subir_plano_drive(file_bytes, filename, mime_type="application/pdf"):
 
     resource_type = "raw" if mime_type == "application/pdf" else "image"
     timestamp     = str(int(time.time()))
-    folder        = "jaan-planos"
     params        = {"folder": folder, "timestamp": timestamp}
     to_sign   = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
     signature = hashlib.sha1(f"{to_sign}{api_secret}".encode()).hexdigest()
@@ -1907,7 +1906,7 @@ def guardar_cotizacion():
         )
         if _pdf_bytes:
             _pdf_filename = f"Cotizacion_{num_cot}.pdf"
-            _pid, _url, _err = upload_to_cloudinary(
+            _pid, _url, _err = subir_plano_drive(
                 _pdf_bytes, _pdf_filename, "application/pdf",
                 folder="jaan-pdfs-cotizaciones"
             )
@@ -3041,7 +3040,7 @@ with tab1:
                     file_bytes_mp = cot_mp_file.read()
                     mime_mp = "application/pdf" if cot_mp_file.name.lower().endswith(".pdf") else "image/png"
                     with st.spinner("☁️ Subiendo cotización MP..."):
-                        _mp_pid, _mp_url, _mp_err = upload_to_cloudinary(
+                        _mp_pid, _mp_url, _mp_err = subir_plano_drive(
                             file_bytes_mp, cot_mp_file.name, mime_mp,
                             folder="jaan-cotizaciones-mp")
                     if _mp_url:

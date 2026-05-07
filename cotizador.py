@@ -2343,10 +2343,12 @@ with tab1:
             plano_col1, plano_col2 = st.columns([1, 1])
             with plano_col1:
                 if _reemplazar:
+                    # Key dinámica — cambia después de subir para limpiar el widget
+                    _upload_key = f"plano_{pieza['id']}_{st.session_state.get(f'_plano_version_{pieza[chr(105)+chr(100)]}', 0)}"
                     plano_file = st.file_uploader(
                         "Subir nuevo plano (PDF o imagen)",
                         type=["pdf", "png", "jpg", "jpeg"],
-                        key=f"plano_{pieza['id']}",
+                        key=_upload_key,
                         help="El plano se enviará a Claude para análisis"
                     )
                 else:
@@ -2368,12 +2370,7 @@ with tab1:
                 plano_file.seek(0)
                 is_img_type = plano_file.name.lower().endswith((".png",".jpg",".jpeg"))
                 # Solo subir si no tiene URL ya guardada o si se pidió reemplazar
-                _ya_subido = bool(st.session_state.piezas[pi].get("plano_drive_id") and
-                                  not _reemplazar and
-                                  st.session_state.get(f"_plano_subido_{pieza['id']}_{plano_file.name}"))
-                if _ya_subido:
-                    pass  # Ya subido en esta sesión — no duplicar
-                elif not st.session_state.piezas[pi].get("plano_drive_id") or _reemplazar:
+                if not st.session_state.piezas[pi].get("plano_drive_id") or _reemplazar:
                     with st.spinner("☁️ Subiendo plano..."):
                         mime = "image/png" if is_img_type else "application/pdf"
                         file_id, plano_url, drive_err = subir_plano_drive(
@@ -2385,7 +2382,9 @@ with tab1:
                         st.session_state.piezas[pi]["plano_b64"]       = ""
                         st.session_state.piezas[pi]["plano_tipo"]      = "img" if is_img_type else "pdf"
                         # Marcar como subido para evitar duplicados en reruns
-                        st.session_state[f"_plano_subido_{pieza['id']}_{plano_file.name}"] = True
+                        # Incrementar versión para limpiar el file_uploader
+                        _ver_key = f"_plano_version_{pieza['id']}"
+                        st.session_state[_ver_key] = st.session_state.get(_ver_key, 0) + 1
                         st.success(f"☁️ Plano subido correctamente: {plano_file.name}")
                     else:
                         st.error(f"❌ Error subiendo a Drive: {drive_err}")

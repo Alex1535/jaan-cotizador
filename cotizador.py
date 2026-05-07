@@ -2367,8 +2367,13 @@ with tab1:
                 file_bytes_prev = plano_file.read()
                 plano_file.seek(0)
                 is_img_type = plano_file.name.lower().endswith((".png",".jpg",".jpeg"))
-                # Subir a Google Drive si no tiene drive_id aún
-                if not st.session_state.piezas[pi].get("plano_drive_id") or _reemplazar:
+                # Solo subir si no tiene URL ya guardada o si se pidió reemplazar
+                _ya_subido = bool(st.session_state.piezas[pi].get("plano_drive_id") and
+                                  not _reemplazar and
+                                  st.session_state.get(f"_plano_subido_{pieza['id']}_{plano_file.name}"))
+                if _ya_subido:
+                    pass  # Ya subido en esta sesión — no duplicar
+                elif not st.session_state.piezas[pi].get("plano_drive_id") or _reemplazar:
                     with st.spinner("☁️ Subiendo plano..."):
                         mime = "image/png" if is_img_type else "application/pdf"
                         file_id, plano_url, drive_err = subir_plano_drive(
@@ -2379,6 +2384,8 @@ with tab1:
                         st.session_state.piezas[pi]["plano_url"]       = plano_url or ""
                         st.session_state.piezas[pi]["plano_b64"]       = ""
                         st.session_state.piezas[pi]["plano_tipo"]      = "img" if is_img_type else "pdf"
+                        # Marcar como subido para evitar duplicados en reruns
+                        st.session_state[f"_plano_subido_{pieza['id']}_{plano_file.name}"] = True
                         st.success(f"☁️ Plano subido correctamente: {plano_file.name}")
                     else:
                         st.error(f"❌ Error subiendo a Drive: {drive_err}")

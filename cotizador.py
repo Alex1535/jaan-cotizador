@@ -521,7 +521,7 @@ st.markdown("""
         overflow: hidden !important;
     }
     div[data-testid="stExpander"] > details > summary {
-        background: linear-gradient(135deg, rgba(24,95,165,0.22) 0%, rgba(15,27,61,0.15) 100%) !important;
+        background: linear-gradient(135deg, rgba(24,95,165,0.12) 0%, rgba(15,27,61,0.08) 100%) !important;
         border-radius: 10px !important;
         padding: 10px 16px !important;
         font-weight: 500 !important;

@@ -515,15 +515,11 @@ st.markdown("""
 
     /* ── Expanders con fondo difuminado azul grisáceo ── */
     div[data-testid="stExpander"] {
-        background: linear-gradient(135deg, rgba(24,95,165,0.18) 0%, rgba(15,27,61,0.12) 100%) !important;
-        border: 1px solid rgba(24,95,165,0.35) !important;
+        background: linear-gradient(135deg, rgba(24,95,165,0.26) 0%, rgba(15,27,61,0.18) 100%) !important;
+        border: 1px solid rgba(24,95,165,0.50) !important;
         border-radius: 10px !important;
         backdrop-filter: blur(4px);
         margin-bottom: 6px !important;
-    }
-    div[data-testid="stExpander"]:hover {
-        background: linear-gradient(135deg, rgba(24,95,165,0.26) 0%, rgba(15,27,61,0.18) 100%) !important;
-        border-color: rgba(24,95,165,0.50) !important;
     }
     div[data-testid="stExpander"] summary {
         font-weight: 500 !important;

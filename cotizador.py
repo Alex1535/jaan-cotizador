@@ -513,6 +513,22 @@ st.markdown("""
         border-radius: 10px; padding: 16px 20px; margin-bottom: 14px;
     }
 
+    /* ── Expanders con fondo difuminado azul grisáceo ── */
+    div[data-testid="stExpander"] {
+        background: linear-gradient(135deg, rgba(24,95,165,0.06) 0%, rgba(15,27,61,0.04) 100%) !important;
+        border: 1px solid rgba(24,95,165,0.15) !important;
+        border-radius: 10px !important;
+        backdrop-filter: blur(4px);
+        margin-bottom: 6px !important;
+    }
+    div[data-testid="stExpander"]:hover {
+        background: linear-gradient(135deg, rgba(24,95,165,0.10) 0%, rgba(15,27,61,0.07) 100%) !important;
+        border-color: rgba(24,95,165,0.30) !important;
+    }
+    div[data-testid="stExpander"] summary {
+        font-weight: 500 !important;
+    }
+
     /* ── Total box ── */
     .total-box {
         border: 0.5px solid rgba(24,95,165,0.3);

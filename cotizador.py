@@ -513,17 +513,25 @@ st.markdown("""
         border-radius: 10px; padding: 16px 20px; margin-bottom: 14px;
     }
 
-    /* ── Expanders con fondo difuminado azul grisáceo ── */
+    /* ── Expanders: header con color, contenido blanco ── */
     div[data-testid="stExpander"] {
-        background: linear-gradient(135deg, rgba(24,95,165,0.18) 0%, rgba(15,27,61,0.12) 100%) !important;
         border: 1px solid rgba(24,95,165,0.35) !important;
         border-radius: 10px !important;
-        backdrop-filter: blur(4px);
         margin-bottom: 6px !important;
+        overflow: hidden !important;
     }
-    div[data-testid="stExpander"]:hover {
-        background: linear-gradient(135deg, rgba(24,95,165,0.26) 0%, rgba(15,27,61,0.18) 100%) !important;
-        border-color: rgba(24,95,165,0.50) !important;
+    div[data-testid="stExpander"] > details > summary {
+        background: linear-gradient(135deg, rgba(24,95,165,0.22) 0%, rgba(15,27,61,0.15) 100%) !important;
+        border-radius: 10px !important;
+        padding: 10px 16px !important;
+        font-weight: 500 !important;
+    }
+    div[data-testid="stExpander"] > details[open] > summary {
+        border-radius: 10px 10px 0 0 !important;
+    }
+    div[data-testid="stExpander"] > details > div {
+        background: white !important;
+        border-radius: 0 0 10px 10px !important;
     }
     div[data-testid="stExpander"] summary {
         font-weight: 500 !important;

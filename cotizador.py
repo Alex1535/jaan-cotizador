@@ -2555,21 +2555,26 @@ with tab1:
                                     "https://api.anthropic.com/v1/messages",
                                     headers={"Content-Type": "application/json", "x-api-key": api_key,
                                              "anthropic-version": "2023-06-01", "anthropic-beta": "pdfs-2024-09-25"},
-                                    json={"model": "claude-opus-4-5", "max_tokens": 1500,
+                                    json={"model": "claude-sonnet-4-5", "max_tokens": 2000,
                                           "messages": [{"role": "user", "content": msg_content}]},
                                     timeout=90
                                 )
-                                data = response.json()
-                                if "error" in data:
-                                    st.error(f"❌ Error Claude: {data['error'].get('message', str(data['error']))}")
-                                elif "content" not in data:
-                                    st.error("❌ Respuesta inesperada:")
-                                    st.json(data)
+                                if response.status_code != 200:
+                                    st.error(f"❌ Error HTTP {response.status_code}: {response.text[:300]}")
                                 else:
-                                    raw = data["content"][0]["text"].strip().replace("```json","").replace("```","").strip()
-                                    plan = json.loads(raw)
-                                    st.session_state[f"ai_result_{pieza['id']}"] = plan
-                                    st.success("✅ Análisis completado con Claude")
+                                    data = response.json()
+                                    if "error" in data:
+                                        st.error(f"❌ Error Claude: {data['error'].get('message', str(data['error']))}")
+                                    elif "content" not in data:
+                                        st.error(f"❌ Respuesta inesperada: {str(data)[:200]}")
+                                    else:
+                                        raw = data["content"][0]["text"].strip().replace("```json","").replace("```","").strip()
+                                        try:
+                                            plan = json.loads(raw)
+                                            st.session_state[f"ai_result_{pieza['id']}"] = plan
+                                            st.success("✅ Análisis completado con Claude")
+                                        except json.JSONDecodeError:
+                                            st.error(f"❌ Error parseando JSON: {raw[:200]}")
 
                             else:
                                 api_key = (st.secrets.get("OPENAI_API_KEY", None) if hasattr(st, "secrets") else None) or os.environ.get("OPENAI_API_KEY", "")

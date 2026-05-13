@@ -2429,9 +2429,6 @@ with tab1:
                 st.markdown("---")
 
             # Mostrar botón de análisis si hay plano (en uploader o guardado)
-            _tiene_bytes_ia = (plano_file is not None or
-                               bool(st.session_state.get(f"_plano_bytes_{pieza['id']}")) or
-                               bool(pieza.get("plano_url","")).startswith("http") if bool(pieza.get("plano_url","")) else False)
             _tiene_plano_ia = (plano_file is not None or
                                bool(st.session_state.get(f"_plano_bytes_{pieza['id']}")) or
                                bool(pieza.get("plano_url","")))

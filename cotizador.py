@@ -2428,7 +2428,14 @@ with tab1:
                     st.info("ℹ️ Este plano fue guardado antes de Cloudinary. Activa '🔄 Reemplazar plano actual' y vuelve a subirlo para tener descarga y vista previa.")
                 st.markdown("---")
 
-            if plano_file is not None:
+            # Mostrar botón de análisis si hay plano (en uploader o guardado)
+            _tiene_bytes_ia = (plano_file is not None or
+                               bool(st.session_state.get(f"_plano_bytes_{pieza['id']}")) or
+                               bool(pieza.get("plano_url","")).startswith("http") if bool(pieza.get("plano_url","")) else False)
+            _tiene_plano_ia = (plano_file is not None or
+                               bool(st.session_state.get(f"_plano_bytes_{pieza['id']}")) or
+                               bool(pieza.get("plano_url","")))
+            if _tiene_plano_ia:
                 ia_col1, ia_col2 = st.columns([1, 2])
                 with ia_col1:
                     ia_engine = st.radio(
@@ -2444,8 +2451,10 @@ with tab1:
                         key=f"analyze_{pieza['id']}",
                         help="La IA analizará el plano y sugerirá operaciones, tiempos y máquinas"
                     )
+            else:
+                analizar_btn = False
 
-                if analizar_btn:
+            if analizar_btn:
                     import base64, json, requests
 
                     usar_claude = st.session_state.get(f"ia_engine_{pieza['id']}", "Claude (Anthropic)") == "Claude (Anthropic)"

@@ -2090,52 +2090,67 @@ def cargar_cotizaciones():
 
 
 def actualizar_status_gsheet(numero, nuevo_status):
-    """Actualiza el status de una cotización en Google Sheets"""
+    """Actualiza el status de una cotización en Google Sheets — busca en todas las pestañas si es admin"""
     import requests
     token, err = get_gsheet_token()
     if not token:
         return False, err
     sheet_id = st.secrets.get("GSHEET_ID", "").strip()
-    # Leer todas las filas para encontrar la fila correcta
-    resp = requests.get(
-        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/'{_get_sheet_tab_name()}'!A1:Z1000",
-        headers={"Authorization": f"Bearer {token}"})
-    if resp.status_code != 200:
-        return False, "No se pudo leer el sheet"
-    values = resp.json().get("values", [])
-    if len(values) < 2:
-        return False, "Sheet vacío"
-    headers = values[0]
-    # Encontrar o crear columna status
-    if "status" in headers:
-        status_col = headers.index("status")
+
+    usuario = st.session_state.get("usuario", {})
+    rol     = usuario.get("rol", "vendedor")
+
+    # Determinar en qué pestañas buscar
+    if rol == "admin":
+        meta = requests.get(
+            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}",
+            headers={"Authorization": f"Bearer {token}"})
+        tabs = [s["properties"]["title"] for s in meta.json().get("sheets", [])] if meta.status_code == 200 else [_get_sheet_tab_name()]
     else:
-        # Agregar encabezado status al final
-        status_col = len(headers)
-        col_header_letter = chr(ord("A") + status_col)
-        requests.put(
-            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{col_header_letter}1?valueInputOption=RAW",
+        tabs = [_get_sheet_tab_name()]
+
+    for tab in tabs:
+        resp = requests.get(
+            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/'{tab}'!A1:Z1000",
+            headers={"Authorization": f"Bearer {token}"})
+        if resp.status_code != 200:
+            continue
+        values = resp.json().get("values", [])
+        if len(values) < 2:
+            continue
+        headers = values[0]
+
+        # Encontrar o crear columna status
+        if "status" in headers:
+            status_col = headers.index("status")
+        else:
+            status_col = len(headers)
+            col_h = chr(ord("A") + status_col)
+            requests.put(
+                f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/'{tab}'!{col_h}1?valueInputOption=RAW",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                json={"values": [["status"]]})
+
+        # Buscar la fila
+        row_num = None
+        for i, row in enumerate(values[1:], 2):
+            if row and row[0] == numero:
+                row_num = i
+                break
+        if not row_num:
+            continue  # No está en esta pestaña, buscar en la siguiente
+
+        # Actualizar
+        col_letter = chr(ord("A") + status_col)
+        update_resp = requests.put(
+            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/'{tab}'!{col_letter}{row_num}?valueInputOption=RAW",
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            json={"values": [["status"]]})
+            json={"values": [[nuevo_status]]})
+        if update_resp.status_code == 200:
+            return True, None
+        return False, f"Error {update_resp.status_code}: {update_resp.text[:200]}"
 
-    # Encontrar fila del número de cotización
-    row_num = None
-    for i, row in enumerate(values[1:], 2):
-        if row and row[0] == numero:
-            row_num = i
-            break
-    if not row_num:
-        return False, f"Cotización {numero} no encontrada en el Sheet"
-
-    # Actualizar el status
-    col_letter = chr(ord("A") + status_col)
-    update_resp = requests.put(
-        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{col_letter}{row_num}?valueInputOption=RAW",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        json={"values": [[nuevo_status]]})
-    if update_resp.status_code == 200:
-        return True, None
-    return False, f"Error {update_resp.status_code}: {update_resp.text[:200]}"
+    return False, f"Cotización {numero} no encontrada en ninguna pestaña"
 
 
 tab1, tab2, tab3 = st.tabs(["· Piezas y Ruteo", "· Cotización", "· Historial"])

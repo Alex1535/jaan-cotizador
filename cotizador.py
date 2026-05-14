@@ -2827,44 +2827,52 @@ with tab1:
 
         # ── Parámetros de operación PROPIOS de esta pieza ───────────────────
         with st.expander("▸  Parámetros de operación", expanded=False):
-            st.markdown("<div class='op-params-box'>", unsafe_allow_html=True)
-            pp1, pp2, pp3, pp4, pp5 = st.columns(5)
-            with pp1:
-                # Máq. activas viene de Tab 4 (maq_en_produccion) — no editable por pieza
-                _params_tab4 = st.session_state.get("param_costos", PARAM_COSTOS_DEFAULT)
-                p_maq = _params_tab4["directos"].get("maq_en_produccion", 7)
-                st.session_state.piezas[pi]["maq_activas"] = p_maq
-            with pp2:
-                p_turn = st.selectbox("Turnos", [1, 2, 3],
-            index=pieza.get("turnos", 1) - 1, key=f"pturn_{pieza['id']}")
-                st.session_state.piezas[pi]["turnos"] = p_turn
-            with pp3:
-                p_hrs = st.number_input("Hrs/turno", min_value=6, max_value=12,
-            value=pieza.get("hrs_turno", 8), key=f"phrs_{pieza['id']}")
-                st.session_state.piezas[pi]["hrs_turno"] = p_hrs
-            with pp4:
-                p_dias = st.number_input("Días/mes", min_value=15, max_value=26,
-            value=pieza.get("dias_mes", 21), key=f"pdias_{pieza['id']}")
-                st.session_state.piezas[pi]["dias_mes"] = p_dias
-            with pp5:
-                _efic_tab4 = st.session_state.get("param_costos", PARAM_COSTOS_DEFAULT)["directos"].get("eficiencia", 75)
-                p_efic = _efic_tab4
-                st.session_state.piezas[pi]["eficiencia"] = p_efic
-                st.markdown(
-                    f"<div style='padding-top:2px'>"
-                    f"<div style='font-size:12px;color:#6b7280'>Eficiencia %</div>"
-                    f"<div style='font-size:1.1rem;font-weight:600;color:#374151'>{_efic_tab4}%</div>"
-                    f"<div style='font-size:10px;color:#9ca3af'>↑ Tab Parámetros</div>"
-                    f"</div>", unsafe_allow_html=True)
+            # ── Parámetros editables ─────────────────────────────────────
+            _params_tab4 = st.session_state.get("param_costos", PARAM_COSTOS_DEFAULT)
+            p_maq  = _params_tab4["directos"].get("maq_en_produccion", 7)
+            _efic_tab4 = _params_tab4["directos"].get("eficiencia", 75)
+            st.session_state.piezas[pi]["maq_activas"] = p_maq
+            st.session_state.piezas[pi]["eficiencia"]  = _efic_tab4
 
-            # Mostrar precios calculados para esta pieza
+            pc1, pc2, pc3 = st.columns(3)
+            with pc1:
+                p_turn = st.selectbox("Turnos por día", [1, 2, 3],
+                    index=pieza.get("turnos", 1) - 1, key=f"pturn_{pieza['id']}")
+                st.session_state.piezas[pi]["turnos"] = p_turn
+            with pc2:
+                p_hrs = st.number_input("Hrs / turno", min_value=6, max_value=12,
+                    value=pieza.get("hrs_turno", 8), key=f"phrs_{pieza['id']}")
+                st.session_state.piezas[pi]["hrs_turno"] = p_hrs
+            with pc3:
+                p_dias = st.number_input("Días laborales / mes", min_value=15, max_value=26,
+                    value=pieza.get("dias_mes", 21), key=f"pdias_{pieza['id']}")
+                st.session_state.piezas[pi]["dias_mes"] = p_dias
+            p_efic = _efic_tab4
+
+            # Info de horas efectivas
+            _hrs_efectivas_p = p_turn * p_hrs * p_dias * (_efic_tab4 / 100)
+            st.caption(f"⏱ {p_turn} turno{'s' if p_turn>1 else ''} × {p_hrs}hrs × {p_dias} días × {_efic_tab4}% efic. = **{_hrs_efectivas_p:.0f} hrs efectivas/mes** &nbsp;·&nbsp; Eficiencia definida en Tab Parámetros")
+
+            # ── Costo/hr por tipo de máquina ──────────────────────────────
+            st.markdown("**Costo/hr por tipo de máquina** con estos parámetros:")
             precios_pieza, fijo_p, hrs_p = calcular_precios_por_tipo(
                 p_maq, p_turn, p_hrs, p_dias, p_efic)
-            precio_cols = st.columns(5)
-            for col, tipo in zip(precio_cols, TIPOS_MAQUINA):
+
+            # Mostrar como tarjetas
+            _tipos_cols = st.columns(len(TIPOS_MAQUINA))
+            for col, tipo in zip(_tipos_cols, TIPOS_MAQUINA):
                 with col:
-                    st.caption(f"{ICONOS_TIPO[tipo]} {tipo}\n**{fmtc(precios_pieza[tipo])}/hr**")
-            st.markdown("</div>", unsafe_allow_html=True)
+                    _precio = precios_pieza[tipo]
+                    _icono  = ICONOS_TIPO.get(tipo, "🔧")
+                    # Nombre corto
+                    _nombre = tipo.replace("Center Mill", "VMC").replace(" Axis", "")
+                    st.markdown(
+                        f"<div style='background:rgba(24,95,165,0.07);border:1px solid rgba(24,95,165,0.2);"
+                        f"border-radius:8px;padding:8px 6px;text-align:center;'>"
+                        f"<div style='font-size:11px;color:#6b7280;margin-bottom:2px'>{_icono} {_nombre}</div>"
+                        f"<div style='font-size:1.1rem;font-weight:700;color:#0f1b3d'>{fmtc(_precio)}</div>"
+                        f"<div style='font-size:10px;color:#9ca3af'>/hr</div>"
+                        f"</div>", unsafe_allow_html=True)
 
         # ── Materia Prima ────────────────────────────────────────────────────
         with st.expander("▸  Materia prima", expanded=False):

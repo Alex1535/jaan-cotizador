@@ -2847,9 +2847,15 @@ with tab1:
             value=pieza.get("dias_mes", 21), key=f"pdias_{pieza['id']}")
                 st.session_state.piezas[pi]["dias_mes"] = p_dias
             with pp5:
-                p_efic = st.number_input("Eficiencia %", min_value=40, max_value=95,
-            value=pieza.get("eficiencia", 65), key=f"pefic_{pieza['id']}")
+                _efic_tab4 = st.session_state.get("param_costos", PARAM_COSTOS_DEFAULT)["directos"].get("eficiencia", 75)
+                p_efic = _efic_tab4
                 st.session_state.piezas[pi]["eficiencia"] = p_efic
+                st.markdown(
+                    f"<div style='padding-top:2px'>"
+                    f"<div style='font-size:12px;color:#6b7280'>Eficiencia %</div>"
+                    f"<div style='font-size:1.1rem;font-weight:600;color:#374151'>{_efic_tab4}%</div>"
+                    f"<div style='font-size:10px;color:#9ca3af'>↑ Tab Parámetros</div>"
+                    f"</div>", unsafe_allow_html=True)
 
             # Mostrar precios calculados para esta pieza
             precios_pieza, fijo_p, hrs_p = calcular_precios_por_tipo(

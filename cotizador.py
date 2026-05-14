@@ -4900,8 +4900,8 @@ if tab4 is not None:
         _total_fijo_tab = _total_cif + d["sueldo_operador_mes"] + _total_op_tab
         _fijo_hr        = _total_fijo_tab / max(_maq_prod * _hrs_mes, 1)
         st.info(
-            f"**Total fijo mensual: {fmtc(_total_fijo_tab)}** &nbsp;·&nbsp; "
-            f"**Costo fijo/hr ({_maq_prod} máqs activas): {fmtc(_fijo_hr)}/hr** &nbsp;·&nbsp; "
+            f"**Total fijo mensual: {fmtc(_total_fijo_tab)}** · "
+            f"**Costo fijo/hr ({_maq_prod} máqs activas): {fmtc(_fijo_hr)}/hr** · "
             f"**Hrs/mes por máquina: {_hrs_mes}**"
         )
 
@@ -4909,8 +4909,9 @@ if tab4 is not None:
         st.markdown("### 🔧 Tipos de Máquina — Depreciación y Costo/hr")
         mq = p["maquinas"]
         _mq_h = st.columns([2.2, 1.2, 1, 0.8, 1.5])
-        for _h, _c in zip(["Tipo de máquina","Valor prom. (USD)","Vida útil (años)","# Máqs","**Costo/hr**"], _mq_h):
+        for _h, _c in zip(["Tipo de máquina","Valor prom. (USD)","Vida útil (años)","# Máqs (ref.)","**Costo/hr**"], _mq_h):
             _c.markdown(_h)
+        st.caption("💡 El Costo/hr cambia ajustando **Máquinas promedio en producción** — no el número de máquinas por tipo.")
         with st.expander("ℹ️ ¿Cómo se calcula el Costo/hr?", expanded=False):
             _hrs_ej      = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"]
             _maq_ej      = d.get("maq_en_produccion", 7)
@@ -4963,9 +4964,10 @@ Total:            {fmtc(_total_hr_ej)}/hr
         for tipo, datos in mq.items():
             mc1,mc2,mc3,mc4,mc5 = st.columns([2.2, 1.2, 1, 0.8, 1.5])
             with mc1: st.markdown(f"🔧 **{tipo}**")
-            with mc2: datos["valor_usd"] = st.number_input("v", value=float(datos["valor_usd"]), step=1000.0, format="%.0f", key=f"mq_v_{tipo}", label_visibility="collapsed")
+            with mc2: datos["valor_usd"] = st.number_input("v", value=float(datos["valor_usd"]), step=1000.0, format="$%.0f", key=f"mq_v_{tipo}", label_visibility="collapsed")
             with mc3: datos["vida_util"] = st.number_input("u", value=int(datos["vida_util"]), step=1, min_value=1, key=f"mq_u_{tipo}", label_visibility="collapsed")
-            with mc4: datos["num"]       = st.number_input("n", value=int(datos["num"]), step=1, min_value=1, key=f"mq_n_{tipo}", label_visibility="collapsed")
+            with mc4:
+                st.markdown(f"<div style='padding-top:8px;text-align:center;color:#6b7280'>{datos['num']}</div>", unsafe_allow_html=True)
             with mc5:
                 _depre_hr  = (datos["valor_usd"] * _tc_new) / max(datos["vida_util"] * 12 * _hrs_mes, 1)
                 _costo_hr  = _fijo_hr + _depre_hr
@@ -4980,7 +4982,12 @@ Total:            {fmtc(_total_hr_ej)}/hr
 
         _total_op = sum(op.values())
         _costo_total = _total_cif + d["sueldo_operador_mes"] + _total_op
-        st.info(f"**Costo total mensual estimado: {fmtc(_costo_total)}** ({fmtc(_total_cif)} CIF + {fmtc(d['sueldo_operador_mes'])} nómina + {fmtc(_total_op)} operativos)")
+        st.info(
+            f"**Costo total mensual: {fmtc(_costo_total)}** · "
+            f"CIF: {fmtc(_total_cif)} · "
+            f"Nómina: {fmtc(d['sueldo_operador_mes'])} · "
+            f"Operativos: {fmtc(_total_op)}"
+        )
 
         st.markdown("---")
         if st.button("💾 Guardar parámetros", type="primary", key="save_params"):

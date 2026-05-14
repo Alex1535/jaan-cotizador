@@ -4916,9 +4916,10 @@ if tab4 is not None:
         st.markdown("### 4. Tipos de Máquina — Depreciación y Costo/hr calculado")
         mq = p["maquinas"]
         _mq_h = st.columns([2.2, 1.2, 1, 0.8, 1.5])
-        for _h, _c in zip(["Tipo de máquina","Valor prom. (USD)","Vida útil (años)","# Máqs (ref.)","**Costo/hr**"], _mq_h):
-            _c.markdown(_h)
-        st.caption("Nota: El Costo/hr cambia ajustando **Máquinas promedio en producción** — no el número de máquinas por tipo.")
+        _header_style = "font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em"
+        for _h, _c in zip(["Tipo de máquina","Valor prom. (USD)","Vida útil (años)","# Máqs","Costo/hr"], _mq_h):
+            _c.markdown(f"<span style='{_header_style}'>{_h}</span>", unsafe_allow_html=True)
+        st.caption("El Costo/hr cambia ajustando 'Máquinas promedio en producción' — no el número de máquinas por tipo.")
         with st.expander("ℹ️ ¿Cómo se calcula el Costo/hr?", expanded=False):
             _hrs_ej      = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"]
             _maq_ej      = d.get("maq_en_produccion", 7)

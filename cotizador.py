@@ -294,7 +294,7 @@ def get_or_create_sheet_id(token):
 GSHEET_HEADERS = ["numero","fecha","usuario_email","cliente","atencion",
                   "direccion","cp","ciudad","pais","moneda","tipo_cambio","margen_global",
                   "subtotal","iva","total_neto","vigencia",
-                  "tiempo_entrega","cond_pago","datos_json"]
+                  "tiempo_entrega","cond_pago","datos_json","plano_url","pdf_url","status"]
 
 def _get_sheet_tab_name():
     """Retorna el nombre de la pestaña según el rol del usuario."""
@@ -1847,6 +1847,7 @@ def guardar_cotizacion():
         }, default=str, ensure_ascii=False),
         next((p.get("plano_url","") for p in st.session_state.piezas if p.get("plano_url")), ""),
         pdf_cloud_url,  # URL del PDF en Cloudinary
+        st.session_state.get("_status_" + num_cot, "borrador"),  # status
     ]
 
     # Upsert: actualiza si ya existe, inserta si es nueva
@@ -1937,7 +1938,7 @@ def cargar_cotizaciones():
         CANONICAL = ["numero","fecha","usuario_email","cliente","atencion",
                      "direccion","cp","ciudad","pais","moneda","tipo_cambio",
                      "margen_global","subtotal","iva","total_neto","vigencia",
-                     "tiempo_entrega","cond_pago","datos_json","plano_url","status"]
+                     "tiempo_entrega","cond_pago","datos_json","plano_url","pdf_url","status"]
 
         # Schemas conocidos — mapeados por número de columnas (sin contar status al final)
         # Schema viejo:  numero,fecha,email,cliente,atencion,ciudad,moneda,tc,margen,sub,iva,total,vig,tent,cpago,json

@@ -731,14 +731,48 @@ MATERIALES_DENSIDAD = {
 # FUNCIONES
 # ══════════════════════════════════════════════════════════════════════════════
 def calcular_precios_por_tipo(maq_activas, turnos, hrs_turno, dias_mes, eficiencia):
-    """Calcula precio/hr para cada tipo según parámetros operativos"""
-    hrs_prod = hrs_turno * turnos * dias_mes * (eficiencia / 100)
-    hrs_prod = max(hrs_prod, 1)
-    fijo_hr  = TOTAL_FIJO_MES / max(maq_activas, 1) / hrs_prod
-    precios  = {}
-    for tipo in TIPOS_MAQUINA:
-        precio = round((DEPR_TIPO[tipo] + fijo_hr) * FACTOR_TIPO[tipo] / 50) * 50
-        precios[tipo] = max(int(precio), 200)
+    """
+    Calcula precio/hr para cada tipo usando parámetros de Tab 4.
+    Incluye: CIF + Nómina operadores + Gastos venta + Gastos admin (TODO en costo/hr)
+    """
+    import streamlit as _st
+    params = _st.session_state.get("param_costos", PARAM_COSTOS_DEFAULT.copy())
+    tc     = params.get("tipo_cambio_param", 17.22)
+    cif    = params["cif"]
+    d      = params["directos"]
+    mq     = params["maquinas"]
+    op     = params["operativos"]
+
+    hrs_prod = max(hrs_turno * turnos * dias_mes * (eficiencia / 100), 1)
+
+    # TOTAL FIJO MENSUAL = CIF + Nómina + Gastos venta + Gastos admin
+    cif_total    = sum(cif.values())
+    nomina_total = d["sueldo_operador_mes"]
+    op_total     = sum(op.values())
+    total_fijo   = cif_total + nomina_total + op_total
+
+    # Costo fijo/hr por máquina (distribuido entre todas las máquinas activas)
+    fijo_hr = total_fijo / max(maq_activas * hrs_prod, 1)
+
+    # Mapeo UI → Tab 4
+    _map = {
+        "Lathe 2 Axis":         "Lathe 2 Axis",
+        "Mill-Turn C Axis":     "Mill-Turn C Axis",
+        "Mill-Turn CY Axis":    "Mill-Turn CY Axis",
+        "Center Mill 3 Axis":   "VMC 3 Axis",
+        "Center Mill 4th Axis": "VMC 4 Axis",
+    }
+
+    precios = {}
+    for tipo_ui in TIPOS_MAQUINA:
+        tipo_tab4 = _map.get(tipo_ui, tipo_ui)
+        mq_data   = mq.get(tipo_tab4, {"valor_usd": 50000, "vida_util": 10, "num": 1})
+        valor_mxn = mq_data["valor_usd"] * tc
+        hrs_vida  = mq_data["vida_util"] * 12 * hrs_prod
+        depre_hr  = valor_mxn / max(hrs_vida, 1)
+        costo_hr  = fijo_hr + depre_hr
+        precios[tipo_ui] = max(int(round(costo_hr / 50) * 50), 200)
+
     return precios, fijo_hr, hrs_prod
 
 

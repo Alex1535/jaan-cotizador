@@ -8,36 +8,41 @@ from datetime import datetime
 # PARÁMETROS DE COSTOS — Valores default (MXN/mes)
 # ══════════════════════════════════════════════════════════════════════════════
 PARAM_COSTOS_DEFAULT = {
+    # ── CIF (Costos Indirectos de Fabricación) — valores exactos del Estado de Resultados
     "cif": {
-        "mano_obra_indirecta":  152166,
-        "materiales_indirectos": 77666,
-        "servicios_publicos":    39200,
-        "mantenimiento":         30000,
-        "seguros":                8333,
-        "calidad":                7333,
-        "servicios_indirectos":   3041,
-        "renta_hipoteca":        37000,
+        "mano_obra_indirecta":  152166,  # Aguinaldo 38k + IMSS 90k + Uniformes 5k + Seg.vida 19,166
+        "materiales_indirectos": 77666,  # Insertos 60k + Refrigerantes 11,750 + Consumibles 5,916
+        "servicios_publicos":    39200,  # Electricidad 30k + Agua 9k + Gas 200
+        "mantenimiento":         30000,  # Mantenimiento correctivo
+        "seguros":                8333,  # Seguro vehículos empresa
+        "calidad":                7333,  # Calibración 3,333 + Equipo medición 4,000
+        "servicios_indirectos":   3041,  # Residuos 2,916 + Fumigación 125
+        "renta_hipoteca":        37000,  # Hipoteca inmueble
     },
+    # ── Costos directos de operación
     "directos": {
-        "sueldo_operador_mes":  400000,
-        "num_operadores":            8,
-        "num_maquinas_total":       17,
-        "horas_turno":               8,
-        "turnos_dia":                1,
-        "dias_mes":                 22,
+        "sueldo_operador_mes":  400000,  # Nómina total operadores y técnicos
+        "num_operadores":            8,  # Operadores en planta
+        "num_maquinas_total":       17,  # Total máquinas JAAN
+        "horas_turno":               8,  # Hrs por turno
+        "turnos_dia":                1,  # 1 turno por día
+        "dias_mes":                 22,  # Días laborales/mes
     },
+    # ── Valor promedio por tipo de máquina (USD) — basado en lista de maquinaria JAAN
+    # Precios MXN de la lista / TC 17.22
     "maquinas": {
-        "Lathe 2 Axis":      {"valor_usd": 45000,  "vida_util": 10, "num": 7},
-        "Mill-Turn CY Axis": {"valor_usd": 100000, "vida_util": 10, "num": 2},
-        "Mill-Turn C Axis":  {"valor_usd": 75000,  "vida_util": 10, "num": 3},
-        "VMC 4 Axis":        {"valor_usd": 95000,  "vida_util": 10, "num": 3},
-        "VMC 3 Axis":        {"valor_usd": 50000,  "vida_util": 10, "num": 2},
+        "Lathe 2 Axis":      {"valor_usd": 33516,  "vida_util": 10, "num": 7},  # Prom $577,143 MXN
+        "Mill-Turn CY Axis": {"valor_usd": 48780,  "vida_util": 10, "num": 2},  # Prom $840,000 MXN
+        "Mill-Turn C Axis":  {"valor_usd": 55943,  "vida_util": 10, "num": 3},  # Prom $963,333 MXN
+        "VMC 4 Axis":        {"valor_usd": 98722,  "vida_util": 10, "num": 3},  # Prom $1,700,000 MXN
+        "VMC 3 Axis":        {"valor_usd": 31940,  "vida_util": 10, "num": 2},  # Prom $550,000 MXN
     },
+    # ── Gastos operativos — exactos del Estado de Resultados
     "operativos": {
-        "gastos_venta":   96583,
-        "gastos_admin":  343600,
+        "gastos_venta":   96583,  # Publicidad 10k + Comisiones 54,583 + Viajes 32k
+        "gastos_admin":  343600,  # Dir.General 250k + Contabilidad 6k + Software 14k + ISO 11,600 + etc.
     },
-    "tipo_cambio_param": 17.50,
+    "tipo_cambio_param": 17.22,
 }
 
 def get_param_costos():

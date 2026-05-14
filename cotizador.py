@@ -1872,6 +1872,7 @@ def guardar_cotizacion():
         st.warning(f"⚠️ Guardada localmente. Error: {err2}")
 
 
+@st.cache_data(ttl=30, show_spinner=False)
 def cargar_cotizaciones():
     """Lee cotizaciones desde Google Sheets, deduplicando por número (más reciente gana)"""
     import requests
@@ -2106,7 +2107,10 @@ def actualizar_status_gsheet(numero, nuevo_status):
         meta = requests.get(
             f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}",
             headers={"Authorization": f"Bearer {token}"})
-        tabs = [s["properties"]["title"] for s in meta.json().get("sheets", [])] if meta.status_code == 200 else [_get_sheet_tab_name()]
+        if meta.status_code == 200:
+            tabs = [s["properties"]["title"] for s in meta.json().get("sheets", [])]
+        else:
+            tabs = ["Sheet1", _get_sheet_tab_name()]
     else:
         tabs = [_get_sheet_tab_name()]
 
@@ -4471,17 +4475,16 @@ with tab3:
                         key=f"hs_{ci}", label_visibility="collapsed")
                     if st.button("Actualizar", key=f"hu_{ci}", use_container_width=True):
                         _num_cot_upd = c.get("numero","")
-                        st.write(f"DEBUG: num={_num_cot_upd}, nuevo={nuevo}, actual={status_actual}")
                         if nuevo == status_actual:
                             st.info(f"ℹ️ El status ya es '{nuevo}'")
                         else:
                             ok, err = actualizar_status_gsheet(_num_cot_upd, nuevo)
-                            st.write(f"DEBUG: ok={ok}, err={err}")
                             if ok:
                                 st.success(f"✅ Status actualizado a '{nuevo}'")
+                                cargar_cotizaciones.clear()
                                 st.rerun()
                             else:
-                                st.error(f"❌ {err}")
+                                st.error(f"❌ Error: {err}")
 
             st.markdown("---")
             numeros   = [c.get("numero","").strip() for c in filtradas if c.get("numero","").strip()]

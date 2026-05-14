@@ -24,6 +24,7 @@ PARAM_COSTOS_DEFAULT = {
         "sueldo_operador_mes":  400000,  # Nómina total operadores y técnicos
         "num_operadores":            8,  # Operadores en planta
         "num_maquinas_total":       17,  # Total máquinas JAAN
+        "maq_en_produccion":         7,  # Máquinas promedio en producción (distribuye costo fijo)
         "horas_turno":               8,  # Hrs por turno
         "turnos_dia":                1,  # 1 turno por día
         "dias_mes":                 22,  # Días laborales/mes
@@ -751,8 +752,10 @@ def calcular_precios_por_tipo(maq_activas, turnos, hrs_turno, dias_mes, eficienc
     op_total     = sum(op.values())
     total_fijo   = cif_total + nomina_total + op_total
 
-    # Costo fijo/hr por máquina (distribuido entre todas las máquinas activas)
-    fijo_hr = total_fijo / max(maq_activas * hrs_prod, 1)
+    # El costo fijo se distribuye entre las máquinas promedio en producción
+    # (configurable en Tab 4 — más máquinas activas = menor costo/hr)
+    num_maq_prod = d.get("maq_en_produccion", d["num_maquinas_total"])
+    fijo_hr = total_fijo / max(num_maq_prod * hrs_prod, 1)
 
     # Mapeo UI → Tab 4
     _map = {
@@ -4881,15 +4884,27 @@ if tab4 is not None:
             d["num_operadores"]      = st.number_input("Número de operadores", value=int(d["num_operadores"]), step=1, key="d_nop")
         with dc2:
             d["num_maquinas_total"]  = st.number_input("Total máquinas en planta", value=int(d["num_maquinas_total"]), step=1, key="d_nmaq")
+            d["maq_en_produccion"]   = st.number_input("Máquinas promedio en producción",
+                value=int(d.get("maq_en_produccion", 7)), step=1, min_value=1,
+                max_value=int(d["num_maquinas_total"]),
+                key="d_maqprod",
+                help="Número de máquinas que trabajan simultáneamente en promedio. Más máquinas = menor costo/hr")
             d["horas_turno"]         = st.number_input("Horas por turno", value=int(d["horas_turno"]), step=1, key="d_ht")
         with dc3:
             d["turnos_dia"]          = st.number_input("Turnos por día", value=int(d["turnos_dia"]), step=1, key="d_td")
             d["dias_mes"]            = st.number_input("Días laborales/mes", value=int(d["dias_mes"]), step=1, key="d_dm")
 
         _hrs_mes       = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"]
-        _cif_hr_planta = _total_cif / max(d["num_maquinas_total"] * _hrs_mes, 1)
+        _maq_prod      = d.get("maq_en_produccion", 7)
+        _total_op_tab  = sum(op.values()) if "op" in dir() else 0
+        _total_fijo_tab = _total_cif + d["sueldo_operador_mes"] + _total_op_tab
+        _fijo_hr       = _total_fijo_tab / max(_maq_prod * _hrs_mes, 1)
         _op_hr         = (d["sueldo_operador_mes"] / max(d["num_operadores"], 1)) / max(_hrs_mes, 1)
-        st.info(f"**CIF/hr por máquina: {fmtc(_cif_hr_planta)}** &nbsp;·&nbsp; **Operador/hr: {fmtc(_op_hr)}** &nbsp;·&nbsp; **Hrs/mes por máquina: {_hrs_mes}**")
+        st.info(
+            f"**Total fijo mensual: {fmtc(_total_fijo_tab)}** &nbsp;·&nbsp; "
+            f"**Costo fijo/hr ({_maq_prod} máqs): {fmtc(_fijo_hr)}** &nbsp;·&nbsp; "
+            f"**Hrs/mes por máquina: {_hrs_mes}**"
+        )
 
         # ── Máquinas ─────────────────────────────────────────────────────────
         st.markdown("### 🔧 Tipos de Máquina — Depreciación y Costo/hr")

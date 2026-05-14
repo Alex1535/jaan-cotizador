@@ -4912,46 +4912,53 @@ if tab4 is not None:
         for _h, _c in zip(["Tipo de máquina","Valor prom. (USD)","Vida útil (años)","# Máqs","**Costo/hr**"], _mq_h):
             _c.markdown(_h)
         with st.expander("ℹ️ ¿Cómo se calcula el Costo/hr?", expanded=False):
-            _hrs_ejemplo = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"]
-            _cif_ej  = _total_cif / max(d["num_maquinas_total"] * _hrs_ejemplo, 1)
-            _op_ej   = (d["sueldo_operador_mes"] / max(d["num_operadores"],1)) / max(_hrs_ejemplo, 1)
+            _hrs_ej      = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"]
+            _maq_ej      = d.get("maq_en_produccion", 7)
+            _op_ej       = p.get("operativos", {})
+            _total_op_ej = sum(_op_ej.values())
+            _total_fijo_ej = _total_cif + d["sueldo_operador_mes"] + _total_op_ej
+            _fijo_hr_ej  = _total_fijo_ej / max(_maq_ej * _hrs_ej, 1)
+            _lathe       = list(mq.values())[0]
+            _depre_ej    = (_lathe["valor_usd"] * _tc_new) / max(_lathe["vida_util"] * 12 * _hrs_ej, 1)
+            _total_hr_ej = _fijo_hr_ej + _depre_ej
             st.markdown(f"""
-**Fórmula:** `Costo/hr = CIF/hr + Operador/hr + Depreciación/hr`
+**Fórmula:** `Costo/hr = Fijo/hr + Depreciación/hr`
+
+Donde **Fijo/hr** incluye todo: CIF + Nómina operadores + Gastos venta + Gastos admin
 
 ---
-**1. CIF/hr por máquina:**
+**Total Fijo Mensual:**
 ```
-CIF total mensual:  {fmtc(_total_cif)}
-÷ {d["num_maquinas_total"]} máquinas  ÷  {_hrs_ejemplo} hrs/mes ({d["horas_turno"]}hrs × {d["turnos_dia"]} turno × {d["dias_mes"]} días)
-= {fmtc(_cif_ej)}/hr
-```
-
-**2. Operador/hr:**
-```
-Nómina total:  {fmtc(d["sueldo_operador_mes"])}
-÷ {d["num_operadores"]} operadores  ÷  {_hrs_ejemplo} hrs/mes
-= {fmtc(_op_ej)}/hr
+CIF:                {fmtc(_total_cif)}
++ Nómina operadores: {fmtc(d["sueldo_operador_mes"])}
++ Gastos venta:      {fmtc(_op_ej.get("gastos_venta", 0))}
++ Gastos admin:      {fmtc(_op_ej.get("gastos_admin", 0))}
+─────────────────────────────────────
+Total fijo mensual: {fmtc(_total_fijo_ej)}
 ```
 
-**3. Depreciación/hr** (varía por máquina):
+**Fijo/hr por máquina:**
+```
+{fmtc(_total_fijo_ej)} ÷ {_maq_ej} máqs activas ÷ {_hrs_ej} hrs/mes
+= {fmtc(_fijo_hr_ej)}/hr
+```
+> 💡 Si tienes más máquinas trabajando, el costo/hr baja porque el costo fijo se reparte entre más máquinas.
+
+**Depreciación/hr** (varía por tipo de máquina):
 ```
 Valor máquina (MXN) = valor_usd × TC ({_tc_new})
-÷ vida útil × 12 meses × {_hrs_ejemplo} hrs/mes
+÷ (vida útil × 12 meses × {_hrs_ej} hrs/mes)
 = depreciación/hr
 ```
 
 **Ejemplo — Lathe 2 Axis:**
 ```
-${list(mq.values())[0]["valor_usd"]:,} USD × {_tc_new} TC = {fmtc(list(mq.values())[0]["valor_usd"] * _tc_new)}
-÷ ({list(mq.values())[0]["vida_util"]} años × 12 × {_hrs_ejemplo} hrs) = {fmtc(list(mq.values())[0]["valor_usd"] * _tc_new / max(list(mq.values())[0]["vida_util"]*12*_hrs_ejemplo,1))}/hr depreciación
-
-CIF/hr:          {fmtc(_cif_ej)}
-Operador/hr:     {fmtc(_op_ej)}
-Depreciación/hr: {fmtc(list(mq.values())[0]["valor_usd"] * _tc_new / max(list(mq.values())[0]["vida_util"]*12*_hrs_ejemplo,1))}
-─────────────────────────────────
-Total:           {fmtc(_cif_ej + _op_ej + list(mq.values())[0]["valor_usd"] * _tc_new / max(list(mq.values())[0]["vida_util"]*12*_hrs_ejemplo,1))}/hr
+Fijo/hr:          {fmtc(_fijo_hr_ej)}
+Depreciación/hr:  {fmtc(_depre_ej)}
+─────────────────────────────
+Total:            {fmtc(_total_hr_ej)}/hr
 ```
-> 💡 *Ajusta el número de operadores, turnos o días para cambiar el costo/hr automáticamente.*
+> 💡 *Cambia las máquinas en producción, turnos o días para ajustar el costo/hr automáticamente.*
 """)
         for tipo, datos in mq.items():
             mc1,mc2,mc3,mc4,mc5 = st.columns([2.2, 1.2, 1, 0.8, 1.5])

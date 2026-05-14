@@ -732,32 +732,20 @@ MATERIALES_DENSIDAD = {
 # FUNCIONES
 # ══════════════════════════════════════════════════════════════════════════════
 def calcular_precios_por_tipo(maq_activas, turnos, hrs_turno, dias_mes, eficiencia):
-    """
-    Calcula precio/hr para cada tipo usando parámetros de Tab 4.
-    Incluye: CIF + Nómina operadores + Gastos venta + Gastos admin (TODO en costo/hr)
-    """
+    """Precio/hr por tipo. Costos base de Tab 4, horas de parámetros de pieza."""
     import streamlit as _st
-    params = _st.session_state.get("param_costos", PARAM_COSTOS_DEFAULT.copy())
-    tc     = params.get("tipo_cambio_param", 17.22)
-    cif    = params["cif"]
-    d      = params["directos"]
-    mq     = params["maquinas"]
-    op     = params["operativos"]
+    params   = _st.session_state.get("param_costos", PARAM_COSTOS_DEFAULT.copy())
+    tc       = params.get("tipo_cambio_param", 17.22)
+    cif      = params["cif"]
+    d        = params["directos"]
+    mq       = params["maquinas"]
+    op       = params["operativos"]
 
-    hrs_prod = max(hrs_turno * turnos * dias_mes * (eficiencia / 100), 1)
+    hrs_prod   = max(hrs_turno * turnos * dias_mes * (eficiencia / 100), 1)
+    total_fijo = sum(cif.values()) + d["sueldo_operador_mes"] + sum(op.values())
+    num_maq    = d.get("maq_en_produccion", 7)  # siempre de Tab 4
+    fijo_hr    = total_fijo / max(num_maq * hrs_prod, 1)
 
-    # TOTAL FIJO MENSUAL = CIF + Nómina + Gastos venta + Gastos admin
-    cif_total    = sum(cif.values())
-    nomina_total = d["sueldo_operador_mes"]
-    op_total     = sum(op.values())
-    total_fijo   = cif_total + nomina_total + op_total
-
-    # El costo fijo se distribuye entre las máquinas promedio en producción
-    # (configurable en Tab 4 — más máquinas activas = menor costo/hr)
-    num_maq_prod = d.get("maq_en_produccion", d["num_maquinas_total"])
-    fijo_hr = total_fijo / max(num_maq_prod * hrs_prod, 1)
-
-    # Mapeo UI → Tab 4
     _map = {
         "Lathe 2 Axis":         "Lathe 2 Axis",
         "Mill-Turn C Axis":     "Mill-Turn C Axis",
@@ -765,14 +753,11 @@ def calcular_precios_por_tipo(maq_activas, turnos, hrs_turno, dias_mes, eficienc
         "Center Mill 3 Axis":   "VMC 3 Axis",
         "Center Mill 4th Axis": "VMC 4 Axis",
     }
-
     precios = {}
     for tipo_ui in TIPOS_MAQUINA:
         tipo_tab4 = _map.get(tipo_ui, tipo_ui)
-        mq_data   = mq.get(tipo_tab4, {"valor_usd": 50000, "vida_util": 10, "num": 1})
-        valor_mxn = mq_data["valor_usd"] * tc
-        hrs_vida  = mq_data["vida_util"] * 12 * hrs_prod
-        depre_hr  = valor_mxn / max(hrs_vida, 1)
+        mq_data   = mq.get(tipo_tab4, {"valor_usd": 50000, "vida_util": 10})
+        depre_hr  = (mq_data["valor_usd"] * tc) / max(mq_data["vida_util"] * 12 * hrs_prod, 1)
         costo_hr  = fijo_hr + depre_hr
         precios[tipo_ui] = max(int(round(costo_hr / 50) * 50), 200)
 
@@ -2844,8 +2829,9 @@ with tab1:
             st.markdown("<div class='op-params-box'>", unsafe_allow_html=True)
             pp1, pp2, pp3, pp4, pp5 = st.columns(5)
             with pp1:
-                p_maq = st.number_input("Máq. activas", min_value=1, max_value=17,
-            value=pieza.get("maq_activas", 7), key=f"pmaq_{pieza['id']}")
+                # Máq. activas viene de Tab 4 (maq_en_produccion) — no editable por pieza
+                _params_tab4 = st.session_state.get("param_costos", PARAM_COSTOS_DEFAULT)
+                p_maq = _params_tab4["directos"].get("maq_en_produccion", 7)
                 st.session_state.piezas[pi]["maq_activas"] = p_maq
             with pp2:
                 p_turn = st.selectbox("Turnos", [1, 2, 3],

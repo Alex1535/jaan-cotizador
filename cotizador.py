@@ -4850,17 +4850,17 @@ if "param_costos" not in st.session_state:
 
 if tab4 is not None:
     with tab4:
-        st.markdown("## ⚙️ Parámetros de Costos de Producción")
+        st.markdown("## Parámetros de Costos de Producción")
         st.caption("Solo visible para administradores. Los cambios se aplican a todas las cotizaciones nuevas.")
 
         p = get_param_costos()
         _tc = p.get("tipo_cambio_param", 17.50)
 
-        st.markdown("### 💱 Tipo de cambio para depreciación de maquinaria")
+        st.markdown("### 1. Tipo de Cambio USD/MXN")
         _tc_new = st.number_input("USD/MXN", value=float(_tc), step=0.10, format="%.2f", key="param_tc")
 
         # ── CIF ─────────────────────────────────────────────────────────────
-        st.markdown("### 🏭 Costos Indirectos de Fabricación (CIF) — MXN/mes")
+        st.markdown("### 2. Costos Indirectos de Fabricación (CIF) — MXN/mes")
         cif = p["cif"]
         cif_c1, cif_c2 = st.columns(2)
         with cif_c1:
@@ -4877,7 +4877,7 @@ if tab4 is not None:
         st.info(f"**Total CIF mensual: {fmtc(_total_cif)}**")
 
         # ── Costos directos ─────────────────────────────────────────────────
-        st.markdown("### 👷 Operación de Planta")
+        st.markdown("### 3. Operación de Planta")
         d = p["directos"]
         dc1, dc2, dc3 = st.columns(3)
         with dc1:
@@ -4913,12 +4913,12 @@ if tab4 is not None:
         )
 
         # ── Máquinas ─────────────────────────────────────────────────────────
-        st.markdown("### 🔧 Tipos de Máquina — Depreciación y Costo/hr")
+        st.markdown("### 4. Tipos de Máquina — Depreciación y Costo/hr calculado")
         mq = p["maquinas"]
         _mq_h = st.columns([2.2, 1.2, 1, 0.8, 1.5])
         for _h, _c in zip(["Tipo de máquina","Valor prom. (USD)","Vida útil (años)","# Máqs (ref.)","**Costo/hr**"], _mq_h):
             _c.markdown(_h)
-        st.caption("💡 El Costo/hr cambia ajustando **Máquinas promedio en producción** — no el número de máquinas por tipo.")
+        st.caption("Nota: El Costo/hr cambia ajustando **Máquinas promedio en producción** — no el número de máquinas por tipo.")
         with st.expander("ℹ️ ¿Cómo se calcula el Costo/hr?", expanded=False):
             _hrs_ej      = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"]
             _maq_ej      = d.get("maq_en_produccion", 7)
@@ -4970,7 +4970,7 @@ Total:            {fmtc(_total_hr_ej)}/hr
 """)
         for tipo, datos in mq.items():
             mc1,mc2,mc3,mc4,mc5 = st.columns([2.2, 1.2, 1, 0.8, 1.5])
-            with mc1: st.markdown(f"🔧 **{tipo}**")
+            with mc1: st.markdown(f"**{tipo}**")
             with mc2: datos["valor_usd"] = st.number_input("v", value=float(datos["valor_usd"]), step=1000.0, format="%.0f", key=f"mq_v_{tipo}", label_visibility="collapsed")
             with mc3: datos["vida_util"] = st.number_input("u", value=int(datos["vida_util"]), step=1, min_value=1, key=f"mq_u_{tipo}", label_visibility="collapsed")
             with mc4:
@@ -4981,7 +4981,7 @@ Total:            {fmtc(_total_hr_ej)}/hr
                 st.markdown(f"<div style='padding-top:6px;font-size:1.05rem;font-weight:700;color:#185FA5'>{fmtc(_costo_hr)}/hr</div>", unsafe_allow_html=True)
 
         # ── Gastos operativos ────────────────────────────────────────────────
-        st.markdown("### 📊 Gastos Operativos — MXN/mes")
+        st.markdown("### 5. Gastos Operativos — MXN/mes")
         op = p["operativos"]
         oc1, oc2 = st.columns(2)
         with oc1: op["gastos_venta"] = st.number_input("Gastos de venta y marketing", value=float(op["gastos_venta"]), step=1000.0, format="%.0f", key="op_vta")

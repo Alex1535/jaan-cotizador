@@ -2226,7 +2226,12 @@ def actualizar_status_gsheet(numero, nuevo_status):
     return False, f"Cotización {numero} no encontrada en ninguna pestaña"
 
 
-tab1, tab2, tab3 = st.tabs(["· Piezas y Ruteo", "· Cotización", "· Historial"])
+_es_admin = st.session_state.get("usuario", {}).get("rol") == "admin"
+if _es_admin:
+    tab1, tab2, tab3, tab4 = st.tabs(["· Piezas y Ruteo", "· Cotización", "· Historial", "· Parámetros"])
+else:
+    tab1, tab2, tab3 = st.tabs(["· Piezas y Ruteo", "· Cotización", "· Historial"])
+    tab4 = None
 
 # Inject expander colors via components.html (executes in real iframe with DOM access)
 import streamlit.components.v1 as components
@@ -4799,12 +4804,10 @@ st.markdown("---")
 st.caption("JAAN Manufacturing · Sistemas de Manufactura Industrial JAAN CNC S.A. de C.V · RFC SAM2008079G8")
 
 # ── Tab 4: Parámetros de Costos (solo admin) ─────────────────────────────────
-_tab4 = st.session_state.get("_tab4_ref")
 if "param_costos" not in st.session_state:
     st.session_state["param_costos"] = PARAM_COSTOS_DEFAULT.copy()
 
-# Tab4 se renderiza dentro de su propio contexto
-if st.session_state.get("usuario", {}).get("rol") == "admin":
+if tab4 is not None:
     with tab4:
         st.markdown("## ⚙️ Parámetros de Costos de Producción")
         st.caption("Solo visible para administradores. Los cambios se aplican a todas las cotizaciones nuevas.")

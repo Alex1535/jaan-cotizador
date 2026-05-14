@@ -5050,9 +5050,12 @@ Total:            {fmtc(_total_hr_ej)}/hr
         )
 
         st.markdown("---")
+        # Actualizar session_state en tiempo real para que calcular_precios_por_tipo
+        # use los valores actuales aunque no se haya dado Guardar aún
+        p["tipo_cambio_param"] = _tc_new
+        st.session_state["param_costos"] = p
+
         if st.button("💾 Guardar parámetros", type="primary", key="save_params"):
-            p["tipo_cambio_param"] = _tc_new
-            st.session_state["param_costos"] = p
             with st.spinner("Guardando en Google Sheets..."):
                 _ok, _err = guardar_parametros_gsheet(p)
             if _ok:

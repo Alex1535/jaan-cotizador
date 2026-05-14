@@ -760,7 +760,7 @@ def calcular_precios_por_tipo(maq_activas, turnos, hrs_turno, dias_mes, eficienc
         mq_data   = mq.get(tipo_tab4, {"valor_usd": 50000, "vida_util": 10})
         depre_hr  = (mq_data["valor_usd"] * tc) / max(mq_data["vida_util"] * 12 * hrs_prod, 1)
         costo_hr  = fijo_hr + depre_hr
-        precios[tipo_ui] = max(int(round(costo_hr / 50) * 50), 200)
+        precios[tipo_ui] = max(round(costo_hr, 2), 200)
 
     return precios, fijo_hr, hrs_prod
 

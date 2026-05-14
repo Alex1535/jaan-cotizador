@@ -4961,7 +4961,7 @@ Total:           {fmtc(_cif_ej + _op_ej + list(mq.values())[0]["valor_usd"] * _t
             with mc4: datos["num"]       = st.number_input("n", value=int(datos["num"]), step=1, min_value=1, key=f"mq_n_{tipo}", label_visibility="collapsed")
             with mc5:
                 _depre_hr  = (datos["valor_usd"] * _tc_new) / max(datos["vida_util"] * 12 * _hrs_mes, 1)
-                _costo_hr  = _cif_hr_planta + _op_hr + _depre_hr
+                _costo_hr  = _fijo_hr + _depre_hr
                 st.markdown(f"<div style='padding-top:6px;font-size:1.05rem;font-weight:700;color:#185FA5'>{fmtc(_costo_hr)}/hr</div>", unsafe_allow_html=True)
 
         # ── Gastos operativos ────────────────────────────────────────────────

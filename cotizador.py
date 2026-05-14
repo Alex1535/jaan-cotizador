@@ -735,37 +735,19 @@ MATERIALES_DENSIDAD = {
 def calcular_precios_por_tipo(maq_activas, turnos, hrs_turno, dias_mes, eficiencia):
     """Precio/hr por tipo. Costos base de Tab 4, horas de parámetros de pieza."""
     import streamlit as _st
+    # Leer siempre desde param_costos que se actualiza en tiempo real en Tab 4
     params   = _st.session_state.get("param_costos", PARAM_COSTOS_DEFAULT.copy())
-    tc       = params.get("tipo_cambio_param", 17.22)
+    tc_live  = float(params.get("tipo_cambio_param", 17.22))
     cif      = params["cif"]
     d        = params["directos"]
     mq       = params["maquinas"]
     op       = params["operativos"]
 
-    # Leer valores actuales de widgets de Tab 4 si están disponibles
-    # Esto resuelve el problema de que session_state["param_costos"] puede estar desactualizado
-    _ss = _st.session_state
-    cif_live = {
-        "mano_obra_indirecta":  _ss.get("cif_moi",  cif.get("mano_obra_indirecta", 0)),
-        "materiales_indirectos":_ss.get("cif_mati", cif.get("materiales_indirectos", 0)),
-        "servicios_publicos":   _ss.get("cif_sp",   cif.get("servicios_publicos", 0)),
-        "mantenimiento":        _ss.get("cif_mant", cif.get("mantenimiento", 0)),
-        "seguros":              _ss.get("cif_seg",  cif.get("seguros", 0)),
-        "calidad":              _ss.get("cif_cal",  cif.get("calidad", 0)),
-        "servicios_indirectos": _ss.get("cif_si",   cif.get("servicios_indirectos", 0)),
-        "renta_hipoteca":       _ss.get("cif_rent", cif.get("renta_hipoteca", 0)),
-    }
-    op_live = {
-        "gastos_venta": _ss.get("op_vta", op.get("gastos_venta", 0)),
-        "gastos_admin": _ss.get("op_adm", op.get("gastos_admin", 0)),
-    }
-    nomina_live = _ss.get("d_sueld", d.get("sueldo_operador_mes", 400000))
-    num_maq     = _ss.get("d_maqprod", d.get("maq_en_produccion", 7))
-    efic_live   = _ss.get("d_efic", d.get("eficiencia", 75))
-    tc_live     = _ss.get("param_tc", tc)
+    efic_live = float(d.get("eficiencia", 75))
+    num_maq   = int(d.get("maq_en_produccion", 7))
 
     hrs_prod   = max(hrs_turno * turnos * dias_mes * (efic_live / 100), 1)
-    total_fijo = sum(cif_live.values()) + nomina_live + sum(op_live.values())
+    total_fijo = sum(cif.values()) + d["sueldo_operador_mes"] + sum(op.values())
     fijo_hr    = total_fijo / max(num_maq * hrs_prod, 1)
 
     _map = {
@@ -778,12 +760,8 @@ def calcular_precios_por_tipo(maq_activas, turnos, hrs_turno, dias_mes, eficienc
     precios = {}
     for tipo_ui in TIPOS_MAQUINA:
         tipo_tab4 = _map.get(tipo_ui, tipo_ui)
-        _val_key  = f"mq_v_{tipo_ui}"
-        _vid_key  = f"mq_u_{tipo_ui}"
-        mq_data   = mq.get(tipo_tab4, {"valor_usd": 50000, "vida_util": 10})
-        _val_usd  = _ss.get(_val_key, mq_data["valor_usd"])
-        _vida     = _ss.get(_vid_key, mq_data["vida_util"])
-        depre_hr  = (_val_usd * tc_live) / max(_vida * 12 * hrs_prod, 1)
+        mq_data  = mq.get(tipo_tab4, {"valor_usd": 50000, "vida_util": 10})
+        depre_hr = (mq_data["valor_usd"] * tc_live) / max(mq_data["vida_util"] * 12 * hrs_prod, 1)
         costo_hr  = fijo_hr + depre_hr
         precios[tipo_ui] = max(round(costo_hr, 2), 200)
 
@@ -5066,6 +5044,9 @@ Total:            {fmtc(_total_hr_ej)}/hr
         with oc2: op["gastos_admin"] = st.number_input("Gastos administrativos", value=float(op["gastos_admin"]), step=1000.0, format="%.0f", key="op_adm")
 
         _total_op = sum(op.values())
+        # Sincronizar inmediatamente para que la tabla de máquinas use valores actuales
+        p["tipo_cambio_param"] = _tc_new
+        st.session_state["param_costos"] = p
         _costo_total = _total_cif + d["sueldo_operador_mes"] + _total_op
         st.info(
             f"**Costo total mensual: {fmtc(_costo_total)}** · "
@@ -5074,12 +5055,11 @@ Total:            {fmtc(_total_hr_ej)}/hr
             f"Operativos: {fmtc(_total_op)}"
         )
 
-        st.markdown("---")
-        # Actualizar session_state en tiempo real para que calcular_precios_por_tipo
-        # use los valores actuales aunque no se haya dado Guardar aún
+        # Sincronizar session_state con los valores actuales ANTES del botón
         p["tipo_cambio_param"] = _tc_new
         st.session_state["param_costos"] = p
 
+        st.markdown("---")
         if st.button("💾 Guardar parámetros", type="primary", key="save_params"):
             with st.spinner("Guardando en Google Sheets..."):
                 _ok, _err = guardar_parametros_gsheet(p)

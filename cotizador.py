@@ -27,13 +27,11 @@ PARAM_COSTOS_DEFAULT = {
         "dias_mes":                 22,
     },
     "maquinas": {
-        "Lathe 2 Axis":      {"valor_usd": 45000,  "vida_util": 10, "num": 8},
-        "Lathe 3 Axis":      {"valor_usd": 80000,  "vida_util": 10, "num": 2},
-        "Mill-Turn C Axis":  {"valor_usd": 75000,  "vida_util": 10, "num": 2},
-        "Mill-Turn CY Axis": {"valor_usd": 100000, "vida_util": 10, "num": 1},
-        "VMC 3 Axis":        {"valor_usd": 50000,  "vida_util": 10, "num": 3},
-        "VMC 4 Axis":        {"valor_usd": 95000,  "vida_util": 10, "num": 2},
-        "Grinding":          {"valor_usd": 30000,  "vida_util": 10, "num": 1},
+        "Lathe 2 Axis":      {"valor_usd": 45000,  "vida_util": 10, "num": 7},
+        "Mill-Turn CY Axis": {"valor_usd": 100000, "vida_util": 10, "num": 2},
+        "Mill-Turn C Axis":  {"valor_usd": 75000,  "vida_util": 10, "num": 3},
+        "VMC 4 Axis":        {"valor_usd": 95000,  "vida_util": 10, "num": 3},
+        "VMC 3 Axis":        {"valor_usd": 50000,  "vida_util": 10, "num": 2},
     },
     "operativos": {
         "gastos_venta":   96583,

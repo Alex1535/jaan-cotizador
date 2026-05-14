@@ -4964,7 +4964,7 @@ Total:            {fmtc(_total_hr_ej)}/hr
         for tipo, datos in mq.items():
             mc1,mc2,mc3,mc4,mc5 = st.columns([2.2, 1.2, 1, 0.8, 1.5])
             with mc1: st.markdown(f"🔧 **{tipo}**")
-            with mc2: datos["valor_usd"] = st.number_input("v", value=float(datos["valor_usd"]), step=1000.0, format="$%.0f", key=f"mq_v_{tipo}", label_visibility="collapsed")
+            with mc2: datos["valor_usd"] = st.number_input("v", value=float(datos["valor_usd"]), step=1000.0, format="%.0f", key=f"mq_v_{tipo}", label_visibility="collapsed")
             with mc3: datos["vida_util"] = st.number_input("u", value=int(datos["vida_util"]), step=1, min_value=1, key=f"mq_u_{tipo}", label_visibility="collapsed")
             with mc4:
                 st.markdown(f"<div style='padding-top:8px;text-align:center;color:#6b7280'>{datos['num']}</div>", unsafe_allow_html=True)

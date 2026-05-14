@@ -4410,7 +4410,12 @@ with tab3:
             st.markdown("<hr style='margin:4px 0 8px'>", unsafe_allow_html=True)
 
             for ci, c in enumerate(filtradas):
-                status_actual = c.get("status", "borrador").lower()
+                _num_c = c.get("numero","")
+                # Usar override de session_state si existe (actualización reciente)
+                status_actual = st.session_state.get(
+                    f"_status_override_{_num_c}",
+                    c.get("status", "borrador") or "borrador"
+                ).lower()
                 if status_actual not in ESTADOS:
                     status_actual = "borrador"
                 color  = COLORES.get(status_actual, "#6b7280")
@@ -4480,6 +4485,8 @@ with tab3:
                         else:
                             ok, err = actualizar_status_gsheet(_num_cot_upd, nuevo)
                             if ok:
+                                # Guardar en session_state como override inmediato
+                                st.session_state[f"_status_override_{_num_cot_upd}"] = nuevo
                                 st.success(f"✅ Status actualizado a '{nuevo}'")
                                 cargar_cotizaciones.clear()
                                 st.rerun()

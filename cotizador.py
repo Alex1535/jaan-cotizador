@@ -5,6 +5,74 @@ import json
 from datetime import datetime
 
 # ══════════════════════════════════════════════════════════════════════════════
+# PARÁMETROS DE COSTOS — Valores default (MXN/mes)
+# ══════════════════════════════════════════════════════════════════════════════
+PARAM_COSTOS_DEFAULT = {
+    "cif": {
+        "mano_obra_indirecta":  152166,
+        "materiales_indirectos": 77666,
+        "servicios_publicos":    39200,
+        "mantenimiento":         30000,
+        "seguros":                8333,
+        "calidad":                7333,
+        "servicios_indirectos":   3041,
+        "renta_hipoteca":        37000,
+    },
+    "directos": {
+        "sueldo_operador_mes":  400000,
+        "num_operadores":            8,
+        "num_maquinas_total":       17,
+        "horas_turno":               8,
+        "turnos_dia":                1,
+        "dias_mes":                 22,
+    },
+    "maquinas": {
+        "Lathe 2 Axis":      {"valor_usd": 45000,  "vida_util": 10, "num": 8},
+        "Lathe 3 Axis":      {"valor_usd": 80000,  "vida_util": 10, "num": 2},
+        "Mill-Turn C Axis":  {"valor_usd": 75000,  "vida_util": 10, "num": 2},
+        "Mill-Turn CY Axis": {"valor_usd": 100000, "vida_util": 10, "num": 1},
+        "VMC 3 Axis":        {"valor_usd": 50000,  "vida_util": 10, "num": 3},
+        "VMC 4 Axis":        {"valor_usd": 95000,  "vida_util": 10, "num": 2},
+        "Grinding":          {"valor_usd": 30000,  "vida_util": 10, "num": 1},
+    },
+    "operativos": {
+        "gastos_venta":   96583,
+        "gastos_admin":  343600,
+    },
+    "tipo_cambio_param": 17.50,
+}
+
+def get_param_costos():
+    """Retorna parámetros de costos desde session_state o defaults."""
+    return st.session_state.get("param_costos", PARAM_COSTOS_DEFAULT.copy())
+
+def calcular_costo_hr_maquina(tipo_maq, params=None, tc=17.50):
+    """
+    Calcula costo/hr de una máquina dado el tipo.
+    Fórmula: (CIF/hr_planta + Depreciación/hr + Operador/hr)
+    """
+    if params is None:
+        params = get_param_costos()
+
+    d  = params["directos"]
+    c  = params["cif"]
+    mq = params["maquinas"]
+    _tc = params.get("tipo_cambio_param", tc)
+
+    hrs_mes_planta = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"] * d["num_maquinas_total"]
+    cif_total = sum(c.values())
+    cif_hr    = cif_total / max(hrs_mes_planta, 1)
+
+    operador_hr = (d["sueldo_operador_mes"] / d["num_operadores"]) / (d["horas_turno"] * d["dias_mes"])
+
+    mq_data  = mq.get(tipo_maq, {"valor_usd": 50000, "vida_util": 10, "num": 1})
+    valor_mxn = mq_data["valor_usd"] * _tc
+    hrs_vida  = mq_data["vida_util"] * 12 * d["horas_turno"] * d["dias_mes"]
+    depre_hr  = valor_mxn / max(hrs_vida, 1)
+
+    return round(cif_hr + operador_hr + depre_hr, 2)
+
+# ══════════════════════════════════════════════════════════════════════════════
 # AUTENTICACIÓN — Usuarios desde Streamlit Secrets
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -4729,3 +4797,86 @@ with tab3:
             st.warning("No se encontraron cotizaciones.")
 st.markdown("---")
 st.caption("JAAN Manufacturing · Sistemas de Manufactura Industrial JAAN CNC S.A. de C.V · RFC SAM2008079G8")
+
+# ── Tab 4: Parámetros de Costos (solo admin) ─────────────────────────────────
+if tab4:
+    with tab4:
+        st.markdown("## ⚙️ Parámetros de Costos de Producción")
+        st.caption("Solo visible para administradores. Los cambios se aplican a todas las cotizaciones nuevas.")
+
+        p = get_param_costos()
+        _tc = p.get("tipo_cambio_param", 17.50)
+
+        st.markdown("### 💱 Tipo de cambio para depreciación de maquinaria")
+        _tc_new = st.number_input("USD/MXN", value=float(_tc), step=0.10, format="%.2f", key="param_tc")
+
+        # ── CIF ─────────────────────────────────────────────────────────────
+        st.markdown("### 🏭 Costos Indirectos de Fabricación (CIF) — MXN/mes")
+        cif = p["cif"]
+        cif_c1, cif_c2 = st.columns(2)
+        with cif_c1:
+            cif["mano_obra_indirecta"]   = st.number_input("Mano de obra indirecta (supervisores, admin planta)", value=float(cif["mano_obra_indirecta"]), step=1000.0, format="%.0f", key="cif_moi")
+            cif["materiales_indirectos"] = st.number_input("Materiales indirectos (insertos, refrigerantes, consumibles)", value=float(cif["materiales_indirectos"]), step=1000.0, format="%.0f", key="cif_mati")
+            cif["servicios_publicos"]    = st.number_input("Servicios públicos (electricidad, agua, gas)", value=float(cif["servicios_publicos"]), step=500.0, format="%.0f", key="cif_sp")
+            cif["mantenimiento"]         = st.number_input("Mantenimiento preventivo y correctivo", value=float(cif["mantenimiento"]), step=1000.0, format="%.0f", key="cif_mant")
+        with cif_c2:
+            cif["seguros"]               = st.number_input("Seguros (vehículos, maquinaria, instalaciones)", value=float(cif["seguros"]), step=500.0, format="%.0f", key="cif_seg")
+            cif["calidad"]               = st.number_input("Control de calidad (calibración, equipo medición)", value=float(cif["calidad"]), step=500.0, format="%.0f", key="cif_cal")
+            cif["servicios_indirectos"]  = st.number_input("Servicios indirectos (limpieza, residuos, fumigación)", value=float(cif["servicios_indirectos"]), step=100.0, format="%.0f", key="cif_si")
+            cif["renta_hipoteca"]        = st.number_input("Renta / Hipoteca de instalaciones", value=float(cif["renta_hipoteca"]), step=1000.0, format="%.0f", key="cif_rent")
+        _total_cif = sum(cif.values())
+        st.info(f"**Total CIF mensual: {fmtc(_total_cif)}**")
+
+        # ── Costos directos ─────────────────────────────────────────────────
+        st.markdown("### 👷 Operación de Planta")
+        d = p["directos"]
+        dc1, dc2, dc3 = st.columns(3)
+        with dc1:
+            d["sueldo_operador_mes"] = st.number_input("Nómina total operadores/mes (MXN)", value=float(d["sueldo_operador_mes"]), step=5000.0, format="%.0f", key="d_sueld")
+            d["num_operadores"]      = st.number_input("Número de operadores", value=int(d["num_operadores"]), step=1, key="d_nop")
+        with dc2:
+            d["num_maquinas_total"]  = st.number_input("Total máquinas en planta", value=int(d["num_maquinas_total"]), step=1, key="d_nmaq")
+            d["horas_turno"]         = st.number_input("Horas por turno", value=int(d["horas_turno"]), step=1, key="d_ht")
+        with dc3:
+            d["turnos_dia"]          = st.number_input("Turnos por día", value=int(d["turnos_dia"]), step=1, key="d_td")
+            d["dias_mes"]            = st.number_input("Días laborales/mes", value=int(d["dias_mes"]), step=1, key="d_dm")
+
+        _hrs_mes       = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"]
+        _cif_hr_planta = _total_cif / max(d["num_maquinas_total"] * _hrs_mes, 1)
+        _op_hr         = (d["sueldo_operador_mes"] / max(d["num_operadores"], 1)) / max(_hrs_mes, 1)
+        st.info(f"**CIF/hr por máquina: {fmtc(_cif_hr_planta)}** &nbsp;·&nbsp; **Operador/hr: {fmtc(_op_hr)}** &nbsp;·&nbsp; **Hrs/mes por máquina: {_hrs_mes}**")
+
+        # ── Máquinas ─────────────────────────────────────────────────────────
+        st.markdown("### 🔧 Tipos de Máquina — Depreciación y Costo/hr")
+        mq = p["maquinas"]
+        _mq_h = st.columns([2.2, 1.2, 1, 0.8, 1.5])
+        for _h, _c in zip(["Tipo de máquina","Valor prom. (USD)","Vida útil (años)","# Máqs","**Costo/hr**"], _mq_h):
+            _c.markdown(_h)
+        for tipo, datos in mq.items():
+            mc1,mc2,mc3,mc4,mc5 = st.columns([2.2, 1.2, 1, 0.8, 1.5])
+            with mc1: st.markdown(f"🔧 **{tipo}**")
+            with mc2: datos["valor_usd"] = st.number_input("v", value=float(datos["valor_usd"]), step=1000.0, format="%.0f", key=f"mq_v_{tipo}", label_visibility="collapsed")
+            with mc3: datos["vida_util"] = st.number_input("u", value=int(datos["vida_util"]), step=1, min_value=1, key=f"mq_u_{tipo}", label_visibility="collapsed")
+            with mc4: datos["num"]       = st.number_input("n", value=int(datos["num"]), step=1, min_value=1, key=f"mq_n_{tipo}", label_visibility="collapsed")
+            with mc5:
+                _depre_hr  = (datos["valor_usd"] * _tc_new) / max(datos["vida_util"] * 12 * _hrs_mes, 1)
+                _costo_hr  = _cif_hr_planta + _op_hr + _depre_hr
+                st.markdown(f"<div style='padding-top:6px;font-size:1.05rem;font-weight:700;color:#185FA5'>{fmtc(_costo_hr)}/hr</div>", unsafe_allow_html=True)
+
+        # ── Gastos operativos ────────────────────────────────────────────────
+        st.markdown("### 📊 Gastos Operativos — MXN/mes")
+        op = p["operativos"]
+        oc1, oc2 = st.columns(2)
+        with oc1: op["gastos_venta"] = st.number_input("Gastos de venta y marketing", value=float(op["gastos_venta"]), step=1000.0, format="%.0f", key="op_vta")
+        with oc2: op["gastos_admin"] = st.number_input("Gastos administrativos", value=float(op["gastos_admin"]), step=1000.0, format="%.0f", key="op_adm")
+
+        _total_op = sum(op.values())
+        _costo_total = _total_cif + d["sueldo_operador_mes"] + _total_op
+        st.info(f"**Costo total mensual estimado: {fmtc(_costo_total)}** ({fmtc(_total_cif)} CIF + {fmtc(d['sueldo_operador_mes'])} nómina + {fmtc(_total_op)} operativos)")
+
+        st.markdown("---")
+        if st.button("💾 Guardar parámetros", type="primary", key="save_params"):
+            p["tipo_cambio_param"] = _tc_new
+            st.session_state["param_costos"] = p
+            st.success("✅ Parámetros guardados — se aplicarán a las próximas cotizaciones")
+            st.rerun()

@@ -1878,6 +1878,53 @@ def enviar_cotizacion_email(pdf_bytes, email_destino, num_cot, cliente,
         return False, str(e)
 
 
+
+def guardar_parametros_gsheet(params):
+    """Guarda los parámetros de costos en una pestaña especial de Google Sheets."""
+    import requests, json
+    token, err = get_gsheet_token()
+    if not token:
+        return False, err
+    sheet_id = st.secrets.get("GSHEET_ID", "").strip()
+    if not sheet_id:
+        return False, "No hay GSHEET_ID configurado"
+
+    # Crear pestaña _parametros si no existe
+    _ensure_tab(token, sheet_id, "_parametros")
+
+    # Guardar como JSON en celda A1
+    params_json = json.dumps(params, ensure_ascii=False, default=str)
+    resp = requests.put(
+        f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/'_parametros'!A1?valueInputOption=RAW",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={"values": [["param_costos", params_json]]})
+    if resp.status_code == 200:
+        return True, None
+    return False, f"Error {resp.status_code}: {resp.text[:200]}"
+
+
+def cargar_parametros_gsheet():
+    """Carga los parámetros de costos desde Google Sheets."""
+    import requests, json
+    token, err = get_gsheet_token()
+    if not token:
+        return None
+    sheet_id = st.secrets.get("GSHEET_ID", "").strip()
+    if not sheet_id:
+        return None
+    try:
+        resp = requests.get(
+            f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/'_parametros'!A1:B1",
+            headers={"Authorization": f"Bearer {token}"})
+        if resp.status_code != 200:
+            return None
+        values = resp.json().get("values", [])
+        if not values or len(values[0]) < 2:
+            return None
+        return json.loads(values[0][1])
+    except Exception:
+        return None
+
 def guardar_cotizacion():
     total = sum(calcular_pieza(p, margen_global).get("total", 0)
                 for p in st.session_state.piezas)
@@ -4846,7 +4893,12 @@ st.caption("JAAN Manufacturing · Sistemas de Manufactura Industrial JAAN CNC S.
 
 # ── Tab 4: Parámetros de Costos (solo admin) ─────────────────────────────────
 if "param_costos" not in st.session_state:
-    st.session_state["param_costos"] = PARAM_COSTOS_DEFAULT.copy()
+    # Intentar cargar desde Sheets primero
+    _params_from_sheet = cargar_parametros_gsheet()
+    if _params_from_sheet:
+        st.session_state["param_costos"] = _params_from_sheet
+    else:
+        st.session_state["param_costos"] = PARAM_COSTOS_DEFAULT.copy()
 
 if tab4 is not None:
     with tab4:
@@ -5001,5 +5053,10 @@ Total:            {fmtc(_total_hr_ej)}/hr
         if st.button("💾 Guardar parámetros", type="primary", key="save_params"):
             p["tipo_cambio_param"] = _tc_new
             st.session_state["param_costos"] = p
-            st.success("✅ Parámetros guardados — se aplicarán a las próximas cotizaciones")
+            with st.spinner("Guardando en Google Sheets..."):
+                _ok, _err = guardar_parametros_gsheet(p)
+            if _ok:
+                st.success("✅ Parámetros guardados permanentemente — aplican a todas las cotizaciones")
+            else:
+                st.warning(f"⚠️ Guardado en sesión pero no en Sheets: {_err}")
             st.rerun()

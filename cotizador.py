@@ -4894,15 +4894,14 @@ if tab4 is not None:
             d["turnos_dia"]          = st.number_input("Turnos por día", value=int(d["turnos_dia"]), step=1, key="d_td")
             d["dias_mes"]            = st.number_input("Días laborales/mes", value=int(d["dias_mes"]), step=1, key="d_dm")
 
-        _hrs_mes       = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"]
-        _maq_prod      = d.get("maq_en_produccion", 7)
-        _total_op_tab  = sum(op.values()) if "op" in dir() else 0
+        _hrs_mes        = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"]
+        _maq_prod       = d.get("maq_en_produccion", 7)
+        _total_op_tab   = sum(p.get("operativos", {}).values())
         _total_fijo_tab = _total_cif + d["sueldo_operador_mes"] + _total_op_tab
-        _fijo_hr       = _total_fijo_tab / max(_maq_prod * _hrs_mes, 1)
-        _op_hr         = (d["sueldo_operador_mes"] / max(d["num_operadores"], 1)) / max(_hrs_mes, 1)
+        _fijo_hr        = _total_fijo_tab / max(_maq_prod * _hrs_mes, 1)
         st.info(
             f"**Total fijo mensual: {fmtc(_total_fijo_tab)}** &nbsp;·&nbsp; "
-            f"**Costo fijo/hr ({_maq_prod} máqs): {fmtc(_fijo_hr)}** &nbsp;·&nbsp; "
+            f"**Costo fijo/hr ({_maq_prod} máqs activas): {fmtc(_fijo_hr)}/hr** &nbsp;·&nbsp; "
             f"**Hrs/mes por máquina: {_hrs_mes}**"
         )
 

@@ -4464,15 +4464,20 @@ with tab3:
                 with cols_row[5]:
                     st.markdown(f"<span style='background:{color};color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{icono} {status_actual.upper()}</span>", unsafe_allow_html=True)
                 with cols_row[6]:
-                    nuevo = st.selectbox("s", [e for e in ESTADOS if e != status_actual],
+                    _idx_actual = ESTADOS.index(status_actual) if status_actual in ESTADOS else 0
+                    nuevo = st.selectbox("s", ESTADOS,
+                        index=_idx_actual,
                         key=f"hs_{ci}", label_visibility="collapsed")
                     if st.button("Actualizar", key=f"hu_{ci}", use_container_width=True):
-                        ok, err = actualizar_status_gsheet(c.get("numero",""), nuevo)
-                        if ok:
-                            st.success(f"✅ Status actualizado a {nuevo}")
-                            st.rerun()
+                        if nuevo == status_actual:
+                            st.info(f"ℹ️ El status ya es '{nuevo}'")
                         else:
-                            st.error(f"❌ {err}")
+                            ok, err = actualizar_status_gsheet(c.get("numero",""), nuevo)
+                            if ok:
+                                st.success(f"✅ Status actualizado a '{nuevo}'")
+                                st.rerun()
+                            else:
+                                st.error(f"❌ {err}")
 
             st.markdown("---")
             numeros   = [c.get("numero","").strip() for c in filtradas if c.get("numero","").strip()]

@@ -4470,10 +4470,13 @@ with tab3:
                         index=_idx_actual,
                         key=f"hs_{ci}", label_visibility="collapsed")
                     if st.button("Actualizar", key=f"hu_{ci}", use_container_width=True):
+                        _num_cot_upd = c.get("numero","")
+                        st.write(f"DEBUG: num={_num_cot_upd}, nuevo={nuevo}, actual={status_actual}")
                         if nuevo == status_actual:
                             st.info(f"ℹ️ El status ya es '{nuevo}'")
                         else:
-                            ok, err = actualizar_status_gsheet(c.get("numero",""), nuevo)
+                            ok, err = actualizar_status_gsheet(_num_cot_upd, nuevo)
+                            st.write(f"DEBUG: ok={ok}, err={err}")
                             if ok:
                                 st.success(f"✅ Status actualizado a '{nuevo}'")
                                 st.rerun()

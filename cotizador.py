@@ -1114,10 +1114,25 @@ def calcular_pieza(pieza, margen_pct):
     costo_log = 0.0
     peso_pza  = float(log.get("peso_pza_log", 0.0))
 
+    # Para "Por proyecto": la logística puede dividirse entre MOQ o EAU independientemente
+    _es_proyecto  = pieza.get("tipo_pedido", "Pedido único") == "Por proyecto"
+    _moq_val      = int(pieza.get("moq", 0) or 0)
+    _eau_val      = int(pieza.get("eau", 0) or 0)
+
     def _costo_tramo(tr, cant, peso):
         modo = tr.get("modo", "fijo")
         val  = float(tr.get("costo", 0.0))
-        if modo == "fijo":    return val / max(cant, 1)
+        if modo == "fijo":
+            if _es_proyecto:
+                # Usar la base del tramo: "MOQ" o "EAU"
+                base = tr.get("log_base", "MOQ")
+                if base == "MOQ":
+                    divisor = _moq_val if _moq_val > 0 else 1
+                else:
+                    divisor = _eau_val if _eau_val > 0 else 1
+            else:
+                divisor = max(cant, 1)
+            return val / divisor
         if modo == "por_kg":  return val * peso
         if modo == "por_pza": return val
         return 0.0
@@ -3569,6 +3584,26 @@ with tab1:
                                     step=50.0,
                                     key=f"lpc_{pieza['id']}_{tr_key}")
                                 tramos_pre[ti]["costo"] = tr_costo
+                            # Solo para "Por proyecto" y modo "fijo": selector de base de división
+                            if tr_modo == "fijo" and pieza.get("tipo_pedido","Pedido único") == "Por proyecto":
+                                _log_base_opts = ["MOQ", "EAU"]
+                                _log_base_cur  = tr.get("log_base", "MOQ")
+                                _log_base_idx  = 0 if _log_base_cur == "MOQ" else 1
+                                _moq_d = pieza.get("moq", 0) or 0
+                                _eau_d = pieza.get("eau", 0) or 0
+                                tr_log_base = st.radio(
+                                    f"Dividir ${tr_costo:,.0f} entre:",
+                                    _log_base_opts,
+                                    index=_log_base_idx,
+                                    horizontal=True,
+                                    key=f"lplb_{pieza['id']}_{tr_key}",
+                                    help="MOQ = entregas mensuales  ·  EAU = volumen anual",
+                                    format_func=lambda x: f"MOQ ({_moq_d:,} pzas/mes)" if x=="MOQ" else f"EAU ({_eau_d:,} pzas/año)"
+                                )
+                                tramos_pre[ti]["log_base"] = tr_log_base
+                                _divisor_d = _moq_d if tr_log_base == "MOQ" else _eau_d
+                                if _divisor_d > 0 and tr_costo > 0:
+                                    st.caption(f"→ ${tr_costo/_divisor_d:,.4f} / pza")
 
                             # Embalaje — usa global si aplica, sino personalizado por tramo
                             _emb_global_key = f"emb_global_activo_{pieza['id']}"
@@ -4239,11 +4274,26 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
             total_moq = res["precio_pza"] * moq_val
             total_eau = res["precio_pza"] * eau_val
 
-            r1, r2, r3, r4 = st.columns(4)
-            r1.metric("Maquinado/pza",   fmtc(res["costo_maq"]))
-            r2.metric("Material/pza",    fmtc(res["costo_material"]))
-            r3.metric("Tratamiento/pza", fmtc(res["costo_trat"]))
-            with r4:
+            # Detectar si hay costos logísticos y de inspección
+            _clt_proy  = res.get("costo_log_total", 0)
+            _pv_insp_p = res.get("pv_insp", 0.0)
+            _ncols_p = 3 + (1 if _clt_proy > 0 else 0) + (1 if _pv_insp_p > 0 else 0) + 1
+            _cols_p = st.columns(_ncols_p)
+            _mg_mo_p   = pieza.get("margen_mo",   35) if not pieza.get("usar_margen_global") else margen_global
+            _mg_mat_p  = pieza.get("margen_mat",  35) if not pieza.get("usar_margen_global") else margen_global
+            _mg_trat_p = pieza.get("margen_trat", 35) if not pieza.get("usar_margen_global") else margen_global
+            _pv_maq_p  = (res.get("costo_setup",0) + res.get("costo_ciclo",0)) * (1 + _mg_mo_p / 100)
+            _pv_mat_p  = res["costo_material"] * (1 + _mg_mat_p  / 100)
+            _pv_trat_p = res["costo_trat"]     * (1 + _mg_trat_p / 100)
+            _bi_p = 0
+            _cols_p[_bi_p].metric("Maquinado/pza",   fmtc(_pv_maq_p));  _bi_p += 1
+            _cols_p[_bi_p].metric("Material/pza",    fmtc(_pv_mat_p));   _bi_p += 1
+            _cols_p[_bi_p].metric("Tratamiento/pza", fmtc(_pv_trat_p));  _bi_p += 1
+            if _clt_proy > 0:
+                _cols_p[_bi_p].metric("Logística/pza", fmtc(_clt_proy)); _bi_p += 1
+            if _pv_insp_p > 0:
+                _cols_p[_bi_p].metric("Inspección/pza", fmtc(_pv_insp_p)); _bi_p += 1
+            with _cols_p[_bi_p]:
                 st.markdown(
                     f"<div style='padding:4px 0'>"
                     f"<div style='font-size:14px;color:#6b7280;font-weight:400;margin-bottom:4px'>Precio/pza</div>"

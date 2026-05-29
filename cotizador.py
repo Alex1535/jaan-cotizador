@@ -54,40 +54,28 @@ def get_param_costos():
 def calcular_costo_hr_maquina(tipo_maq, params=None, tc=17.50):
     """
     Calcula costo/hr de una máquina dado el tipo.
-    Fórmula: (Fijo_total/hr_por_maq + Depreciación/hr)
-    Fijo_total = CIF + Nómina operadores + Gastos operativos (venta + admin)
-    Se distribuye entre las máquinas EN PRODUCCIÓN con eficiencia aplicada.
+    Fórmula: (CIF/hr_planta + Depreciación/hr + Operador/hr)
     """
     if params is None:
         params = get_param_costos()
 
-    d   = params["directos"]
-    c   = params["cif"]
-    mq  = params["maquinas"]
-    op  = params.get("operativos", {})
+    d  = params["directos"]
+    c  = params["cif"]
+    mq = params["maquinas"]
     _tc = params.get("tipo_cambio_param", tc)
 
-    # Horas efectivas por máquina al mes (con eficiencia)
-    _efic         = d.get("eficiencia", 75) / 100
-    _hrs_mes      = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"]
-    _hrs_efectivas = _hrs_mes * _efic
-    _maq_prod     = d.get("maq_en_produccion", 7)
+    hrs_mes_planta = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"] * d["num_maquinas_total"]
+    cif_total = sum(c.values())
+    cif_hr    = cif_total / max(hrs_mes_planta, 1)
 
-    # Costo fijo total = CIF + Nómina + Gastos operativos
-    cif_total   = sum(c.values())
-    op_total    = sum(op.values())
-    fijo_total  = cif_total + d["sueldo_operador_mes"] + op_total
+    operador_hr = (d["sueldo_operador_mes"] / d["num_operadores"]) / (d["horas_turno"] * d["dias_mes"])
 
-    # Costo fijo por hora por máquina (distribuido entre máquinas en producción)
-    fijo_hr = fijo_total / max(_maq_prod * _hrs_efectivas, 1)
-
-    # Depreciación por hora de esta máquina
-    mq_data   = mq.get(tipo_maq, {"valor_usd": 50000, "vida_util": 10, "num": 1})
+    mq_data  = mq.get(tipo_maq, {"valor_usd": 50000, "vida_util": 10, "num": 1})
     valor_mxn = mq_data["valor_usd"] * _tc
-    hrs_vida  = mq_data["vida_util"] * 12 * _hrs_mes
+    hrs_vida  = mq_data["vida_util"] * 12 * d["horas_turno"] * d["dias_mes"]
     depre_hr  = valor_mxn / max(hrs_vida, 1)
 
-    return round(fijo_hr + depre_hr, 2)
+    return round(cif_hr + operador_hr + depre_hr, 2)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # AUTENTICACIÓN — Usuarios desde Streamlit Secrets
@@ -2454,8 +2442,18 @@ with tab1:
                     eau = st.number_input("EAU/Year", min_value=0, max_value=9999999,
                         value=int(pieza.get("eau", 0)), key=f"eau_{pieza['id']}")
                     st.session_state.piezas[pi]["eau"] = eau
-                # Use MOQ as cantidad for calculations
-                cant = moq if moq > 0 else 1
+                # Selector: cómo dividir el setup
+                _setup_base_opts = ["Dividir setup entre MOQ", "Dividir setup entre EAU/Year"]
+                _setup_base_idx = 0 if pieza.get("setup_base", "MOQ") == "MOQ" else 1
+                _setup_base_sel = st.radio("Amortizar setup entre:", _setup_base_opts,
+                    index=_setup_base_idx, key=f"setup_base_{pieza['id']}", horizontal=True)
+                _setup_base = "MOQ" if _setup_base_sel == "Dividir setup entre MOQ" else "EAU"
+                st.session_state.piezas[pi]["setup_base"] = _setup_base
+                # cantidad para cálculos según selección
+                if _setup_base == "MOQ":
+                    cant = moq if moq > 0 else 1
+                else:
+                    cant = eau if eau > 0 else 1
                 st.session_state.piezas[pi]["cantidad"] = cant
         with ci5:
             if len(st.session_state.piezas) > 1:
@@ -4966,29 +4964,21 @@ if tab4 is not None:
                 key="d_efic",
                 help="% de horas disponibles que son productivas. Igual que el campo Eficiencia en parámetros de operación.")
 
-        # ── Gastos operativos (antes de máquinas para que _fijo_hr sea correcto) ──
-        st.markdown("### 4. Gastos Operativos — MXN/mes")
-        op = p["operativos"]
-        oc1, oc2 = st.columns(2)
-        with oc1: op["gastos_venta"] = st.number_input("Gastos de venta y marketing", value=float(op["gastos_venta"]), step=1000.0, format="%.0f", key="op_vta")
-        with oc2: op["gastos_admin"] = st.number_input("Gastos administrativos", value=float(op["gastos_admin"]), step=1000.0, format="%.0f", key="op_adm")
-
         _efic_tab       = d.get("eficiencia", 75) / 100
         _hrs_mes        = d["horas_turno"] * d["turnos_dia"] * d["dias_mes"]
         _hrs_efectivas  = _hrs_mes * _efic_tab
         _maq_prod       = d.get("maq_en_produccion", 7)
-        _total_op_tab   = sum(op.values())
+        _total_op_tab   = sum(p.get("operativos", {}).values())
         _total_fijo_tab = _total_cif + d["sueldo_operador_mes"] + _total_op_tab
         _fijo_hr        = _total_fijo_tab / max(_maq_prod * _hrs_efectivas, 1)
         st.info(
             f"**Total fijo mensual: {fmtc(_total_fijo_tab)}** · "
-            f"CIF: {fmtc(_total_cif)} · Nómina: {fmtc(d['sueldo_operador_mes'])} · Operativos: {fmtc(_total_op_tab)} · "
             f"**Costo fijo/hr ({_maq_prod} máqs, {int(_efic_tab*100)}% efic): {fmtc(_fijo_hr)}/hr** · "
             f"**Hrs efectivas/mes: {_hrs_efectivas:.0f}** ({_hrs_mes} × {int(_efic_tab*100)}%)"
         )
 
         # ── Máquinas ─────────────────────────────────────────────────────────
-        st.markdown("### 5. Tipos de Máquina — Depreciación y Costo/hr calculado")
+        st.markdown("### 4. Tipos de Máquina — Depreciación y Costo/hr calculado")
         mq = p["maquinas"]
         _mq_h = st.columns([2.2, 1.2, 1, 0.8, 1.5])
         _header_style = "font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em"
@@ -5055,6 +5045,25 @@ Total:            {fmtc(_total_hr_ej)}/hr
                 _depre_hr  = (datos["valor_usd"] * _tc_new) / max(datos["vida_util"] * 12 * _hrs_efectivas, 1)
                 _costo_hr  = _fijo_hr + _depre_hr
                 st.markdown(f"<div style='padding-top:6px;font-size:1.05rem;font-weight:700;color:#185FA5'>{fmtc(_costo_hr)}/hr</div>", unsafe_allow_html=True)
+
+        # ── Gastos operativos ────────────────────────────────────────────────
+        st.markdown("### 5. Gastos Operativos — MXN/mes")
+        op = p["operativos"]
+        oc1, oc2 = st.columns(2)
+        with oc1: op["gastos_venta"] = st.number_input("Gastos de venta y marketing", value=float(op["gastos_venta"]), step=1000.0, format="%.0f", key="op_vta")
+        with oc2: op["gastos_admin"] = st.number_input("Gastos administrativos", value=float(op["gastos_admin"]), step=1000.0, format="%.0f", key="op_adm")
+
+        _total_op = sum(op.values())
+        # Sincronizar inmediatamente para que la tabla de máquinas use valores actuales
+        p["tipo_cambio_param"] = _tc_new
+        st.session_state["param_costos"] = p
+        _costo_total = _total_cif + d["sueldo_operador_mes"] + _total_op
+        st.info(
+            f"**Costo total mensual: {fmtc(_costo_total)}** · "
+            f"CIF: {fmtc(_total_cif)} · "
+            f"Nómina: {fmtc(d['sueldo_operador_mes'])} · "
+            f"Operativos: {fmtc(_total_op)}"
+        )
 
         # Sincronizar session_state con los valores actuales ANTES del botón
         p["tipo_cambio_param"] = _tc_new

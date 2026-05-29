@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import math
 import json
+import copy
 from datetime import datetime
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2401,6 +2402,7 @@ with tab1:
                 st.rerun()
 
     piezas_a_eliminar = []
+    piezas_a_duplicar = []
 
     for pi, pieza in enumerate(st.session_state.piezas):
         # Garantizar que logistica esté inicializada en piezas viejas
@@ -2410,7 +2412,7 @@ with tab1:
         st.markdown("<div class='pieza-card'>", unsafe_allow_html=True)
 
         # ── Identificación ───────────────────────────────────────────────────
-        ci1, ci2, ci3, ci4, ci5 = st.columns([0.4, 1.2, 2.4, 1.4, 0.4])
+        ci1, ci2, ci3, ci4, ci5 = st.columns([0.4, 1.2, 2.4, 1.4, 0.7])
         with ci1:
             st.markdown(f"<b style='font-size:20px;color:#1a5cff'>#{pi+1}</b>",
                         unsafe_allow_html=True)
@@ -2456,10 +2458,15 @@ with tab1:
                     cant = eau if eau > 0 else 1
                 st.session_state.piezas[pi]["cantidad"] = cant
         with ci5:
-            if len(st.session_state.piezas) > 1:
-                st.write("")
-                if st.button("🗑️", key=f"delp_{pieza['id']}"):
-                    piezas_a_eliminar.append(pi)
+            st.write("")
+            btn_col1, btn_col2 = st.columns(2)
+            with btn_col1:
+                if st.button("📋", key=f"dup_{pieza['id']}", help="Duplicar esta pieza"):
+                    piezas_a_duplicar.append(pi)
+            with btn_col2:
+                if len(st.session_state.piezas) > 1:
+                    if st.button("🗑️", key=f"delp_{pieza['id']}", help="Eliminar esta pieza"):
+                        piezas_a_eliminar.append(pi)
 
         # ── Plano / Análisis IA ──────────────────────────────────────────────
         with st.expander("▸  Plano de la pieza — Análisis IA", expanded=False):
@@ -4297,6 +4304,18 @@ El tooling aparece como cargo independiente junto a las piezas. Transparente par
             _bar_cols[_bi+1].metric(f"Total {cant} pzas", fmtc(res["total"]))
 
         st.markdown("</div>", unsafe_allow_html=True)
+
+    if piezas_a_duplicar:
+        # Generar nuevo ID único basado en max existente
+        max_id = max(p["id"] for p in st.session_state.piezas)
+        for idx in sorted(piezas_a_duplicar):
+            max_id += 1
+            pieza_copia = copy.deepcopy(st.session_state.piezas[idx])
+            pieza_copia["id"] = max_id
+            pieza_copia["descripcion"] = pieza_copia["descripcion"] + " (copia)"
+            # Insertar justo después de la pieza original
+            st.session_state.piezas.insert(idx + 1, pieza_copia)
+        st.rerun()
 
     if piezas_a_eliminar:
         for idx in sorted(piezas_a_eliminar, reverse=True):

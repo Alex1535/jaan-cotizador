@@ -1381,6 +1381,7 @@ with st.sidebar:
     tc_auto = obtener_tipo_cambio()
     st.caption(f"💱 TC de referencia hoy: **${tc_auto:,.4f}** · Fuente: Frankfurter (BCE) · Editable")
     tipo_cambio = st.number_input("Tipo de cambio USD/MXN", key="sb_tipo_cambio", step=0.01,
+                    min_value=0.01,
                     help="Se actualiza automáticamente cada 24h — puedes editarlo manualmente")
     if st.button("🔄 Usar TC del día", use_container_width=True):
         st.session_state["_reset_tc"] = tc_auto
@@ -4440,7 +4441,7 @@ with tab2:
             f"<div class=\"label\">MXN &middot; {len(st.session_state.piezas)} pieza(s)</div>",
             unsafe_allow_html=True)
     with col2:
-        alt_mon = f"MXN: ${total_general:,.2f}" if moneda_cot=="USD" else f"USD: ${total_general/tipo_cambio:,.2f}"
+        alt_mon = f"MXN: ${total_general:,.2f}" if moneda_cot=="USD" else (f"USD: ${total_general/tipo_cambio:,.2f}" if tipo_cambio and tipo_cambio > 0 else "USD: —")
         st.markdown(
             "<div class='total-box'>"
             "<div style='font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em'>"

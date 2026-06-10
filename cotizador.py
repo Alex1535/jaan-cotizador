@@ -1527,14 +1527,21 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
         for i,p in enumerate(piezas):
             res  = calcular_pieza(p, margen_global)
             mp   = p.get("materia_prima",{})
-            cant = p.get("cantidad",0) if p.get("tipo_pedido")!="Por proyecto" else p.get("eau",0)
+            _es_proy  = p.get("tipo_pedido","Pedido único") == "Por proyecto"
+            _moq_val  = int(p.get("moq", 0) or 0)
+            _eau_val  = int(p.get("eau", 0) or 0)
+            cant      = p.get("cantidad", 0) if not _es_proy else _eau_val
 
             # Encabezado pieza
+            if _es_proy:
+                _cant_hdr = f"MOQ: {_moq_val:,} pzas/mes  ·  EAU: {_eau_val:,} pzas/año"
+            else:
+                _cant_hdr = f"Cant: {cant:,}"
             ph = Table([[
                 Paragraph(f"#{i+1}  {p.get('num_dibujo','—')} — {p.get('descripcion','—')}",
                           ps(f"ph{i}",10,WHITE,True)),
-                Paragraph(f"Cant: {cant}", ps(f"phc{i}",9,WHITE,align=TA_RIGHT))
-            ]], colWidths=[5.5*inch,1.5*inch])
+                Paragraph(_cant_hdr, ps(f"phc{i}",9,WHITE,align=TA_RIGHT))
+            ]], colWidths=[4.8*inch,2.2*inch])
             ph.setStyle(TableStyle([
                 ("BACKGROUND",(0,0),(-1,-1),BLUE),
                 ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
@@ -1559,32 +1566,48 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
             pv_tr    = res["costo_trat"]     * (1 + mg_tr/100)
             pv_log   = res.get("costo_log_total", 0.0)
 
-            det_rows = [
-                [Paragraph("Concepto",ps("dh0",8,WHITE,True)),
-                 Paragraph("Precio venta/pza",ps("dh1",8,WHITE,True,TA_RIGHT)),
-                 Paragraph(f"Total ({cant} pzas)",ps("dh2",8,WHITE,True,TA_RIGHT))],
-                [Paragraph(
-                    "Materia prima" + (lambda _m, _s, _c: (
-                        "<br/><font size='7' color='grey'>" +
-                        " ".join(filter(None, [_m, _s])) +
-                        ("  ·  " + _c if _c else "") +
-                        "</font>"
-                    ) if (_m or _s or _c) else "")(
-                        (mp.get("material","") or "").strip(),
-                        (mp.get("spec","") or "").strip(),
-                        (mp.get("comentarios_mp","") or "").strip()
-                    ), ps("dr0",8)),
-                 Paragraph(fmtc(pv_mat),ps("dr1",8,align=TA_RIGHT)),
-                 Paragraph(fmtc(pv_mat*cant),ps("dr2",8,align=TA_RIGHT))],
-                [Paragraph("Set up",ps("dr3",8)),
-                 Paragraph(fmtc(pv_setup),ps("dr4",8,align=TA_RIGHT)),
-                 Paragraph(fmtc(pv_setup*cant),ps("dr5",8,align=TA_RIGHT))],
-                [Paragraph("Maquinado",ps("dr3b",8)),
-                 Paragraph(fmtc(pv_ciclo),ps("dr4b",8,align=TA_RIGHT)),
-                 Paragraph(fmtc(pv_ciclo*cant),ps("dr5b",8,align=TA_RIGHT))],
+            if _es_proy:
+                _col_hdr3 = f"Total EAU ({_eau_val:,})"
+                _col_hdr4 = f"Total MOQ ({_moq_val:,})"
+                _det_cols  = [3.0*inch, 1.5*inch, 1.25*inch, 1.25*inch]
+            else:
+                _col_hdr3 = f"Total ({cant:,} pzas)"
+                _det_cols  = [3.5*inch, 1.75*inch, 1.75*inch]
+
+            _hdr_row = [Paragraph("Concepto",ps("dh0",8,WHITE,True)),
+                        Paragraph("Precio venta/pza",ps("dh1",8,WHITE,True,TA_RIGHT)),
+                        Paragraph(_col_hdr3,ps("dh2",8,WHITE,True,TA_RIGHT))]
+            if _es_proy:
+                _hdr_row.append(Paragraph(_col_hdr4, ps("dh3p",8,WHITE,True,TA_RIGHT)))
+
+            # Helper: agrega col MOQ automáticamente cuando es proyecto
+            def _dr(label_p, pv, cant_n, key):
+                row = [label_p,
+                       Paragraph(fmtc(pv), ps(f"dr_{key}a",8,align=TA_RIGHT)),
+                       Paragraph(fmtc(pv*cant_n), ps(f"dr_{key}b",8,align=TA_RIGHT))]
+                if _es_proy:
+                    row.append(Paragraph(fmtc(pv*_moq_val), ps(f"dr_{key}c",8,align=TA_RIGHT)))
+                return row
+
+            _mp_label = Paragraph(
+                "Materia prima" + (lambda _m, _s, _c: (
+                    "<br/><font size='7' color='grey'>" +
+                    " ".join(filter(None, [_m, _s])) +
+                    ("  ·  " + _c if _c else "") +
+                    "</font>"
+                ) if (_m or _s or _c) else "")(
+                    (mp.get("material","") or "").strip(),
+                    (mp.get("spec","") or "").strip(),
+                    (mp.get("comentarios_mp","") or "").strip()
+                ), ps("dr0",8))
+
+            det_rows = [_hdr_row,
+                _dr(_mp_label, pv_mat, cant, "mat"),
+                _dr(Paragraph("Set up",    ps("dr3",8)),  pv_setup, cant, "su"),
+                _dr(Paragraph("Maquinado", ps("dr3b",8)), pv_ciclo, cant, "mq"),
             ]
             if pv_tr > 0:
-                det_rows.append([
+                det_rows.append(_dr(
                     Paragraph(
                         f"Tratamiento ({p.get('tratamiento','—')})" + (
                             "<br/><font size='7' color='grey'>" +
@@ -1592,24 +1615,22 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                             "</font>"
                             if p.get("comentarios_trat","").strip() else ""
                         ), ps("dr6",8)),
-                    Paragraph(fmtc(pv_tr),ps("dr7",8,align=TA_RIGHT)),
-                    Paragraph(fmtc(pv_tr*cant),ps("dr8",8,align=TA_RIGHT))])
+                    pv_tr, cant, "tr"))
+
             pv_insp_pdf = res.get("pv_insp", 0.0)
             if pv_insp_pdf > 0:
                 insp_d     = p.get("inspeccion", {})
                 tipo_insp  = insp_d.get("tipo", "CMM")
                 cotas_d    = int(insp_d.get("num_cotas", 0))
-                cota_c_d   = float(insp_d.get("costo_por_cota", 0.0))
                 notas_id   = insp_d.get("notas_inspeccion", "").strip()
                 insp_detalle = f"{tipo_insp} · {cotas_d} cotas críticas"
                 if notas_id: insp_detalle += f" · {notas_id}"
-                det_rows.append([
+                det_rows.append(_dr(
                     Paragraph(
                         f"Inspección final y validación"
                         f"<br/><font size='6.5' color='grey'>{insp_detalle}</font>",
                         ps("dr_insp",8)),
-                    Paragraph(fmtc(pv_insp_pdf), ps("dr_insp1",8,align=TA_RIGHT)),
-                    Paragraph(fmtc(pv_insp_pdf*cant), ps("dr_insp2",8,align=TA_RIGHT))])
+                    pv_insp_pdf, cant, "insp"))
 
             if pv_log > 0:
                 log_d      = p.get("logistica",{})
@@ -1624,26 +1645,37 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                     dom_d,
                     " ".join(filter(None,[ciudad_d, estado_d, cp_d])),
                     pais_d]))
-                # Solo Incoterm + empresa + dirección (sin tramos internos)
                 entrega_txt = ""
                 if empresa_d: entrega_txt += empresa_d
                 if dir_linea: entrega_txt += ("  ·  " if empresa_d else "") + dir_linea
-                det_rows.append([
+                # Para logística en proyecto: calcular pv_log_moq con divisor MOQ
+                if _es_proy and _moq_val > 0:
+                    _pv_log_moq = res.get("costo_log_total", 0.0)  # ya es por pieza
+                    _log_moq_total = _pv_log_moq * _moq_val
+                else:
+                    _log_moq_total = pv_log * cant
+                _log_row = [
                     Paragraph(
                         f"Logística &nbsp;<font color='#185FA5'><b>[{incoterm_d}]</b></font>"
                         + (f"<br/><font size='6.5' color='grey'>{entrega_txt}</font>" if entrega_txt else ""),
                         ps("dr9",8)),
-                    Paragraph(fmtc(pv_log),ps("dr10",8,align=TA_RIGHT)),
-                    Paragraph(fmtc(pv_log*cant),ps("dr11",8,align=TA_RIGHT))])
+                    Paragraph(fmtc(pv_log), ps("dr10",8,align=TA_RIGHT)),
+                    Paragraph(fmtc(pv_log*cant), ps("dr11",8,align=TA_RIGHT))]
+                if _es_proy:
+                    _log_row.append(Paragraph(fmtc(_log_moq_total), ps("dr11m",8,align=TA_RIGHT)))
+                det_rows.append(_log_row)
 
             pv_insp_pdf  = res.get("pv_insp", 0.0)
             subtotal_pza = pv_mat + pv_mo + pv_tr + pv_log + pv_insp_pdf
-            det_rows.append([
+            _sub_row = [
                 Paragraph("Precio unitario total",ps("drs",9,NAVY,True)),
                 Paragraph(fmtc(subtotal_pza),ps("drst",9,NAVY,True,TA_RIGHT)),
-                Paragraph(fmtc(subtotal_pza*cant),ps("drst2",9,NAVY,True,TA_RIGHT))])
+                Paragraph(fmtc(subtotal_pza*cant),ps("drst2",9,NAVY,True,TA_RIGHT))]
+            if _es_proy:
+                _sub_row.append(Paragraph(fmtc(subtotal_pza*_moq_val), ps("drstm",9,NAVY,True,TA_RIGHT)))
+            det_rows.append(_sub_row)
 
-            dt = Table(det_rows, colWidths=[3.5*inch,1.75*inch,1.75*inch])
+            dt = Table(det_rows, colWidths=_det_cols)
             dt.setStyle(TableStyle([
                 ("BACKGROUND",(0,0),(-1,0),NAVY),
                 ("ROWBACKGROUNDS",(0,1),(-1,-2),[WHITE,LGRAY]),
@@ -1671,26 +1703,48 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
         # Template Simplificado — tabla compacta estándar
         story.append(Paragraph("Resumen de piezas", ps("h2",10,NAVY,True)))
         story.append(Spacer(1,0.08*inch))
-        col_w = [0.3*inch,1.0*inch,1.3*inch,0.8*inch,1.0*inch,0.9*inch,0.5*inch,1.0*inch]
-        rows = [[Paragraph(h, ps(f"th{i}",8,WHITE,True)) for i,h in
-                 enumerate(["#","Núm. Dibujo","Descripción","Material","Tratamiento","P. Unitario","Cant.","Total"])]]
+        # Detectar si hay piezas de tipo "Por proyecto" para ajustar columnas
+        _hay_proyecto_s = any(p.get("tipo_pedido","Pedido único")=="Por proyecto" for p in piezas)
+        if _hay_proyecto_s:
+            col_w = [0.3*inch,0.9*inch,1.2*inch,0.7*inch,0.8*inch,0.8*inch,0.6*inch,0.7*inch,0.9*inch]
+            _hdrs = ["#","Núm. Dibujo","Descripción","Material","Tratamiento","P. Unitario","MOQ","EAU","Total EAU"]
+        else:
+            col_w = [0.3*inch,1.0*inch,1.3*inch,0.8*inch,1.0*inch,0.9*inch,0.5*inch,1.0*inch]
+            _hdrs = ["#","Núm. Dibujo","Descripción","Material","Tratamiento","P. Unitario","Cant.","Total"]
+        rows = [[Paragraph(h, ps(f"th{i}",8,WHITE,True)) for i,h in enumerate(_hdrs)]]
         for i,p in enumerate(piezas):
             res = calcular_pieza(p, margen_global)
             mp  = p.get("materia_prima",{})
-            cant = p.get("cantidad",0) if p.get("tipo_pedido")!="Por proyecto" else p.get("eau",0)
+            _es_proy_s = p.get("tipo_pedido","Pedido único") == "Por proyecto"
+            _moq_s = int(p.get("moq",0) or 0)
+            _eau_s = int(p.get("eau",0) or 0)
+            cant = p.get("cantidad",0) if not _es_proy_s else _eau_s
             mat_str = (mp.get("material","—") or "—")
             if mp.get("spec","").strip():
                 mat_str += " " + mp.get("spec","").strip()
-            rows.append([
-                Paragraph(str(i+1),               ps(f"td{i}0",8)),
-                Paragraph(p.get("num_dibujo","—"), ps(f"td{i}1",8)),
-                Paragraph(p.get("descripcion","—"),ps(f"td{i}2",8)),
-                Paragraph(mat_str,                 ps(f"td{i}3",8)),
-                Paragraph(p.get("tratamiento","Ninguno"), ps(f"td{i}4",8)),
-                Paragraph(fmtc(res["precio_pza"]), ps(f"td{i}5",8,align=TA_RIGHT)),
-                Paragraph(str(cant),               ps(f"td{i}6",8,align=TA_RIGHT)),
-                Paragraph(fmtc(res["total"]),      ps(f"td{i}7",8,align=TA_RIGHT)),
-            ])
+            if _hay_proyecto_s:
+                rows.append([
+                    Paragraph(str(i+1),               ps(f"td{i}0",8)),
+                    Paragraph(p.get("num_dibujo","—"), ps(f"td{i}1",8)),
+                    Paragraph(p.get("descripcion","—"),ps(f"td{i}2",8)),
+                    Paragraph(mat_str,                 ps(f"td{i}3",8)),
+                    Paragraph(p.get("tratamiento","Ninguno"), ps(f"td{i}4",8)),
+                    Paragraph(fmtc(res["precio_pza"]), ps(f"td{i}5",8,align=TA_RIGHT)),
+                    Paragraph(str(_moq_s) if _es_proy_s else "—", ps(f"td{i}6",8,align=TA_RIGHT)),
+                    Paragraph(str(_eau_s) if _es_proy_s else str(cant), ps(f"td{i}7",8,align=TA_RIGHT)),
+                    Paragraph(fmtc(res["total"]),      ps(f"td{i}8",8,align=TA_RIGHT)),
+                ])
+            else:
+                rows.append([
+                    Paragraph(str(i+1),               ps(f"td{i}0",8)),
+                    Paragraph(p.get("num_dibujo","—"), ps(f"td{i}1",8)),
+                    Paragraph(p.get("descripcion","—"),ps(f"td{i}2",8)),
+                    Paragraph(mat_str,                 ps(f"td{i}3",8)),
+                    Paragraph(p.get("tratamiento","Ninguno"), ps(f"td{i}4",8)),
+                    Paragraph(fmtc(res["precio_pza"]), ps(f"td{i}5",8,align=TA_RIGHT)),
+                    Paragraph(str(cant),               ps(f"td{i}6",8,align=TA_RIGHT)),
+                    Paragraph(fmtc(res["total"]),      ps(f"td{i}7",8,align=TA_RIGHT)),
+                ])
             # Comentarios adicionales MP y Tratamiento bajo la fila
             coment_mp_s   = mp.get("comentarios_mp","").strip()
             coment_trat_s = p.get("comentarios_trat","").strip()

@@ -1425,7 +1425,7 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
     from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether
     from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
     import io
 
@@ -1540,7 +1540,7 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                 ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
                 ("LEFTPADDING",(0,0),(0,-1),10),("RIGHTPADDING",(-1,0),(-1,-1),10),
             ]))
-            story.append(ph)
+            _pieza_story = [ph]
 
             # Calcular precios de venta por sección
             if p.get("usar_margen_global", False):
@@ -1652,10 +1652,10 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                 ("LEFTPADDING",(0,0),(-1,-1),8),("RIGHTPADDING",(0,0),(-1,-1),8),
                 ("LINEBELOW",(0,-2),(-1,-2),1,NAVY),
             ]))
-            story.append(dt)
-            story.append(Spacer(1,0.12*inch))
+            _pieza_story.append(dt)
+            _pieza_story.append(Spacer(1,0.12*inch))
 
-            # Custom tooling de esta pieza
+            # Custom tooling de esta pieza (no incluye en KeepTogether — puede ser largo)
             for tool in p.get("custom_tooling", []):
                 if not tool.get("activo", True): continue
                 t_op = tool.get("opcion","C")
@@ -1663,6 +1663,9 @@ def generar_pdf_cotizacion(piezas, num_cot, cliente, atencion, direccion, cp, ci
                     t_precio = float(tool.get("costo",0)) * (1 + float(tool.get("margen_pct",0))/100)
                     t_iva    = t_precio * 0.16 if aplica_iva_pdf else 0
                     total_tooling_cot += t_precio + t_iva
+
+            # Volcar bloque de pieza como unidad — evita cortes entre páginas
+            story.append(KeepTogether(_pieza_story))
 
     else:
         # Template Simplificado — tabla compacta estándar
